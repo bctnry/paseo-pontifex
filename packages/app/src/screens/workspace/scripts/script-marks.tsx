@@ -63,7 +63,7 @@ const styles = StyleSheet.create((theme) => ({
   exitBadge: {
     paddingHorizontal: theme.spacing[1.5],
     paddingVertical: 1,
-    borderRadius: 2,
+    borderRadius: 0,
     backgroundColor: theme.colors.surface2,
   },
   exitBadgeText: {

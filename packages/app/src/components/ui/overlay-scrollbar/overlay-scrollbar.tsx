@@ -145,7 +145,7 @@ const styles = StyleSheet.create((theme) => ({
   thumb: {
     width: THUMB_WIDTH,
     height: "100%",
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     backgroundColor: theme.colors.foregroundExtraMuted,
     opacity: WEB_SCROLLBAR_RESTING_OPACITY,
   },

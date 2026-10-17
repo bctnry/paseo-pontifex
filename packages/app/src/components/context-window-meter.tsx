@@ -314,7 +314,7 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     gap: theme.spacing[1],
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
   percentageLabel: {
     color: theme.colors.foregroundMuted,

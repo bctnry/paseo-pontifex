@@ -344,7 +344,7 @@ const styles = StyleSheet.create((_theme) => ({
     transform: [{ translateX: -44 }],
   },
   touchGrip: {
-    borderRadius: 2,
+    borderRadius: 0,
   },
   touchGripHorizontal: {
     width: 4,

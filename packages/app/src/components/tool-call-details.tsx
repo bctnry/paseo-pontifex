@@ -1007,19 +1007,19 @@ const styles = StyleSheet.create((theme) => {
     loadingLineWide: {
       height: 12,
       width: "100%",
-      borderRadius: theme.borderRadius.full,
+      borderRadius: theme.borderRadius.none,
       backgroundColor: theme.colors.surface3,
     },
     loadingLineMedium: {
       height: 12,
       width: "72%",
-      borderRadius: theme.borderRadius.full,
+      borderRadius: theme.borderRadius.none,
       backgroundColor: theme.colors.surface3,
     },
     loadingLineShort: {
       height: 12,
       width: "48%",
-      borderRadius: theme.borderRadius.full,
+      borderRadius: theme.borderRadius.none,
       backgroundColor: theme.colors.surface3,
     },
   };

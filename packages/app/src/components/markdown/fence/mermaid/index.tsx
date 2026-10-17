@@ -11,7 +11,7 @@ const styles = (theme: Theme) => ({
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
   },
-  textStyle: { backgroundColor: theme.colors.surface2, padding: 12, borderRadius: 8 },
+  textStyle: { backgroundColor: theme.colors.surface2, padding: 12, borderRadius: 0 },
 });
 export function MermaidFence({ code }: { code: string }) {
   const streaming = useContext(MermaidStreamingContext);

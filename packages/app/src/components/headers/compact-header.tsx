@@ -168,7 +168,7 @@ const styles = StyleSheet.create((theme) => ({
     width: 140,
     maxWidth: "100%",
     height: 22,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     backgroundColor: theme.colors.surface3,
     opacity: 0.25,
   },

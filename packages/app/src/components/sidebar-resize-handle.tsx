@@ -152,7 +152,7 @@ const styles = StyleSheet.create((theme) => ({
   grip: {
     width: 4,
     height: 36,
-    borderRadius: 2,
+    borderRadius: 0,
     backgroundColor: theme.colors.foreground,
   },
   hiddenGrip: {

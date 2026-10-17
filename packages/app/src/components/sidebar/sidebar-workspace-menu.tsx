@@ -440,7 +440,7 @@ function triggerStyle({ hovered = false }: PressableStateCallbackType & { hovere
 const styles = StyleSheet.create((theme) => ({
   trigger: {
     padding: 2,
-    borderRadius: 4,
+    borderRadius: 0,
     marginLeft: 2,
     // MoreVertical paints only around the center of its SVG. Keep the padded hit box, but
     // pull the painted dots through that unused view-box space onto the trailing-content rail.

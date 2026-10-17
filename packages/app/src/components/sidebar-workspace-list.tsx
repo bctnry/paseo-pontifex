@@ -2794,7 +2794,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   kebabButton: {
     padding: 2,
-    borderRadius: 4,
+    borderRadius: 0,
     marginLeft: 2,
   },
   kebabButtonHovered: {

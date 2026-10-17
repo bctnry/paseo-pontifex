@@ -90,7 +90,7 @@ const styles = StyleSheet.create((theme) => ({
   container: {
     marginVertical: theme.spacing[3],
     padding: theme.spacing[3],
-    borderRadius: theme.spacing[2],
+    borderRadius: theme.borderRadius.none,
     borderWidth: 1,
     backgroundColor: theme.colors.surface1,
     borderColor: theme.colors.border,

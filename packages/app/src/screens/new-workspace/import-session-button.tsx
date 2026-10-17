@@ -44,7 +44,7 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[4],
   },
   pill: {
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     borderColor: theme.colors.borderAccent,
   },
 }));

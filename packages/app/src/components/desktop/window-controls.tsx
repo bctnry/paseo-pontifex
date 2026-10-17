@@ -194,7 +194,7 @@ const styles = StyleSheet.create((theme) => ({
   circularControlSurface: {
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 0,
   },
   glyph: {
     flexShrink: 0,

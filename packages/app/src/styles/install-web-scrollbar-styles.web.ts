@@ -36,7 +36,7 @@ export function installWebScrollbarStyles(): () => void {
 
 *::-webkit-scrollbar-thumb {
   border: 2px solid transparent;
-  border-radius: 999px;
+  border-radius: 0;
   background: ${webScrollbarThumbColor("var(--colors-foreground-extra-muted)")};
   background-clip: content-box;
 }

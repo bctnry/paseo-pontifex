@@ -1677,7 +1677,7 @@ const stylesheet = StyleSheet.create((theme) => ({
   scrollToBottomButton: {
     width: 48,
     height: 48,
-    borderRadius: 24,
+    borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surface2,
     alignItems: "center",
     justifyContent: "center",
@@ -1692,7 +1692,7 @@ const permissionStyles = StyleSheet.create((theme) => ({
   container: {
     marginVertical: theme.spacing[3],
     padding: theme.spacing[3],
-    borderRadius: theme.spacing[2],
+    borderRadius: theme.borderRadius.none,
     borderWidth: 1,
     gap: theme.spacing[2],
     backgroundColor: theme.colors.surface1,

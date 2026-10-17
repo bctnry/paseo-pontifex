@@ -2649,6 +2649,6 @@ const styles = StyleSheet.create((theme) => ({
   hostStatusDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: 0,
   },
 }));

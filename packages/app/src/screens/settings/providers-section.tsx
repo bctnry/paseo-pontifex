@@ -539,7 +539,7 @@ const styles = StyleSheet.create((theme) => ({
   statusDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: 0,
   },
   statusLabel: {
     color: theme.colors.foregroundMuted,

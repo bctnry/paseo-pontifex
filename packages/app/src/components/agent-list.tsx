@@ -706,7 +706,7 @@ const styles = StyleSheet.create((theme) => ({
     alignSelf: "center",
     width: 40,
     height: 4,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     backgroundColor: theme.colors.foregroundMuted,
     opacity: 0.3,
   },

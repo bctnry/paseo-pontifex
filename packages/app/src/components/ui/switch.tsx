@@ -123,7 +123,7 @@ const styles = StyleSheet.create((theme) => {
     switchTrack: {
       width: switchGeometry.trackWidth,
       height: switchGeometry.trackHeight,
-      borderRadius: switchGeometry.trackHeight / 2,
+      borderRadius: 0,
       padding: (switchGeometry.trackHeight - switchGeometry.thumbSize) / 2,
       justifyContent: "center",
     },

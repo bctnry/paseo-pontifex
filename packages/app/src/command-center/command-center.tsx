@@ -977,7 +977,7 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
   },
   sheetBackground: { backgroundColor: theme.colors.surface0 },
-  sheetHandle: { backgroundColor: theme.colors.palette.zinc[600] },
+  sheetHandle: { backgroundColor: theme.colors.palette.zinc[600], borderRadius: 0 },
   titledSection: { height: 32, justifyContent: "flex-end" },
   dividedSection: { height: 49, justifyContent: "flex-end" },
   dividerSection: { height: 17, justifyContent: "flex-end" },

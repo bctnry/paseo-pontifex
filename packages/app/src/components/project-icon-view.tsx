@@ -7,19 +7,14 @@ const WHITE_TEXT = { color: "#ffffff" } as const;
 const FALLBACK_LAYOUT = { alignItems: "center", justifyContent: "center" } as const;
 
 /**
- * Corner radius of the *generated* project icon — the colored square with an initial — as a
- * fraction of the box, so it reads as the same shape at 16pt in the sidebar and 40pt in the edit
- * sheet. Fixed tokens did not give that: the radius scale is coarse at the bottom, so small icons
- * landed on 2pt and looked square while large ones were visibly rounder.
+ * Corner radius of the *generated* project icon — the colored square with an initial. Corners are
+ * square, so this is 0 at every size.
  *
- * This is ours to shape. A **user-uploaded icon is never rounded** — it is someone's mark, and
- * clipping its corners distorts branding we don't own. A square logo stays square, a round one is
- * already round.
+ * A **user-uploaded icon is never rounded** — it is someone's mark, and clipping its corners
+ * distorts branding we don't own. A square logo stays square, a round one is already round.
  */
-const RADIUS_RATIO = 0.25;
-
-export function projectIconRadius(size: number): number {
-  return Math.round(size * RADIUS_RATIO);
+export function projectIconRadius(_size: number): number {
+  return 0;
 }
 
 /**

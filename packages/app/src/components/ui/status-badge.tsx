@@ -46,7 +46,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: 6,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     borderWidth: 1,
     borderColor: theme.colors.border,
     backgroundColor: theme.colors.surface3,

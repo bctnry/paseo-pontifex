@@ -46,6 +46,7 @@ const ThemedBottomSheetModal = withUnistyles(IsolatedBottomSheetModal, (theme) =
   handleIndicatorStyle: {
     width: 36,
     height: 4,
+    borderRadius: 0,
     backgroundColor: theme.colors.surface2,
   },
 }));

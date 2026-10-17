@@ -98,13 +98,13 @@ const styles = StyleSheet.create((theme) => ({
   },
   track: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: 0,
     backgroundColor: theme.colors.surface3,
     overflow: "hidden",
   },
   fill: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: 0,
   },
   fillDefault: {
     backgroundColor: theme.colors.foregroundMuted,

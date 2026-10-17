@@ -140,14 +140,14 @@ const styles = StyleSheet.create((theme) => ({
   progressBar: {
     height: 3,
     backgroundColor: theme.colors.surface2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     marginTop: theme.spacing[1],
     overflow: "hidden",
   },
   progressFill: {
     height: "100%",
     backgroundColor: theme.colors.primary,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
   dismiss: {
     padding: theme.spacing[1],

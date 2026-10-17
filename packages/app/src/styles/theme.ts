@@ -606,14 +606,18 @@ export const FONT_WEIGHT = {
   bold: "bold" as const,
 } as const;
 
+// The UI is squared off: every rectangular surface keeps sharp corners, so the whole scale
+// collapses to 0. `full` stays for elements that are genuinely circular — status dots, avatars,
+// round icon buttons — which are circles rather than rounded rectangles. Pick `full` only when
+// the element's width and height are equal; a non-square element with `full` renders as a pill.
 export const BORDER_RADIUS = {
   none: 0,
-  sm: 2,
-  base: 4,
-  md: 6,
-  lg: 8,
-  xl: 12,
-  "2xl": 16,
+  sm: 0,
+  base: 0,
+  md: 0,
+  lg: 0,
+  xl: 0,
+  "2xl": 0,
   full: 9999,
 } as const;
 

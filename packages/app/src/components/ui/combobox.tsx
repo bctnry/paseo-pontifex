@@ -1535,7 +1535,7 @@ export function Combobox({
   useDismissKeyboardOnOpen(isOpen, isMobile);
 
   const handleIndicatorStyle = useMemo(
-    () => ({ backgroundColor: theme.colors.palette.zinc[600] }),
+    () => ({ backgroundColor: theme.colors.palette.zinc[600], borderRadius: 0 }),
     [theme.colors.palette.zinc],
   );
 

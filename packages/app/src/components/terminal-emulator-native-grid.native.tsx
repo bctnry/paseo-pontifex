@@ -1039,7 +1039,7 @@ const styles = StyleSheet.create({
     right: 12,
     bottom: 12,
     zIndex: 2,
-    borderRadius: 12,
+    borderRadius: 0,
     paddingHorizontal: 12,
     paddingVertical: 6,
     backgroundColor: "rgba(32, 32, 32, 0.86)",

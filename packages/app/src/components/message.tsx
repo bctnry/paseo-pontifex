@@ -898,7 +898,7 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   iconBadge: {
     width: 22,
     height: 22,
-    borderRadius: 11,
+    borderRadius: 0,
     alignItems: "center",
     justifyContent: "center",
     marginRight: theme.spacing[1],

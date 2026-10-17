@@ -900,7 +900,7 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[1],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: 2,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     backgroundColor: theme.colors.accent,
   },
   devBuildBadgeText: {

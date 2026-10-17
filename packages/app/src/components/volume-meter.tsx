@@ -202,6 +202,6 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
   },
   line: {
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
 }));

@@ -2346,7 +2346,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     width: "auto",
     minWidth: 28,
     paddingHorizontal: theme.spacing[3],
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
   sendButtonLabel: {
     fontSize: theme.fontSize.base,

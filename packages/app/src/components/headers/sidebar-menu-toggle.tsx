@@ -153,7 +153,7 @@ const styles = StyleSheet.create((theme) => ({
   mobileMenuLine: {
     width: MOBILE_MENU_LINE_WIDTH,
     height: MOBILE_MENU_LINE_HEIGHT,
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
   mobileMenuLineMuted: {
     backgroundColor: theme.colors.foregroundMuted,

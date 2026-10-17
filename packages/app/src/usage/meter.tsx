@@ -47,14 +47,14 @@ export function UsageMeter({
 const styles = StyleSheet.create((theme) => ({
   track: {
     height: 4,
-    borderRadius: 2,
+    borderRadius: 0,
     backgroundColor: theme.colors.surface3,
     overflow: "hidden",
   },
   // Follows the track, so a caller that sizes the track sizes the bar.
   fill: {
     height: "100%",
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
   },
   fillQuiet: {
     backgroundColor: theme.colors.surface4,

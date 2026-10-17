@@ -356,7 +356,7 @@ function buildAnnotationMarkerScript(markers: readonly BrowserAnnotationMarker[]
           if (rect.width === 0 && rect.height === 0) continue;
           var badge = document.createElement('div');
           badge.textContent = String(m.index);
-          badge.style.cssText = 'position:fixed;min-width:18px;height:18px;padding:0 4px;border-radius:9px;background:#2563eb;color:#fff;font:600 11px/18px -apple-system,system-ui,sans-serif;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;box-sizing:border-box;';
+          badge.style.cssText = 'position:fixed;min-width:18px;height:18px;padding:0 4px;border-radius:0;background:#2563eb;color:#fff;font:600 11px/18px -apple-system,system-ui,sans-serif;text-align:center;box-shadow:0 1px 3px rgba(0,0,0,0.4);pointer-events:none;box-sizing:border-box;';
           badge.style.left = Math.max(0, rect.left) + 'px';
           badge.style.top = Math.max(0, rect.top) + 'px';
           host.appendChild(badge);

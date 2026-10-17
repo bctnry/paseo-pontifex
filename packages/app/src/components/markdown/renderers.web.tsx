@@ -20,7 +20,7 @@ const codeStyle = (theme: Theme) => ({
     fontFamily: theme.fontFamily.mono,
     fontSize: theme.fontSize.code,
   },
-  textStyle: { backgroundColor: theme.colors.surface2, padding: 12, borderRadius: 8 },
+  textStyle: { backgroundColor: theme.colors.surface2, padding: 12, borderRadius: 0 },
 });
 function WebCodeBlock({ code, language }: CodeBlockRendererProps) {
   if (language?.toLowerCase() === "mermaid") return <MermaidFence code={code} />;

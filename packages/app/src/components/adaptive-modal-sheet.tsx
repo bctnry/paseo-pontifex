@@ -241,7 +241,7 @@ export function SheetBackground({ style }: BottomSheetBackgroundProps) {
 }
 
 const ThemedBottomSheetHandle = withUnistyles(BottomSheetHandle, (theme) => ({
-  indicatorStyle: { backgroundColor: theme.colors.palette.zinc[600] },
+  indicatorStyle: { backgroundColor: theme.colors.palette.zinc[600], borderRadius: 0 },
 }));
 
 const HANDLE_WITH_CONTENT_STYLE = { paddingHorizontal: 0, paddingBottom: 0 };

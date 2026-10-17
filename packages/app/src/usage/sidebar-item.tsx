@@ -270,7 +270,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   meter: {
     height: 6,
-    borderRadius: 3,
+    borderRadius: 0,
   },
   percent: {
     flexShrink: 0,

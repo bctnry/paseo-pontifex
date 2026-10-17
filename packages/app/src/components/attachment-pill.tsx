@@ -195,7 +195,7 @@ const styles = StyleSheet.create((theme) => ({
     left: -8,
     width: 24,
     height: 24,
-    borderRadius: 12,
+    borderRadius: 0,
     backgroundColor: theme.colors.surface2,
     borderWidth: theme.borderWidth[1],
     borderColor: theme.colors.border,

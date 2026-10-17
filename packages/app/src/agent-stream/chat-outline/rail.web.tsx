@@ -221,7 +221,7 @@ const styles = StyleSheet.create((theme) => ({
   // At rest the pills use low-emphasis chrome so the column stays readable peripherally
   // without competing with the transcript. Attention is the only foreground state.
   pill: {
-    borderRadius: theme.borderRadius.full,
+    borderRadius: theme.borderRadius.none,
     backgroundColor: theme.colors.borderAccent,
     transitionProperty: "width, height, background-color",
     transitionDuration: "140ms",

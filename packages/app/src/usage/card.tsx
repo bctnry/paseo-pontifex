@@ -323,7 +323,7 @@ const styles = StyleSheet.create((theme) => ({
   statusDot: {
     width: 8,
     height: 8,
-    borderRadius: 4,
+    borderRadius: 0,
     backgroundColor: theme.colors.foregroundMuted,
   },
   statusDotAvailable: {

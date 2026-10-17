@@ -75,7 +75,7 @@ export function createMarkdownStyles(
         fontSize: theme.fontSize.code,
         backgroundColor: theme.colors.surface2,
         borderColor: theme.colors.border,
-        borderRadius: 8,
+        borderRadius: 0,
         padding: 12,
       },
       table: {
@@ -93,7 +93,7 @@ export function createMarkdownStyles(
         borderColor: theme.colors.foregroundMuted,
       },
       inlineImage: { size: paragraph.lineHeight },
-      image: { height: 320, resizeMode: "contain", borderRadius: 8 },
+      image: { height: 320, resizeMode: "contain", borderRadius: 0 },
       thematicBreak: { color: theme.colors.border, height: 1, marginTop: 12, marginBottom: 12 },
     },
   };

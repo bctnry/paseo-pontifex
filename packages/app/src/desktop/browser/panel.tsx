@@ -25,7 +25,7 @@ function getBrowserLabel(input: { title: string; url: string }): string {
 function createBrowserTabIcon(faviconUrl: string | null) {
   return function BrowserTabIcon({ size, color }: PanelIconProps) {
     const source = useMemo(() => (faviconUrl ? { uri: faviconUrl } : undefined), []);
-    const imageStyle = useMemo(() => ({ width: size, height: size, borderRadius: 3 }), [size]);
+    const imageStyle = useMemo(() => ({ width: size, height: size, borderRadius: 0 }), [size]);
 
     if (faviconUrl) {
       return <Image accessibilityIgnoresInvertColors source={source} style={imageStyle} />;

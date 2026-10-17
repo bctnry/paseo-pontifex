@@ -658,7 +658,7 @@ export function QuestionFormCard({
 const styles = StyleSheet.create((theme) => ({
   container: {
     padding: theme.spacing[3],
-    borderRadius: theme.spacing[2],
+    borderRadius: theme.borderRadius.none,
     borderWidth: 1,
     gap: theme.spacing[3],
   },
@@ -748,12 +748,12 @@ const styles = StyleSheet.create((theme) => ({
     borderRadius: theme.borderRadius.base,
   },
   selectionControlRadio: {
-    borderRadius: 999,
+    borderRadius: theme.borderRadius.full,
   },
   selectionRadioDot: {
     width: 8,
     height: 8,
-    borderRadius: 999,
+    borderRadius: theme.borderRadius.full,
   },
   otherInput: {
     borderWidth: 1,
