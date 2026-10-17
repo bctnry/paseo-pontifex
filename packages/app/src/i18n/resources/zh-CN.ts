@@ -2023,6 +2023,11 @@ export const zhCN: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "搜索设置",
+      clear: "清除搜索",
+      noMatches: "没有与你的搜索匹配的设置。",
+    },
     title: "设置",
     loading: "正在加载设置...",
     groups: {

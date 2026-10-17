@@ -2070,6 +2070,11 @@ export const en = {
     },
   },
   settings: {
+    search: {
+      placeholder: "Search settings",
+      clear: "Clear search",
+      noMatches: "No settings match your search.",
+    },
     title: "Settings",
     loading: "Loading settings...",
     groups: {

@@ -2078,6 +2078,11 @@ export const ptBR: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "Buscar ajustes",
+      clear: "Limpar busca",
+      noMatches: "Nenhuma configuração corresponde à sua busca.",
+    },
     title: "Configurações",
     loading: "Carregando configurações...",
     groups: {

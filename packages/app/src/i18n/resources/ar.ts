@@ -2045,6 +2045,11 @@ export const ar: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "بحث في الإعدادات",
+      clear: "مسح البحث",
+      noMatches: "لا توجد إعدادات مطابقة لبحثك.",
+    },
     title: "إعدادات",
     loading: "جارٍ تحميل الإعدادات...",
     groups: {

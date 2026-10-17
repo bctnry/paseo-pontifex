@@ -2078,6 +2078,11 @@ export const ru: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "Поиск настроек",
+      clear: "Очистить поиск",
+      noMatches: "Нет настроек, соответствующих вашему поиску.",
+    },
     title: "Настройки",
     loading: "Загрузка настроек...",
     groups: {

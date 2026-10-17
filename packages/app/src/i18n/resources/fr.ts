@@ -2092,6 +2092,11 @@ export const fr: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "Rechercher des réglages",
+      clear: "Effacer la recherche",
+      noMatches: "Aucun réglage ne correspond à votre recherche.",
+    },
     title: "Paramètres",
     loading: "Chargement des paramètres…",
     groups: {

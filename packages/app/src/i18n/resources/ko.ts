@@ -2055,6 +2055,11 @@ export const ko: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "설정 검색",
+      clear: "검색 지우기",
+      noMatches: "검색과 일치하는 설정이 없습니다.",
+    },
     title: "설정",
     loading: "설정 불러오는 중...",
     groups: {

@@ -44,6 +44,8 @@ import {
 } from "lucide-react-native";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
+import { SearchField } from "@/components/ui/search-field";
+import { filterSettingsTargets } from "@/screens/settings/settings-search";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
 import { HostStatusDot } from "@/components/host-status-dot";
@@ -146,29 +148,45 @@ interface SidebarSectionItem {
   icon: ComponentType<{ size: number; color: string; strokeWidth?: number }>;
   desktopOnly?: boolean;
   webOnly?: boolean;
+  /** Extra terms the index search matches, for destinations whose label is not the word typed. */
+  keywords?: readonly string[];
   /** The page body, for pages that need nothing from the settings screen. */
   Content?: ComponentType;
 }
 
 const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
-  { id: "general", labelKey: "settings.sections.general", icon: Settings },
+  {
+    id: "general",
+    labelKey: "settings.sections.general",
+    icon: Settings,
+    keywords: ["language", "locale", "startup", "location", "sending"],
+  },
   {
     id: "appearance",
     labelKey: "settings.sections.appearance",
     icon: Palette,
+    keywords: ["theme", "dark mode", "colors", "font size", "density", "zoom"],
     Content: AppearanceSection,
   },
   {
     id: "sidebar",
     labelKey: "settings.sections.sidebar",
     icon: PanelLeft,
+    keywords: ["explorer", "side pane", "panel", "layout"],
     Content: SidebarNavSection,
   },
-  { id: "chat", labelKey: "settings.sections.chat", icon: MessageSquare, Content: ChatSection },
+  {
+    id: "chat",
+    labelKey: "settings.sections.chat",
+    icon: MessageSquare,
+    keywords: ["messages", "markdown", "streaming", "code blocks"],
+    Content: ChatSection,
+  },
   {
     id: "terminal",
     labelKey: "settings.sections.terminal",
     icon: SquareTerminal,
+    keywords: ["shell", "font", "cursor", "scrollback", "renderer", "profile"],
     Content: TerminalSection,
   },
   {
@@ -176,6 +194,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.browser",
     icon: Globe,
     desktopOnly: true,
+    keywords: ["cookies", "cache", "webview", "data", "downloads"],
     Content: BrowserDataSection,
   },
   {
@@ -183,6 +202,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.editor",
     icon: Code2,
     webOnly: true,
+    keywords: ["keybindings", "keymap", "vim", "emacs", "source files"],
     Content: EditorSection,
   },
   {
@@ -190,6 +210,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.shortcuts",
     icon: Keyboard,
     desktopOnly: true,
+    keywords: ["keyboard", "hotkeys", "keybindings", "chords"],
     Content: KeyboardShortcutsSection,
   },
   {
@@ -197,6 +218,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.integrations",
     icon: Puzzle,
     desktopOnly: true,
+    keywords: ["plugins", "mcp", "extensions", "skills"],
     Content: IntegrationsSection,
   },
   {
@@ -204,6 +226,7 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.notifications",
     icon: Bell,
     desktopOnly: true,
+    keywords: ["alerts", "sound", "desktop notifications"],
     Content: DesktopNotificationsSection,
   },
   {
@@ -211,10 +234,21 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     labelKey: "settings.sections.permissions",
     icon: Shield,
     desktopOnly: true,
+    keywords: ["access", "allow", "security", "approvals"],
     Content: DesktopPermissionsSection,
   },
-  { id: "diagnostics", labelKey: "settings.sections.diagnostics", icon: Stethoscope },
-  { id: "about", labelKey: "settings.sections.about", icon: Info },
+  {
+    id: "diagnostics",
+    labelKey: "settings.sections.diagnostics",
+    icon: Stethoscope,
+    keywords: ["logs", "debug", "voice", "audio", "legacy renderer"],
+  },
+  {
+    id: "about",
+    labelKey: "settings.sections.about",
+    icon: Info,
+    keywords: ["version", "updates", "changelog"],
+  },
 ];
 
 function isSectionAvailable(item: SidebarSectionItem, isDesktopApp: boolean): boolean {
@@ -225,20 +259,76 @@ interface HostSectionItem {
   id: HostSectionSlug;
   labelKey: string;
   icon: ComponentType<{ size: number; color: string; strokeWidth?: number }>;
+  keywords?: readonly string[];
 }
 
 const HOST_SECTION_ITEMS: HostSectionItem[] = [
-  { id: "host", labelKey: "settings.hostSections.host", icon: Server },
-  { id: "projects", labelKey: "settings.hostSections.projects", icon: FolderGit2 },
-  { id: "connections", labelKey: "settings.hostSections.connections", icon: Network },
-  { id: "pair-device", labelKey: "openProject.tiles.pairDevice.title", icon: Smartphone },
-  { id: "agents", labelKey: "settings.hostSections.agents", icon: Bot },
-  { id: "metadata", labelKey: "settings.hostSections.metadata", icon: Sparkles },
-  { id: "workspaces", labelKey: "settings.hostSections.workspaces", icon: FolderGit2 },
-  { id: "providers", labelKey: "settings.hostSections.providers", icon: Boxes },
-  { id: "usage", labelKey: "settings.hostSections.usage", icon: Gauge },
-  { id: "terminals", labelKey: "settings.hostSections.terminals", icon: SquareTerminal },
-  { id: "plugins", labelKey: "settings.hostSections.plugins", icon: Blocks },
+  {
+    id: "host",
+    labelKey: "settings.hostSections.host",
+    icon: Server,
+    keywords: ["overview", "server", "rename", "remove"],
+  },
+  {
+    id: "projects",
+    labelKey: "settings.hostSections.projects",
+    icon: FolderGit2,
+    keywords: ["repositories", "repos", "folders"],
+  },
+  {
+    id: "connections",
+    labelKey: "settings.hostSections.connections",
+    icon: Network,
+    keywords: ["network", "ssh", "endpoint", "url"],
+  },
+  {
+    id: "pair-device",
+    labelKey: "openProject.tiles.pairDevice.title",
+    icon: Smartphone,
+    keywords: ["qr", "pair", "phone", "device"],
+  },
+  {
+    id: "agents",
+    labelKey: "settings.hostSections.agents",
+    icon: Bot,
+    keywords: ["agent defaults", "configuration"],
+  },
+  {
+    id: "metadata",
+    labelKey: "settings.hostSections.metadata",
+    icon: Sparkles,
+    keywords: ["generate", "summary", "ai"],
+  },
+  {
+    id: "workspaces",
+    labelKey: "settings.hostSections.workspaces",
+    icon: FolderGit2,
+    keywords: ["worktrees", "folders", "branches"],
+  },
+  {
+    id: "providers",
+    labelKey: "settings.hostSections.providers",
+    icon: Boxes,
+    keywords: ["models", "api keys", "credentials", "claude", "codex", "copilot"],
+  },
+  {
+    id: "usage",
+    labelKey: "settings.hostSections.usage",
+    icon: Gauge,
+    keywords: ["tokens", "cost", "spend", "billing", "balance"],
+  },
+  {
+    id: "terminals",
+    labelKey: "settings.hostSections.terminals",
+    icon: SquareTerminal,
+    keywords: ["shells", "processes", "running terminals"],
+  },
+  {
+    id: "plugins",
+    labelKey: "settings.hostSections.plugins",
+    icon: Blocks,
+    keywords: ["extensions", "mcp", "installed plugins"],
+  },
 ];
 
 function renderHostSettingsContent(
@@ -965,6 +1055,7 @@ function SettingsSidebar({
   const enableBuiltInDaemonOption = useEnableBuiltInDaemonOption();
   const isDesktopApp = isElectronRuntime();
   const items = SIDEBAR_SECTION_ITEMS.filter((item) => isSectionAvailable(item, isDesktopApp));
+  const [searchQuery, setSearchQuery] = useState("");
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
   const outerContainerStyle = useMemo(
@@ -981,30 +1072,52 @@ function SettingsSidebar({
   if (view.kind === "project") selectedHostSection = "projects";
   if (view.kind === "plugin") selectedHostSection = "plugins";
 
+  const isSearching = searchQuery.trim().length > 0;
+  const visibleItems = filterSettingsTargets(searchQuery, items, t);
+  const visibleHostItems = filterSettingsTargets(searchQuery, HOST_SECTION_ITEMS, t);
+  const hasSearchResults = visibleItems.length > 0 || (hasHosts && visibleHostItems.length > 0);
+
+  const searchField = (
+    <View style={sidebarStyles.searchRow}>
+      <SearchField
+        value={searchQuery}
+        onChangeText={setSearchQuery}
+        placeholder={t("settings.search.placeholder")}
+        clearAccessibilityLabel={t("settings.search.clear")}
+        testID="settings-search-input"
+        clearTestID="settings-search-clear"
+      />
+    </View>
+  );
+
   const sidebarBody = (
     <>
-      <SidebarGroup label={t("settings.groups.app")}>
-        {items.map((item) => (
-          <SidebarSectionButton
-            key={item.id}
-            itemId={item.id}
-            label={t(item.labelKey)}
-            icon={item.icon}
-            isSelected={selectedSectionId === item.id}
-            onSelect={onSelectSection}
-          />
-        ))}
-      </SidebarGroup>
-      {hasHosts ? (
+      {visibleItems.length > 0 ? (
+        <SidebarGroup label={t("settings.groups.app")}>
+          {visibleItems.map((item) => (
+            <SidebarSectionButton
+              key={item.id}
+              itemId={item.id}
+              label={t(item.labelKey)}
+              icon={item.icon}
+              isSelected={selectedSectionId === item.id}
+              onSelect={onSelectSection}
+            />
+          ))}
+        </SidebarGroup>
+      ) : null}
+      {hasHosts && visibleHostItems.length > 0 ? (
         <SidebarGroup label={t("settings.groups.host")}>
-          <HostPicker
-            activeServerId={activeHostServerId}
-            sortedHosts={sortedHosts}
-            onSelectHost={onSelectHost}
-            onAddHost={onAddHost}
-            enableBuiltInDaemonOption={enableBuiltInDaemonOption}
-          />
-          {HOST_SECTION_ITEMS.map((item) => (
+          {isSearching ? null : (
+            <HostPicker
+              activeServerId={activeHostServerId}
+              sortedHosts={sortedHosts}
+              onSelectHost={onSelectHost}
+              onAddHost={onAddHost}
+              enableBuiltInDaemonOption={enableBuiltInDaemonOption}
+            />
+          )}
+          {visibleHostItems.map((item) => (
             <SidebarHostSectionButton
               key={item.id}
               itemId={item.id}
@@ -1015,7 +1128,8 @@ function SettingsSidebar({
             />
           ))}
         </SidebarGroup>
-      ) : (
+      ) : null}
+      {!hasHosts && !isSearching ? (
         <SidebarGroup>
           <Pressable
             accessibilityRole="button"
@@ -1052,7 +1166,14 @@ function SettingsSidebar({
             </Pressable>
           ) : null}
         </SidebarGroup>
-      )}
+      ) : null}
+      {isSearching && !hasSearchResults ? (
+        <SidebarGroup>
+          <View style={sidebarStyles.emptyState}>
+            <Text style={sidebarStyles.emptyStateText}>{t("settings.search.noMatches")}</Text>
+          </View>
+        </SidebarGroup>
+      ) : null}
     </>
   );
 
@@ -1075,6 +1196,7 @@ function SettingsSidebar({
               testID="settings-back-to-workspace"
             />
           </View>
+          {searchField}
           <ScrollView
             style={sidebarStyles.scrollBody}
             showsVerticalScrollIndicator={false}
@@ -1084,7 +1206,10 @@ function SettingsSidebar({
           </ScrollView>
         </View>
       ) : (
-        sidebarBody
+        <>
+          {searchField}
+          {sidebarBody}
+        </>
       )}
     </View>
   );
@@ -1593,6 +1718,13 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     paddingVertical: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
   },
+  // Aligns with the group islands: the mobile container already supplies one padding step, the
+  // desktop sidebar none, so one step inside the row lands both on the same rail.
+  searchRow: {
+    paddingHorizontal: theme.spacing[2],
+    paddingTop: theme.spacing[2],
+    paddingBottom: theme.spacing[2],
+  },
   // Compact values draw each group as an island of tiles; desktop keeps a plain list.
   group: {
     paddingVertical: theme.spacing[2],
@@ -1663,5 +1795,13 @@ const sidebarStyles = StyleSheet.create((theme) => ({
     height: densityIconBox("md"),
     alignItems: "center",
     justifyContent: "center",
+  },
+  emptyState: {
+    paddingVertical: theme.spacing[6],
+    paddingHorizontal: { xs: theme.spacing[4], md: theme.spacing[2] },
+  },
+  emptyStateText: {
+    color: theme.colors.foregroundMuted,
+    fontSize: { xs: theme.fontSize.lg, md: theme.fontSize.base },
   },
 }));

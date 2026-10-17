@@ -2093,6 +2093,11 @@ export const es: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "Buscar ajustes",
+      clear: "Borrar búsqueda",
+      noMatches: "Ningún ajuste coincide con tu búsqueda.",
+    },
     title: "Ajustes",
     loading: "Cargando configuración...",
     groups: {

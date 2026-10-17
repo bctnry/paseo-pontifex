@@ -2066,6 +2066,11 @@ export const ja: TranslationResources = {
     },
   },
   settings: {
+    search: {
+      placeholder: "設定を検索",
+      clear: "検索をクリア",
+      noMatches: "検索に一致する設定がありません。",
+    },
     title: "設定",
     loading: "設定を読み込み中...",
     groups: {
