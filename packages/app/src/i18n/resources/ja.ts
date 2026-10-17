@@ -2103,8 +2103,15 @@ export const ja: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "エディター",
-      vimKeybindings: "Vim キーバインド",
-      vimHint: "Web とデスクトップのソースファイルに適用されます。",
+      keybindings: {
+        label: "キーバインド",
+        hint: "Web とデスクトップのソースファイルに適用されます。",
+        options: {
+          default: "デフォルト",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "通知",

@@ -2115,8 +2115,15 @@ export const ptBR: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "Editor",
-      vimKeybindings: "Atalhos do Vim",
-      vimHint: "Aplica-se a arquivos-fonte na web e no desktop.",
+      keybindings: {
+        label: "Atalhos de teclado",
+        hint: "Aplica-se a arquivos-fonte na web e no desktop.",
+        options: {
+          default: "Padrão",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "Notificações",

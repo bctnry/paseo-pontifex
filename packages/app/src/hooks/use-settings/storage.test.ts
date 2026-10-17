@@ -793,6 +793,29 @@ describe("appearance settings", () => {
     expect((await loadAppSettingsFromStorage(deps)).toolCallDetailLevel).toBe("overview");
   });
 
+  it("migrates the enabled Vim keybindings preference to the Vim preset", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ vimKeybindings: true }),
+      }),
+    });
+
+    const loaded = await loadAppSettingsFromStorage(deps);
+
+    expect(loaded.editorKeybindings).toBe("vim");
+    expect(deps.storage.entries.get(APP_SETTINGS_KEY)).not.toContain('"vimKeybindings"');
+  });
+
+  it("falls back to the default preset when the stored keybindings value is unknown", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({ editorKeybindings: "sublime" }),
+      }),
+    });
+
+    expect((await loadAppSettingsFromStorage(deps)).editorKeybindings).toBe("default");
+  });
+
   it("clears settings with an unrecognized tool call detail level", async () => {
     const deps = makeDeps({
       storage: createInMemoryKeyValueStorage({

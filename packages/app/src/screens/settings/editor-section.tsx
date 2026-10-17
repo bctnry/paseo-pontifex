@@ -1,34 +1,37 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
-import { Text, View } from "react-native";
-import { Switch } from "@/components/ui/switch";
-import { useAppSettings } from "@/hooks/use-settings";
-import { settingsStyles } from "@/styles/settings";
-import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { SettingsCard, SettingsSection, SettingsSelect } from "@/components/settings";
+import { useAppSettings, type EditorKeybindings } from "@/hooks/use-settings";
+
+const EDITOR_KEYBINDINGS: readonly EditorKeybindings[] = ["default", "vim", "emacs"];
 
 export function EditorSection() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
-  const handleChange = useCallback(
-    (vimKeybindings: boolean) => void updateSettings({ vimKeybindings }),
+  const options = useMemo(
+    () =>
+      EDITOR_KEYBINDINGS.map((value) => ({
+        value,
+        label: t(`settings.editor.keybindings.options.${value}`),
+      })),
+    [t],
+  );
+  const change = useCallback(
+    (editorKeybindings: EditorKeybindings) => void updateSettings({ editorKeybindings }),
     [updateSettings],
   );
   return (
     <SettingsSection title={t("settings.editor.title")}>
-      <View style={settingsStyles.card}>
-        <View style={settingsStyles.row}>
-          <View style={settingsStyles.rowContent}>
-            <Text style={settingsStyles.rowTitle}>{t("settings.editor.vimKeybindings")}</Text>
-            <Text style={settingsStyles.rowHint}>{t("settings.editor.vimHint")}</Text>
-          </View>
-          <Switch
-            value={settings.vimKeybindings}
-            onValueChange={handleChange}
-            accessibilityLabel={t("settings.editor.vimKeybindings")}
-            testID="vim-keybindings-toggle"
-          />
-        </View>
-      </View>
+      <SettingsCard>
+        <SettingsSelect
+          label={t("settings.editor.keybindings.label")}
+          hint={t("settings.editor.keybindings.hint")}
+          value={settings.editorKeybindings}
+          options={options}
+          onValueChange={change}
+          testID="editor-keybindings-select"
+        />
+      </SettingsCard>
     </SettingsSection>
   );
 }

@@ -2060,8 +2060,15 @@ export const zhCN: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "编辑器",
-      vimKeybindings: "Vim 键位",
-      vimHint: "适用于网页和桌面端的源文件。",
+      keybindings: {
+        label: "键位",
+        hint: "适用于网页和桌面端的源文件。",
+        options: {
+          default: "默认",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "通知",

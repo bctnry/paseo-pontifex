@@ -2115,8 +2115,15 @@ export const ru: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "Редактор",
-      vimKeybindings: "Сочетания клавиш Vim",
-      vimHint: "Применяется к исходным файлам в веб- и настольной версии.",
+      keybindings: {
+        label: "Сочетания клавиш",
+        hint: "Применяется к исходным файлам в веб- и настольной версии.",
+        options: {
+          default: "По умолчанию",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "Уведомления",

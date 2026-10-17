@@ -2130,8 +2130,15 @@ export const es: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "Editor",
-      vimKeybindings: "Atajos de Vim",
-      vimHint: "Se aplica a archivos fuente en web y escritorio.",
+      keybindings: {
+        label: "Atajos de teclado",
+        hint: "Se aplica a archivos fuente en web y escritorio.",
+        options: {
+          default: "Por defecto",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "Notificaciones",

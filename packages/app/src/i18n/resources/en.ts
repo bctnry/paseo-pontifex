@@ -2145,8 +2145,15 @@ export const en = {
     },
     editor: {
       title: "Editor",
-      vimKeybindings: "Vim keybindings",
-      vimHint: "Applies to source files on web and desktop.",
+      keybindings: {
+        label: "Keybindings",
+        hint: "Applies to source files on web and desktop.",
+        options: {
+          default: "Default",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "Notifications",

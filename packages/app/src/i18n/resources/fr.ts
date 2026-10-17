@@ -2129,8 +2129,15 @@ export const fr: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "Éditeur",
-      vimKeybindings: "Raccourcis Vim",
-      vimHint: "S’applique aux fichiers source dans l’app web et l’app de bureau.",
+      keybindings: {
+        label: "Raccourcis clavier",
+        hint: "S’applique aux fichiers source dans l’app web et l’app de bureau.",
+        options: {
+          default: "Par défaut",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "Notifications",

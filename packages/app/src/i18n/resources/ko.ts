@@ -2092,8 +2092,15 @@ export const ko: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "편집기",
-      vimKeybindings: "Vim 키 바인딩",
-      vimHint: "웹 및 데스크톱의 소스 파일에 적용됩니다.",
+      keybindings: {
+        label: "키 바인딩",
+        hint: "웹 및 데스크톱의 소스 파일에 적용됩니다.",
+        options: {
+          default: "기본값",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "알림",

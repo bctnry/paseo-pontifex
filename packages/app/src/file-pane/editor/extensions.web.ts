@@ -1,4 +1,10 @@
-import { defaultKeymap, history, historyKeymap, indentWithTab } from "@codemirror/commands";
+import {
+  defaultKeymap,
+  emacsStyleKeymap,
+  history,
+  historyKeymap,
+  indentWithTab,
+} from "@codemirror/commands";
 import {
   bracketMatching,
   defaultHighlightStyle,
@@ -13,6 +19,7 @@ import {
   lineNumbers,
 } from "@codemirror/view";
 import { createCodeMirrorHighlightStyle, type HighlightStyle } from "@getpaseo/highlight";
+import type { EditorKeybindings } from "@/hooks/use-settings";
 
 export interface EditorVisualTheme {
   colorScheme: "light" | "dark";
@@ -27,7 +34,22 @@ export interface EditorVisualTheme {
   syntax: Record<HighlightStyle, string>;
 }
 
-export function editorBaseExtensions(onSave: () => void) {
+/**
+ * Emacs bindings sit first in the same keymap so they win over the standard bindings they
+ * overlap. CodeMirror's emacs-style map covers Ctrl navigation and editing, not the full
+ * Emacs feature set (no kill ring, no mark).
+ */
+export function editorKeymap(keybindings: EditorKeybindings, onSave: () => void) {
+  const base = [
+    { key: "Mod-s", preventDefault: true, run: () => (onSave(), true) },
+    indentWithTab,
+    ...defaultKeymap,
+    ...historyKeymap,
+  ];
+  return keymap.of(keybindings === "emacs" ? [...emacsStyleKeymap, ...base] : base);
+}
+
+export function editorBaseExtensions() {
   return [
     lineNumbers(),
     history(),
@@ -36,12 +58,6 @@ export function editorBaseExtensions(onSave: () => void) {
     bracketMatching(),
     highlightActiveLine(),
     syntaxHighlighting(defaultHighlightStyle, { fallback: true }),
-    keymap.of([
-      { key: "Mod-s", preventDefault: true, run: () => (onSave(), true) },
-      indentWithTab,
-      ...defaultKeymap,
-      ...historyKeymap,
-    ]),
   ];
 }
 

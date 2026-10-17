@@ -840,12 +840,13 @@ test.describe("CodeMirror workspace file editing", () => {
     await writeFile(path.join(workspace.repoPath, "vim.ts"), "const vim = true;\n", "utf8");
 
     await page.goto("/settings/editor");
-    const toggle = page.getByRole("switch", { name: "Vim keybindings" });
-    await expect(toggle).toBeVisible();
-    await toggle.click();
-    await expect(toggle).toBeChecked();
+    const keybindings = page.getByRole("button", { name: /^Keybindings: / });
+    await expect(keybindings).toBeVisible();
+    await keybindings.click();
+    await page.getByRole("menuitem", { name: "Vim", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Keybindings: Vim" })).toBeVisible();
     await page.reload();
-    await expect(page.getByRole("switch", { name: "Vim keybindings" })).toBeChecked();
+    await expect(page.getByRole("button", { name: "Keybindings: Vim" })).toBeVisible();
 
     await workspace.navigateTo();
     await openWorkspaceFile(page, "vim.ts");
@@ -856,6 +857,26 @@ test.describe("CodeMirror workspace file editing", () => {
     await expect(page.getByLabel("Vim mode INSERT")).toBeVisible();
     await editor(page).press("Escape");
     await expect(page.getByLabel("Vim mode NORMAL")).toBeVisible();
+  });
+
+  test("applies Emacs keybindings to the source editor", async ({ page, withWorkspace }) => {
+    test.setTimeout(90_000);
+    const workspace = await withWorkspace({ prefix: "file-editing-emacs-" });
+    await writeFile(path.join(workspace.repoPath, "emacs.ts"), "const emacs = true;\n", "utf8");
+
+    await page.goto("/settings/editor");
+    await page.getByRole("button", { name: /^Keybindings: / }).click();
+    await page.getByRole("menuitem", { name: "Emacs", exact: true }).click();
+    await expect(page.getByRole("button", { name: "Keybindings: Emacs" })).toBeVisible();
+
+    await workspace.navigateTo();
+    await openWorkspaceFile(page, "emacs.ts");
+    await expect(page.getByLabel(/Vim mode/)).toHaveCount(0);
+    await editor(page).click();
+    await editor(page).press("Control+a");
+    await expect(page.getByLabel("Line 1, column 1")).toBeVisible();
+    await editor(page).press("Control+e");
+    await expect(page.getByLabel("Line 1, column 20")).toBeVisible();
   });
 });
 

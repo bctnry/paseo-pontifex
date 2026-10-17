@@ -41,6 +41,8 @@ export type PullRequestOpenLocation = "main" | "side" | "explorer";
 /** What a sidebar workspace row shows in the space to the right of its title. */
 export type SidebarWorkspaceTrailing = "diff" | "timestamp" | "none";
 export type ToolCallDetailLevel = "overview" | "detailed";
+/** Keybinding preset for the source editor on web and desktop. */
+export type EditorKeybindings = "default" | "vim" | "emacs";
 
 const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
@@ -103,7 +105,7 @@ export interface AppSettings {
   autoExpandReasoning: boolean;
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
-  vimKeybindings: boolean;
+  editorKeybindings: EditorKeybindings;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
   pullRequestOpenLocation: PullRequestOpenLocation;
@@ -159,7 +161,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
-  vimKeybindings: false,
+  editorKeybindings: "default",
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
 };
@@ -199,6 +201,8 @@ const SidebarRowItemsSchema = z
 type StoredAppSettingsFallback = AppSettings & {
   uiFontSize?: number;
   compactToolCalls?: boolean;
+  // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
+  vimKeybindings?: boolean;
   manageBuiltInDaemon?: boolean;
   releaseChannel?: ReleaseChannel;
   needsWrite: boolean;
@@ -260,7 +264,9 @@ const StoredAppSettingsSchema = z
     // COMPAT(compactToolCalls): migrated in v0.1.105, remove after 2027-01-12.
     compactToolCalls: z.boolean().optional().catch(undefined),
     chatOutlineEnabled: z.boolean().catch(true),
-    vimKeybindings: z.boolean().catch(false),
+    editorKeybindings: z.enum(["default", "vim", "emacs"]).optional().catch(undefined),
+    // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
+    vimKeybindings: z.boolean().optional().catch(undefined),
     openInSidePane: z
       .object({
         explorerFiles: z.boolean().catch(false),
@@ -292,9 +298,12 @@ const StoredAppSettingsSchema = z
   })
   .transform((stored) => {
     const { legacyPullRequestsInSidePane, ...openInSidePane } = stored.openInSidePane;
+    // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
+    const { vimKeybindings, ...current } = stored;
     const needsWrite =
       (stored.uiBaseFontSize === undefined && stored.uiFontSize !== undefined) ||
-      stored.contentFontSize === undefined;
+      stored.contentFontSize === undefined ||
+      vimKeybindings !== undefined;
     const uiBaseFontSize =
       stored.uiBaseFontSize ??
       (stored.uiFontSize === undefined
@@ -308,7 +317,8 @@ const StoredAppSettingsSchema = z
     const toolCallDetailLevel =
       stored.toolCallDetailLevel ?? (stored.compactToolCalls ? "overview" : "detailed");
     return {
-      ...stored,
+      ...current,
+      editorKeybindings: stored.editorKeybindings ?? (vimKeybindings ? "vim" : "default"),
       openInSidePane,
       pullRequestOpenLocation:
         stored.pullRequestOpenLocation ?? (legacyPullRequestsInSidePane ? "side" : "explorer"),

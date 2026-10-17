@@ -512,7 +512,8 @@ function EditableFilePane({
   const { settings } = useAppSettings();
   const { t } = useTranslation();
   const [cursor, setCursor] = useState({ line: 1, column: 1 });
-  const [vimMode, setVimMode] = useState<string | null>(settings.vimKeybindings ? "NORMAL" : null);
+  const vimEnabled = settings.editorKeybindings === "vim";
+  const [vimMode, setVimMode] = useState<string | null>(vimEnabled ? "NORMAL" : null);
   const session = useMemo(
     () => ({
       write(input: { content: string; expectedModifiedAt: string; expectedRevision?: string }) {
@@ -632,7 +633,7 @@ function EditableFilePane({
           filename={filename}
           location={location}
           navigationRevision={navigationRevision}
-          vimEnabled={settings.vimKeybindings}
+          keybindings={settings.editorKeybindings}
           theme={visualTheme}
           onCursorChange={setCursor}
           onVimModeChange={handleVimModeChange}

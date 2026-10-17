@@ -5,16 +5,22 @@ import { EditorView } from "@codemirror/view";
 import { getLanguageForFile } from "@getpaseo/highlight";
 import { getCM, vim } from "@replit/codemirror-vim";
 import { isRenderedMarkdownFile } from "@/components/file-pane-render-mode";
+import type { EditorKeybindings } from "@/hooks/use-settings";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
-import { editorBaseExtensions, editorTheme, type EditorVisualTheme } from "./extensions.web";
+import {
+  editorBaseExtensions,
+  editorKeymap,
+  editorTheme,
+  type EditorVisualTheme,
+} from "./extensions.web";
 
 interface FileEditorViewProps {
   model: FileEditorModel;
   filename: string;
   location: WorkspaceFileLocation;
   navigationRevision: number;
-  vimEnabled: boolean;
+  keybindings: EditorKeybindings;
   theme: EditorVisualTheme;
   onCursorChange(position: { line: number; column: number }): void;
   onVimModeChange(mode: string | null): void;
@@ -24,6 +30,7 @@ const languageCompartment = new Compartment();
 const wrappingCompartment = new Compartment();
 const themeCompartment = new Compartment();
 const vimCompartment = new Compartment();
+const keybindingsCompartment = new Compartment();
 
 function wrappingForFile(filename: string) {
   return isRenderedMarkdownFile(filename) ? EditorView.lineWrapping : [];
@@ -34,7 +41,7 @@ export function FileEditorView({
   filename,
   location,
   navigationRevision,
-  vimEnabled,
+  keybindings,
   theme,
   onCursorChange,
   onVimModeChange,
@@ -43,7 +50,7 @@ export function FileEditorView({
   const hostRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
   const snapshot = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
-  const initial = useRef({ filename, model, theme, vimEnabled, content: snapshot.content });
+  const initial = useRef({ filename, model, theme, keybindings, content: snapshot.content });
   const onCursorChangeRef = useRef(onCursorChange);
   onCursorChangeRef.current = onCursorChange;
 
@@ -55,9 +62,12 @@ export function FileEditorView({
       state: EditorState.create({
         doc: values.content,
         extensions: [
-          vimCompartment.of(values.vimEnabled ? vim() : []),
+          vimCompartment.of(values.keybindings === "vim" ? vim() : []),
+          keybindingsCompartment.of(
+            editorKeymap(values.keybindings, () => void values.model.save()),
+          ),
           find.extension,
-          ...editorBaseExtensions(() => void values.model.save()),
+          ...editorBaseExtensions(),
           languageCompartment.of(getLanguageForFile(values.filename)?.extension ?? []),
           wrappingCompartment.of(wrappingForFile(values.filename)),
           themeCompartment.of(editorTheme(values.theme)),
@@ -128,8 +138,13 @@ export function FileEditorView({
   useEffect(() => {
     const view = viewRef.current;
     if (!view) return;
-    view.dispatch({ effects: vimCompartment.reconfigure(vimEnabled ? vim() : []) });
-    if (!vimEnabled) {
+    view.dispatch({
+      effects: [
+        vimCompartment.reconfigure(keybindings === "vim" ? vim() : []),
+        keybindingsCompartment.reconfigure(editorKeymap(keybindings, () => void model.save())),
+      ],
+    });
+    if (keybindings !== "vim") {
       onVimModeChange(null);
       return;
     }
@@ -141,7 +156,7 @@ export function FileEditorView({
     cm.on("vim-mode-change", handleModeChange);
     onVimModeChange("NORMAL");
     return () => cm.off("vim-mode-change", handleModeChange);
-  }, [onVimModeChange, vimEnabled]);
+  }, [keybindings, model, onVimModeChange]);
 
   return (
     <div style={FRAME_STYLE}>

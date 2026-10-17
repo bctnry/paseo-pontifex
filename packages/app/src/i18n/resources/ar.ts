@@ -2082,8 +2082,15 @@ export const ar: TranslationResources = {
     layout: en.settings.layout,
     editor: {
       title: "المحرر",
-      vimKeybindings: "اختصارات Vim",
-      vimHint: "تنطبق على ملفات المصدر في الويب وسطح المكتب.",
+      keybindings: {
+        label: "اختصارات لوحة المفاتيح",
+        hint: "تنطبق على ملفات المصدر في الويب وسطح المكتب.",
+        options: {
+          default: "افتراضي",
+          vim: "Vim",
+          emacs: "Emacs",
+        },
+      },
     },
     notifications: {
       title: "الإشعارات",

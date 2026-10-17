@@ -1,6 +1,7 @@
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import type { HighlightStyle } from "@getpaseo/highlight";
+import type { EditorKeybindings } from "@/hooks/use-settings";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";
 
@@ -9,7 +10,7 @@ export function FileEditorView(_props: {
   filename: string;
   location: WorkspaceFileLocation;
   navigationRevision: number;
-  vimEnabled: boolean;
+  keybindings: EditorKeybindings;
   theme: {
     background: string;
     foreground: string;
