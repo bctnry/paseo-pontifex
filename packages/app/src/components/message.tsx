@@ -2350,6 +2350,7 @@ export const ToolCall = memo(function ToolCall({
         errorText={presentation.errorText}
         maxHeight={maxDetailHeight}
         showLoadingSkeleton={presentation.isLoadingDetails}
+        streaming={status === "executing" || status === "running"}
       />
     );
   }, [
@@ -2359,6 +2360,7 @@ export const ToolCall = memo(function ToolCall({
     presentation.errorText,
     presentation.isLoadingDetails,
     maxDetailHeight,
+    status,
   ]);
 
   if (presentation.isPlan && effectiveDetail?.type === "plan") {

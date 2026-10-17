@@ -23,7 +23,9 @@ import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { extensionFromPath, highlightToKeyedLines } from "@/utils/highlight-cache";
 import { HighlightedLines } from "./highlighted-content";
 import { DiffViewer } from "./diff-viewer";
+import { MarkdownRenderer } from "./markdown/renderer";
 import { getCodeInsets } from "./code-insets";
+import { thinkingTextFromToolCall } from "@/utils/thinking-detail";
 import { isWeb } from "@/constants/platform";
 
 const ScrollView = isWeb ? RNScrollView : GHScrollView;
@@ -37,6 +39,7 @@ interface ToolCallDetailsContentProps {
   maxHeight?: number;
   fillAvailableHeight?: boolean;
   showLoadingSkeleton?: boolean;
+  streaming?: boolean;
 }
 
 interface DetailStyles {
@@ -511,6 +514,32 @@ function ScrollablePlainTextSection({ text, ds }: { text: string; ds: DetailStyl
   );
 }
 
+interface ThinkingDetailProps {
+  text: string;
+  maxHeight: number | undefined;
+  streaming: boolean;
+}
+
+/** Reasoning text is Markdown, so it renders through the shared Markdown engine. */
+function ThinkingDetailSection({ text, maxHeight, streaming }: ThinkingDetailProps) {
+  const scrollStyle = useMemo(
+    () => (maxHeight === undefined ? undefined : inlineUnistylesStyle({ maxHeight })),
+    [maxHeight],
+  );
+  return (
+    <View style={styles.section}>
+      <ScrollView
+        style={scrollStyle}
+        contentContainerStyle={styles.thinkingContent}
+        nestedScrollEnabled
+        showsVerticalScrollIndicator
+      >
+        <MarkdownRenderer text={text} compact streaming={streaming} />
+      </ScrollView>
+    </View>
+  );
+}
+
 interface SearchDetail {
   query?: string;
   content?: string;
@@ -671,6 +700,7 @@ function buildDetailSections(
   diffLines: DiffLine[] | undefined,
   ds: DetailStyles,
   t: TFunction,
+  streaming: boolean,
 ): ReactNode[] {
   if (!detail) return [];
   if (detail.type === "shell") {
@@ -740,6 +770,17 @@ function buildDetailSections(
     if (!detail.text) return [];
     return [<ScrollablePlainTextSection key="plain-text" text={detail.text} ds={ds} />];
   }
+  const thinkingText = thinkingTextFromToolCall(toolName, detail);
+  if (thinkingText !== null) {
+    return [
+      <ThinkingDetailSection
+        key="thinking"
+        text={thinkingText}
+        maxHeight={ds.resolvedMaxHeight}
+        streaming={streaming}
+      />,
+    ];
+  }
   if (detail.type === "unknown") {
     return buildPaseoUnknownSections(toolName, detail) ?? buildUnknownSections(detail, ds, t);
   }
@@ -787,13 +828,14 @@ export function ToolCallDetailsContent({
   maxHeight,
   fillAvailableHeight = false,
   showLoadingSkeleton = false,
+  streaming = false,
 }: ToolCallDetailsContentProps) {
   const { t } = useTranslation();
   const resolvedMaxHeight = fillAvailableHeight ? undefined : (maxHeight ?? 300);
   const ds = useDetailStyles(detail, resolvedMaxHeight, fillAvailableHeight);
   const diffLines = useDiffLines(detail);
 
-  const sections: ReactNode[] = buildDetailSections(toolName, detail, diffLines, ds, t);
+  const sections: ReactNode[] = buildDetailSections(toolName, detail, diffLines, ds, t, streaming);
 
   if (errorText) {
     sections.push(<ErrorSection key="error" errorText={errorText} ds={ds} />);
@@ -890,6 +932,10 @@ const styles = StyleSheet.create((theme) => {
       color: theme.colors.foreground,
       lineHeight: 22,
       overflowWrap: "anywhere",
+    },
+    thinkingContent: {
+      paddingHorizontal: theme.spacing[3],
+      paddingVertical: theme.spacing[2],
     },
     sectionTitle: {
       color: theme.colors.foregroundMuted,
