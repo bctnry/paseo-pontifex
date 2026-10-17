@@ -456,7 +456,7 @@ function SyntaxRow({ value, onChange }: SyntaxRowProps) {
         >
           {selectedLabel}
         </DropdownTrigger>
-        <DropdownMenuContent side="bottom" align="end" width={200}>
+        <DropdownMenuContent side="bottom" align="end" width={260} maxHeight={380} scrollable>
           {SYNTAX_THEME_OPTIONS.map((option) => (
             <SyntaxMenuItem
               key={option.id}
