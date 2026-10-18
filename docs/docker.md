@@ -32,7 +32,7 @@ docker run -d --name paseo \
   -e PASEO_PASSWORD=change-me \
   -v "$PWD/paseo-home:/home/paseo" \
   -v "$PWD:/workspace" \
-  ghcr.io/getpaseo/paseo:latest
+  ghcr.io/bctnry/paseo:latest
 ```
 
 Then open:
@@ -59,7 +59,7 @@ Minimal example:
 ```yaml
 services:
   paseo:
-    image: ghcr.io/getpaseo/paseo:latest
+    image: ghcr.io/bctnry/paseo:latest
     restart: unless-stopped
     ports:
       - "6767:6767"
@@ -79,7 +79,7 @@ releases to third-party agent release cycles.
 Create a child image for the agents you use:
 
 ```Dockerfile
-FROM ghcr.io/getpaseo/paseo:latest
+FROM ghcr.io/bctnry/paseo:latest
 
 USER root
 RUN npm install -g @openai/codex @anthropic-ai/claude-code opencode-ai
@@ -205,15 +205,15 @@ docker build \
   .
 ```
 
-The Docker workflow builds the image on pull requests and on `main` as a
-non-publishing check. Stable `vX.Y.Z` tag pushes publish
-`ghcr.io/getpaseo/paseo:X.Y.Z` and `ghcr.io/getpaseo/paseo:latest`. Beta tags
-publish only the exact prerelease tag, such as
-`ghcr.io/getpaseo/paseo:0.1.102-beta.1`, and do not update `latest`.
+The Docker workflow is manual. With `publish` off it only builds the image. With
+`publish` on and `paseo_version` set, it publishes
+`ghcr.io/bctnry/paseo:X.Y.Z`; stable versions can also move
+`ghcr.io/bctnry/paseo:latest`. Beta versions publish only the exact prerelease
+tag and do not update `latest`. The image namespace is the repository owner, so
+a fork publishes under its own GHCR namespace.
 
-To replace a Docker image in place without rebuilding desktop, APK, or EAS
-mobile release artifacts, dispatch the Docker workflow manually instead of
-pushing a `v*` release tag:
+To publish or replace a Docker image without rebuilding desktop, APK, or EAS
+mobile release artifacts, dispatch the Docker workflow:
 
 ```bash
 gh workflow run docker.yml \

@@ -1,10 +1,8 @@
 name: Android APK Release
 
 on:
-  push:
-    tags:
-      - "v*"
-      - "android-v*"
+  # Manual only. A tag pushed while syncing upstream must not build in another
+  # maintainer's EAS project.
   workflow_dispatch:
     inputs:
       tag:
@@ -68,12 +66,23 @@ jobs:
       contents: write
       packages: read
     runs-on: ubuntu-latest
+    env:
+      EAS_OWNER: ${{ vars.EAS_OWNER }}
+      EAS_PROJECT_ID: ${{ vars.EAS_PROJECT_ID }}
+      EAS_SLUG: ${{ vars.EAS_SLUG }}
 
     steps:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
           ref: ${{ github.event_name == 'workflow_dispatch' && github.event.inputs.tag || github.ref }}
+
+      - name: Require fork EAS configuration
+        run: |
+          if [ -z "${EAS_OWNER:-}" ] || [ -z "${EAS_PROJECT_ID:-}" ]; then
+            echo "::error::Set EAS_OWNER and EAS_PROJECT_ID repository variables for this fork."
+            exit 1
+          fi
 
       - name: Resolve release tag
         shell: bash
@@ -84,13 +93,9 @@ jobs:
         with:
           node-version: "22"
           cache: "npm"
-          registry-url: "https://npm.pkg.github.com"
-          scope: "@boudra"
 
       - name: Install JS dependencies
         run: node scripts/npm-retry.mjs ci
-        env:
-          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Setup Expo and EAS
         uses: expo/expo-github-action@v8

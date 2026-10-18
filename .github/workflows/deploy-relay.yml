@@ -1,8 +1,7 @@
 name: Deploy Relay
 
 on:
-  # Manual-only while relay.paseo.sh bridges traffic to the Fly deployment.
-  # A release or main push must not redeploy the temporary Cloudflare bridge.
+  # Manual only. A release or main push must not redeploy the relay.
   workflow_dispatch:
 
 jobs:
@@ -11,6 +10,15 @@ jobs:
 
     steps:
       - uses: actions/checkout@v4
+
+      - name: Require fork Cloudflare configuration
+        env:
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+        run: |
+          if [ -z "${CLOUDFLARE_ACCOUNT_ID:-}" ]; then
+            echo "::error::Set the CLOUDFLARE_ACCOUNT_ID repository variable to your own Cloudflare account."
+            exit 1
+          fi
 
       - uses: actions/setup-node@v4
         with:
@@ -24,6 +32,14 @@ jobs:
         run: npm run typecheck --workspace=@getpaseo/relay
 
       - name: Deploy worker
-        run: cd packages/relay && npx wrangler deploy
         env:
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ vars.CLOUDFLARE_ACCOUNT_ID }}
+          PASEO_RELAY_UPSTREAM: ${{ vars.PASEO_RELAY_UPSTREAM }}
+        run: |
+          cd packages/relay
+          if [ -n "${PASEO_RELAY_UPSTREAM:-}" ]; then
+            npx wrangler deploy --var "PASEO_RELAY_UPSTREAM=$PASEO_RELAY_UPSTREAM"
+          else
+            npx wrangler deploy
+          fi

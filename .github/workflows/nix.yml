@@ -1,8 +1,8 @@
 name: Nix
 
 on:
-  push:
-    branches: [main]
+  # Manual only. Upstream syncs must not start Nix builds.
+  workflow_dispatch:
 
 permissions:
   contents: read

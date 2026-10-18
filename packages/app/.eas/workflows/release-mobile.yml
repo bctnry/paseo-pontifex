@@ -1,11 +1,8 @@
 name: Release Mobile
 
 on:
-  push:
-    tags:
-      - "v*"
-      - "!v*-rc.*"
-      - "!v*-beta.*"
+  # Manual only. Tag pushes from upstream syncs must not build or submit to
+  # another maintainer's EAS project.
   workflow_dispatch: {}
 
 jobs:
@@ -31,7 +28,7 @@ jobs:
       build_id: ${{ needs.build_ios.outputs.build_id }}
       profile: production
       external_groups:
-        - Paseo Beta
+        - Paseo Pontifex Beta
       submit_beta_review: true
 
   submit_android:

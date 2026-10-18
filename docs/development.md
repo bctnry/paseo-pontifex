@@ -638,6 +638,10 @@ Do NOT use browser history (back/forward). Always navigate by clicking UI elemen
 
 `packages/app` exports a single-page Expo web app and deploys the `dist/`
 directory to Cloudflare Pages with `npm run deploy:web --workspace=@getpaseo/app`.
+The Pages project defaults to `paseo-pontifex-app`; set
+`CLOUDFLARE_PAGES_PROJECT` to override it. The deploy workflow is manual and
+requires the `CLOUDFLARE_ACCOUNT_ID` repository variable and the
+`CLOUDFLARE_API_TOKEN` secret.
 
 PWA install metadata lives in `packages/app/public/manifest.json` and is linked
 from `packages/app/public/index.html`. Keep the install icons in `public/` so

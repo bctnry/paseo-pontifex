@@ -37,8 +37,9 @@ extraResources:
     to: editor-target-icons
 publish:
   provider: github
-  owner: getpaseo
-  repo: paseo
+  # Publish to this fork, never to the upstream getpaseo/paseo repository.
+  owner: bctnry
+  repo: paseo-pontifex
 mac:
   artifactName: "Paseo-${version}-${arch}.${ext}"
   minimumSystemVersion: "13.0.0"

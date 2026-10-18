@@ -11,6 +11,11 @@ const { getNativeReleaseVersion } = require("./native-release-version");
 const appVariant = process.env.APP_VARIANT ?? "production";
 const isFdroidBuild = process.env.PASEO_FDROID_BUILD === "1";
 const isProfileBuild = process.env.PASEO_PROFILE_BUILD === "1";
+// Point EAS at this fork's project. Leave these unset unless you have created
+// your own EAS project; EAS builds fail instead of using the upstream project.
+const easOwner = process.env.EAS_OWNER?.trim() || undefined;
+const easProjectId = process.env.EAS_PROJECT_ID?.trim() || undefined;
+const easSlug = process.env.EAS_SLUG?.trim() || "paseo-pontifex";
 
 const buildProfile = isFdroidBuild
   ? {
@@ -99,7 +104,7 @@ const nativeReleaseVersion = getNativeReleaseVersion(pkg.version);
 export default {
   expo: {
     name: variant.name,
-    slug: "voice-mobile",
+    slug: easSlug,
     version: nativeReleaseVersion.appVersion,
     orientation: "portrait",
     icon: "./assets/images/icon.png",
@@ -191,10 +196,8 @@ export default {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
       router: {},
-      eas: {
-        projectId: "0e7f65ce-0367-46c8-a238-2b65963d235a",
-      },
+      ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
-    owner: "getpaseo",
+    ...(easOwner ? { owner: easOwner } : {}),
   },
 };

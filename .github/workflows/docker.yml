@@ -1,10 +1,7 @@
 name: Docker
 
 on:
-  push:
-    branches: [main]
-    tags:
-      - "v*"
+  # Manual only. The image belongs to this repository's GHCR namespace.
   workflow_dispatch:
     inputs:
       paseo_version:
@@ -20,7 +17,7 @@ on:
           - "false"
           - "true"
       publish_latest:
-        description: "Also publish ghcr.io/getpaseo/paseo:latest. Ignored for prereleases."
+        description: "Also publish the latest tag for this repository's image. Ignored for prereleases."
         required: false
         default: "false"
         type: choice

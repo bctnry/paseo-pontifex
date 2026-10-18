@@ -90,7 +90,10 @@ test("gated checks are statically named jobs with real job-level gating", () => 
   const jobs = jobBlocks(workflowSource);
   const trigger = workflowSource.split("jobs:", 1)[0];
 
-  assert.match(trigger, /^\s+merge_group:\s*$/m);
+  assert.match(trigger, /^\s+pull_request:\s*$/m);
+  assert.match(trigger, /^\s+workflow_dispatch:\s*$/m);
+  assert.doesNotMatch(trigger, /^\s+push:/m);
+  assert.doesNotMatch(trigger, /^\s+merge_group:/m);
   assert.doesNotMatch(workflowSource, /strategy:\s*\n\s+matrix:/);
   assert.doesNotMatch(workflowSource, /RUN_TESTS|Skip unaffected|No .* changes detected/);
 
@@ -294,22 +297,23 @@ test("browser and desktop tests have exclusive, directory-owned suites", () => {
   ]);
 });
 
-test("packaging runs on main without allocating pull-request runners", () => {
+test("packaging is manual-only", () => {
   for (const workflowPath of [dockerWorkflowPath, nixWorkflowPath]) {
     const source = readFileSync(workflowPath, "utf8");
     const trigger = source.split("jobs:", 1)[0];
-    assert.match(trigger, /push:\s*\n\s+branches: \[main\]/);
-    assert.doesNotMatch(trigger, /pull_request/);
+    assert.match(trigger, /^\s+workflow_dispatch:/m);
+    assert.doesNotMatch(trigger, /^\s+push:/m);
+    assert.doesNotMatch(trigger, /^\s+pull_request:/m);
     assert.doesNotMatch(source, /dorny\/paths-filter/);
   }
 });
 
-test("desktop packaging smokes main pushes and only the pull requests that touch packaging", () => {
+test("desktop packaging is manual-only", () => {
   const source = readFileSync(new URL(".github/workflows/desktop-packages.yml", repoRoot), "utf8");
   const trigger = source.split("jobs:", 1)[0];
-  assert.match(trigger, /push:\s*\n\s+branches: \[main\]/);
-  assert.match(trigger, /pull_request:\s*\n\s+branches: \[main\]\s*\n\s+paths:/);
-  assert.match(trigger, /- "packages\/desktop\/\*\*"/);
+  assert.match(trigger, /^\s+workflow_dispatch:/m);
+  assert.doesNotMatch(trigger, /^\s+push:/m);
+  assert.doesNotMatch(trigger, /^\s+pull_request:/m);
   assert.doesNotMatch(source, /dorny\/paths-filter/);
   for (const action of ["actions/checkout", "actions/setup-node", "actions/upload-artifact"]) {
     assert.match(source, new RegExp(`${action}@[0-9a-f]{40} # v\\d+\\.\\d+\\.\\d+`));
@@ -321,6 +325,9 @@ test("stable iOS releases upload once and distribute to external testers before 
     new URL("packages/app/.eas/workflows/release-mobile.yml", repoRoot),
     "utf8",
   );
+  const trigger = source.split("jobs:", 1)[0];
+  assert.match(trigger, /^\s+workflow_dispatch:/m);
+  assert.doesNotMatch(trigger, /^\s+push:/m);
   const jobs = jobBlocks(source);
   const uploads = [...jobs.entries()].filter(
     ([, lines]) =>
@@ -331,7 +338,7 @@ test("stable iOS releases upload once and distribute to external testers before 
   const [distributionId, distributionLines] = uploads[0];
   const distribution = distributionLines.join("\n");
   assert.match(distribution, /^    type: testflight$/m);
-  assert.match(distribution, /external_groups:\s*\n\s+- Paseo Beta/);
+  assert.match(distribution, /external_groups:\s*\n\s+- Paseo Pontifex Beta/);
   assert.match(distribution, /^      submit_beta_review: true$/m);
 
   const review = jobs.get("submit_ios_for_review").join("\n");

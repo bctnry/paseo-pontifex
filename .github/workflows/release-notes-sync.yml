@@ -1,13 +1,8 @@
 name: Release Notes Sync
 
 on:
-  push:
-    tags:
-      - "v*"
-    branches:
-      - main
-    paths:
-      - "CHANGELOG.md"
+  # Manual only. Release notes are synced deliberately, not on every changelog
+  # merge or tag from upstream.
   workflow_dispatch:
     inputs:
       tag:

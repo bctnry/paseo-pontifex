@@ -1,17 +1,16 @@
 name: CI
 
 on:
-  push:
-    branches: [main]
+  # This fork runs CI on pull requests and manual dispatch only. Main pushes
+  # from upstream syncs must not spend runner minutes or touch shared secrets.
   pull_request:
     branches: [main]
-  merge_group:
   workflow_dispatch:
 
-# A newer push to the same ref cancels the run still in progress, main included.
+# A newer run on the same ref cancels the run still in progress.
 # A full run costs about 200 runner-minutes against the org's 20 concurrent
-# jobs, and a superseded main run only answers a question the newer commit
-# answers again.
+# jobs, and a superseded run only answers a question the newer commit answers
+# again.
 concurrency:
   group: ci-${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true

@@ -203,16 +203,17 @@ adb exec-out screencap -p > screenshot.png
 
 ## Cloud build + submit (EAS)
 
-Stable tag pushes like `v0.1.0` trigger:
+The EAS workflows are manual-only in this fork. Set the `EAS_OWNER`, `EAS_PROJECT_ID`, and optionally `EAS_SLUG` repository variables, then dispatch:
 
-- The EAS GitHub app on Expo servers, using `packages/app/.eas/workflows/release-mobile.yml` (iOS + Android production builds and distribution).
-- `.github/workflows/android-apk-release.yml` on GitHub Actions (APK asset on GitHub Release).
+- `Release Mobile` for stable tags, using `packages/app/.eas/workflows/release-mobile.yml` (iOS + Android production builds and distribution).
+- `Release iOS Beta` for beta tags, using `packages/app/.eas/workflows/release-ios-beta.yml`.
+- `.github/workflows/android-apk-release.yml` on GitHub Actions for the APK asset on a GitHub Release. It is manual-only and requires the same EAS variables.
 
 iOS distributes the same build to external TestFlight testers and App Store review; see [Mobile builds (EAS)](release.md#mobile-builds-eas) for the review paths. Android auto-submits to the Play Store via EAS-managed credentials.
 
-Beta tags like `v0.1.1-beta.1` trigger the GitHub APK workflow and EAS `Release iOS Beta`. They publish a GitHub prerelease APK and distribute iOS through TestFlight without submitting to production stores.
+Beta tags like `v0.1.1-beta.1` publish a GitHub prerelease APK and, when `Release iOS Beta` is dispatched, distribute iOS through TestFlight without submitting to production stores.
 
-`android-v*` tags also trigger only the GitHub APK workflow — useful when you want to ship an APK without going through stores. The GitHub APK workflow supports `workflow_dispatch` with an existing `tag` input so you can rebuild without cutting a new tag.
+`android-v*` tags do not trigger the GitHub APK workflow in this fork. Dispatch it with the existing `tag` input when you want to ship an APK without going through stores.
 
 ### Useful commands
 
