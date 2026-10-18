@@ -28,6 +28,20 @@ export interface PluginSettings<Schema extends ZodType> {
 }
 
 export interface PluginServerContext extends PluginLifecycleRegistration {
+  /**
+   * Absolute path to this plugin's private, persistent data directory, created
+   * before the plugin is contributed. The daemon roots it under its own home
+   * (`<paseoHome>/plugin-data/<pluginId>`), so it survives plugin updates and is
+   * the supported place for durable state such as a SQLite database. Undefined
+   * only when the host was started without a data root.
+   */
+  dataDirectory?: string;
+  /**
+   * The daemon's stable server id, the host part of fully-qualified ids. It is
+   * the same value clients receive in `server_info`. Undefined only when the
+   * host did not provide one, so plugins that need it must decide their fallback.
+   */
+  serverId?: string;
   registerSettings<Schema extends ZodType>(
     definition: import("../settings.js").SettingsDefinition<Schema>,
   ): PluginSettings<Schema>;

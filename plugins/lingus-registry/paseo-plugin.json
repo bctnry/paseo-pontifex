@@ -1,0 +1,4 @@
+{
+  "id": "lingus-registry",
+  "requirements": { "paseo": ">=0.11.0" }
+}

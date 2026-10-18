@@ -98,3 +98,7 @@ app.json
 
 # Project-local Serena configuration and memories.
 .serena/
+
+# Lingus internal docs: kept in the working tree for reference, not published
+# with this fork. The plugin code itself is tracked.
+docs/lingus/

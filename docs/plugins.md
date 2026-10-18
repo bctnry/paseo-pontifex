@@ -677,6 +677,20 @@ reload path: that path disposes the plugin and would destroy open drafts after e
 `ready` or `invalid` state and `subscribe()` for successful saves, resets, and migrations. The
 subscription cleanup belongs in the plugin's contribution cleanup when it outlives the entry.
 
+## Durable plugin data
+
+`server.dataDirectory` is an absolute path to a private, persistent directory the daemon creates
+before calling the plugin's server contribution (`<paseoHome>/plugin-data/<pluginId>`). Unlike
+settings storage it holds arbitrary files, so it is the supported home for a plugin-owned SQLite
+database or other on-disk state. It lives outside managed sources, so updates and reloads keep its
+contents, and the daemon does not delete it when the plugin is removed. Server-target code may use
+Node built-ins such as `node:sqlite` for this state; client and shared bundles cannot. The value is
+undefined when the host was started without a data root, so guard before writing.
+
+`server.serverId` is the daemon's stable host id, the same value clients receive in `server_info`.
+Plugins that build fully-qualified ids use it instead of re-deriving the id from files or paths. It
+is undefined only when the host did not provide one.
+
 ## Contribute a theme
 
 `addTheme` takes a small light or dark palette and a display name. Paseo expands it through the

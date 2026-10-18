@@ -310,6 +310,17 @@ contributions run in a daemon subprocess with Node access to the host machine. K
 process, credential, and other machine-local work under `server/`. A plugin without
 `index.server.ts` starts no subprocess.
 
+`PluginServerContext.dataDirectory` is an absolute path to a private, persistent directory the
+daemon creates before the server contribution runs (`<paseoHome>/plugin-data/<pluginId>`). It holds
+arbitrary files, so it is the supported home for durable state such as a plugin-owned SQLite
+database (`node:sqlite` is available to server code). It lives outside managed sources, so updates
+and reloads keep its contents, and the daemon does not remove it when the plugin is uninstalled. The
+value is undefined when the host was started without a data root, so guard before writing.
+
+`PluginServerContext.serverId` is the daemon's stable host id, the same value clients receive in
+`server_info`. Use it when a plugin builds fully-qualified ids instead of deriving the id from files
+or paths. It is undefined only when the host did not provide one.
+
 ### Providers
 
 Follow [Build a provider plugin](/docs/plugins/providers) for direct and ACP implementations,

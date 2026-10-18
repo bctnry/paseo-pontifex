@@ -8,6 +8,7 @@ import {
 import type { UsageSourceRegistration } from "@getpaseo/plugin/server/usage";
 import type { SettingsDefinition, PluginRpcContract } from "@getpaseo/plugin";
 import type { PluginHandlerContext, PluginServerContribution } from "@getpaseo/plugin/server";
+import { mkdir } from "node:fs/promises";
 import { fileURLToPath } from "node:url";
 import type { ZodType } from "zod";
 import {
@@ -280,6 +281,7 @@ export function createPluginWorker(options: {
           send({ type: "settings.changed", settingsId }),
         )
       : null;
+    if (message.dataDirectory) await mkdir(message.dataDirectory, { recursive: true });
     const contributedCleanup = contribute({
       handle: (contract, handler) =>
         register(contract, (input, context) => handler(contract.input.parse(input), context)),
@@ -288,6 +290,8 @@ export function createPluginWorker(options: {
       registerSettings,
       on: hooks.on,
       before: hooks.before,
+      dataDirectory: message.dataDirectory,
+      serverId: message.serverId,
     });
     if (typeof contributedCleanup !== "function") {
       throw new Error("Plugin contribution must return a cleanup function");
