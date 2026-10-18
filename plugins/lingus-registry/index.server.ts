@@ -6,6 +6,11 @@ import path from "node:path";
 import type { PluginHandlerContext, PluginServerContext } from "@getpaseo/plugin/server";
 import {
   broadcastList,
+  capabilityGet,
+  capabilityIssue,
+  capabilityList,
+  capabilityRevoke,
+  capabilityVerify,
   eventsList,
   operatorBind,
   operatorGet,
@@ -36,6 +41,7 @@ import {
   shareList,
   shareRemove,
 } from "./shared/contracts.js";
+import { loadOrCreateIssuerKeys } from "./server/capability.js";
 import { openRegistryDatabase } from "./server/db.js";
 import { Registry } from "./server/registry.js";
 
@@ -96,6 +102,7 @@ export default function contribute(server: PluginServerContext) {
   const registry = new Registry(
     openRegistryDatabase(path.join(dataDirectory, "registry.db")),
     hostId,
+    loadOrCreateIssuerKeys(dataDirectory),
   );
   registry.bootstrap();
 
@@ -235,10 +242,69 @@ export default function contribute(server: PluginServerContext) {
   server.handle(sessionRef, (input) => ({ session: registry.indexSession(input) }));
   server.handle(sessionList, () => ({ sessions: registry.listSessions() }));
 
+  server.handle(capabilityIssue, (input) => registry.issueCapability(input));
+  server.handle(capabilityGet, (input) => ({ capability: registry.getCapability(input.id) }));
+  server.handle(capabilityList, (input) => ({
+    capabilities: registry.listCapabilities(input),
+  }));
+  server.handle(capabilityRevoke, (input) => ({
+    capability: registry.revokeCapability(input.id),
+  }));
+  server.handle(capabilityVerify, (input) => ({
+    verification: registry.verifyCapability(input.token, input),
+  }));
+
   server.handle(broadcastList, (input) => ({ entries: registry.broadcast(input.since ?? 0) }));
   server.handle(eventsList, (input) => ({
     events: registry.listEvents(input.since ?? 0, input.limit ?? 0),
   }));
+
+  // --- capability injection -------------------------------------------------
+
+  /**
+   * Hands an operator its live capabilities as environment variables when its
+   * session opens (draft 3.9, local half). Two rules keep this from becoming a
+   * source of outages:
+   *   - A `history` session replays a transcript and runs no tools, so it gets
+   *     nothing (D-B-3).
+   *   - Anything unexpected is logged and passed through. A before-hook that
+   *     throws fails the whole session open, and a registry bug must not be able
+   *     to stop agents from starting.
+   */
+  server.before("agent.session_open", ({ request }) => {
+    try {
+      if (request.purpose === "history") return request;
+      const binding = registry.findActiveOperatorByAgent(request.agentId);
+      if (!binding) return request;
+      return {
+        ...request,
+        env: {
+          ...request.env,
+          LINGUS_DESCRIPTOR: JSON.stringify(registry.descriptor(binding.projectId)),
+          LINGUS_CAPABILITIES: JSON.stringify(registry.tokensForBinding(binding.id)),
+        },
+      };
+    } catch (error) {
+      console.error("lingus-registry could not inject capabilities", error);
+      return request;
+    }
+  });
+
+  /**
+   * Archiving a paseo session is the end of that operator: its bindings become
+   * terminated and their capabilities join the revocation list.
+   *
+   * `agent.closed` deliberately does nothing here. It also fires on daemon
+   * shutdown and when a runtime is replaced, and bindings must survive those
+   * (D-B-2: the operator id is stable across session rebuilds).
+   */
+  server.on("agent.archived", (event) => {
+    try {
+      registry.terminateForAgent(event.agent.id);
+    } catch (error) {
+      console.error("lingus-registry could not terminate operator bindings", error);
+    }
+  });
 
   return () => {
     registry.close();

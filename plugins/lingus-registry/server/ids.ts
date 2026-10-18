@@ -32,6 +32,15 @@ export function compose(host: string, local: string): string {
   return `${host}/${local}`;
 }
 
+/**
+ * A capability id. The token serial defaults to it, so it is 128 random bits
+ * rather than the time-sortable local id: a revocation list is keyed by serial
+ * and needs uniqueness, not ordering.
+ */
+export function newCapabilityId(): string {
+  return `cap_${randomBytes(16).toString("hex")}`;
+}
+
 /** The host part of a qualified id, or "" when the id is unqualified. */
 export function hostOf(id: string): string {
   const index = id.lastIndexOf("/");

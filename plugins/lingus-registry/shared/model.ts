@@ -21,10 +21,36 @@ export const LocalitySchema = z.enum(["local", "remote"]);
 export const ResourceStatusSchema = z.enum(["registered", "disabled", "revoked"]);
 export const OperatorStatusSchema = z.enum(["active", "suspended", "terminated"]);
 
+export const CAPABILITY_KINDS = ["access", "approval"] as const;
+
+export const CapabilityKindSchema = z.enum(["access", "approval"]);
+
 export type ResourceClass = (typeof CLASSES)[number];
 export type Locality = (typeof LOCALITIES)[number];
 export type ResourceStatus = (typeof RESOURCE_STATUSES)[number];
 export type OperatorStatus = (typeof OPERATOR_STATUSES)[number];
+export type CapabilityKind = (typeof CAPABILITY_KINDS)[number];
+
+/**
+ * Why a verification refused a token. The order mirrors the offline check order
+ * in `server/capability.ts`: format, version, clock, signature, revocation, then
+ * whatever the caller expected to find on the token.
+ */
+export const VERIFY_FAILURES = [
+  "malformed",
+  "unsupported_version",
+  "expired",
+  "not_yet_valid",
+  "bad_signature",
+  "revoked",
+  "revocation_unavailable",
+  "subject_mismatch",
+  "resource_mismatch",
+  "kind_mismatch",
+] as const;
+
+export const VerifyFailureSchema = z.enum(VERIFY_FAILURES);
+export type VerifyFailure = (typeof VERIFY_FAILURES)[number];
 
 /** Built-in kind for the local registry resource itself. */
 export const KIND_REGISTRY = "registry";
@@ -64,12 +90,18 @@ export const EVENTS = {
   operatorBound: "operator_bound",
   operatorStatus: "operator_status",
   sessionIndexed: "session_indexed",
+  capabilityIssued: "capability_issued",
+  capabilityRevoked: "capability_revoked",
+  capabilityDenied: "capability_denied",
 } as const;
 
 /** Reasons carried in revocation event payloads. */
 export const REVOCATION_REASONS = {
   classPrivate: "class_private",
   statusRevoked: "status_revoked",
+  ownerRevoked: "owner_revoked",
+  operatorTerminated: "operator_terminated",
+  memberRemoved: "member_removed",
 } as const;
 
 // --- entities --------------------------------------------------------------
@@ -89,6 +121,24 @@ export const ResourceSchema = z.object({
   updatedAt: z.number(),
 });
 export type Resource = z.infer<typeof ResourceSchema>;
+
+/** Sensitivity values a resource may declare in `attrs.sensitivity`. */
+export const SENSITIVITIES = ["low", "normal", "high"] as const;
+
+/** Kinds that count as high-sensitivity unless the resource says otherwise. */
+const HIGH_SENSITIVITY_KINDS = new Set<string>(["external"]);
+
+/**
+ * D-B-4: high sensitivity is declared explicitly in `resources.attrs.sensitivity`;
+ * `kind` only supplies the default. High-sensitivity resources make a verifier
+ * fail closed when it cannot reach revocation state (draft 3.7).
+ */
+export function isHighSensitivity(resource: { kind: string; attrs: JsonObject }): boolean {
+  const declared = resource.attrs.sensitivity;
+  if (declared === "high") return true;
+  if (declared === "low" || declared === "normal") return false;
+  return HIGH_SENSITIVITY_KINDS.has(resource.kind);
+}
 
 /** The architecture draft's "Project": a new registry entity, not paseo's. */
 export const RegistryProjectSchema = z.object({
@@ -111,6 +161,44 @@ export const ProjectMemberSchema = z.object({
   addedAt: z.number(),
 });
 export type ProjectMember = z.infer<typeof ProjectMemberSchema>;
+
+/**
+ * Draft 3.2/5: a capability's scope must stay inside the project member's
+ * allocation, which is what gives the stored allocation meaning. Objects narrow
+ * key by key; every other value must match exactly.
+ */
+export function isScopeWithinAllocation(scope: JsonObject, allocation: JsonObject): boolean {
+  return Object.entries(scope).every(([key, value]) => {
+    const permitted = allocation[key];
+    if (permitted === undefined) return false;
+    if (isJsonObject(value) && isJsonObject(permitted)) {
+      return isScopeWithinAllocation(value, permitted);
+    }
+    return jsonEquals(value, permitted);
+  });
+}
+
+function isJsonObject(value: unknown): value is JsonObject {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
+}
+
+/** Deep equality for JSON values, independent of object key order. */
+function jsonEquals(left: unknown, right: unknown): boolean {
+  if (isJsonObject(left) && isJsonObject(right)) {
+    const leftKeys = Object.keys(left).sort();
+    const rightKeys = Object.keys(right).sort();
+    if (leftKeys.length !== rightKeys.length) return false;
+    return leftKeys.every(
+      (key, index) => rightKeys[index] === key && jsonEquals(left[key], right[key]),
+    );
+  }
+  if (Array.isArray(left) && Array.isArray(right)) {
+    return (
+      left.length === right.length && left.every((item, index) => jsonEquals(item, right[index]))
+    );
+  }
+  return left === right;
+}
 
 /** Draft project ↔ paseo Workspace binding (1:N). */
 export const ProjectWorkspaceSchema = z.object({
@@ -141,6 +229,59 @@ export const OperatorBindingSchema = z.object({
   createdAt: z.number(),
 });
 export type OperatorBinding = z.infer<typeof OperatorBindingSchema>;
+
+/**
+ * The signed payload of a capability token. It travels inside the token, so a
+ * verifier needs no database to read it; only revocation state is a lookup.
+ */
+export const CapabilityClaimsSchema = z.object({
+  v: z.number(),
+  id: z.string().min(1),
+  serial: z.string().min(1),
+  kid: z.string().min(1),
+  issuer: z.string().min(1),
+  subject: z.string().min(1),
+  project: z.string().nullable(),
+  resource: z.string().min(1),
+  kind: CapabilityKindSchema,
+  scope: JsonObjectSchema,
+  caveats: JsonObjectSchema,
+  iat: z.number(),
+  exp: z.number().nullable(),
+});
+export type CapabilityClaims = z.infer<typeof CapabilityClaimsSchema>;
+
+/**
+ * A capability as the registry stores it. `revokedAt` comes from the revocation
+ * list rather than from a column, so a token and its revocation have one source.
+ */
+export const CapabilitySchema = z.object({
+  id: z.string().min(1),
+  serial: z.string().min(1),
+  kid: z.string().min(1),
+  issuer: z.string().min(1),
+  subject: z.string().min(1),
+  projectId: z.string().nullable(),
+  resourceId: z.string().min(1),
+  kind: CapabilityKindSchema,
+  scope: JsonObjectSchema,
+  caveats: JsonObjectSchema,
+  issuedAt: z.number(),
+  expiresAt: z.number().nullable(),
+  revokedAt: z.number().nullable(),
+  revokedReason: z.string().nullable(),
+});
+export type Capability = z.infer<typeof CapabilitySchema>;
+
+/** Outcome of `capability.verify`: the claims survive a refusal so callers can log them. */
+export const CapabilityVerificationSchema = z.object({
+  ok: z.boolean(),
+  reason: VerifyFailureSchema.nullable(),
+  subject: z.string().nullable(),
+  resourceId: z.string().nullable(),
+  claims: CapabilityClaimsSchema.nullable(),
+});
+export type CapabilityVerification = z.infer<typeof CapabilityVerificationSchema>;
 
 /** Index of a paseo agent session; content stays in paseo's timeline. */
 export const SessionRefSchema = z.object({

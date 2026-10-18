@@ -5,12 +5,16 @@
 import { useCallback } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import type {
+  BroadcastEntry,
+  Capability,
+  CapabilityVerification,
   OperatorBinding,
   OperatorStatus,
   ProjectMember,
   ProjectWorkspace,
   ProviderInfo,
   ProviderModel,
+  RegistryEvent,
   RegistryProject,
   Resource,
 } from "../shared/model.js";
@@ -310,6 +314,8 @@ export function AddMemberChip({
 function describeOperator(operator: OperatorBinding): string {
   const parts = [operator.id, operator.status];
   if (operator.role) parts.push(operator.role);
+  // Which workspace it runs in matters once a project binds more than one.
+  if (operator.workspaceId) parts.push(operator.workspaceId);
   return parts.join(" · ");
 }
 
@@ -353,6 +359,8 @@ export function OperatorPanel({
   providers,
   models,
   modelsPending,
+  workspaces,
+  selectedWorkspace,
   selectedProvider,
   selectedModel,
   roleValue,
@@ -362,6 +370,7 @@ export function OperatorPanel({
   operators,
   onSelectProvider,
   onSelectModel,
+  onSelectWorkspace,
   onChangeRole,
   onChangeSession,
   onCreate,
@@ -375,6 +384,8 @@ export function OperatorPanel({
   providers: ProviderInfo[];
   models: ProviderModel[];
   modelsPending: boolean;
+  workspaces: ProjectWorkspace[];
+  selectedWorkspace: string;
   selectedProvider: string;
   selectedModel: string;
   roleValue: string;
@@ -384,6 +395,7 @@ export function OperatorPanel({
   operators: OperatorBinding[];
   onSelectProvider: (value: string) => void;
   onSelectModel: (value: string) => void;
+  onSelectWorkspace: (value: string) => void;
   onChangeRole: (value: string) => void;
   onChangeSession: (value: string) => void;
   onCreate: () => void;
@@ -398,6 +410,20 @@ export function OperatorPanel({
       {errorMessage ? <Text style={styles.danger}>{errorMessage}</Text> : null}
 
       <Text style={styles.sectionTitle}>new paseo agent session</Text>
+      {workspaces.length > 1 ? (
+        <View style={styles.chipRow}>
+          {workspaces.map((workspace) => (
+            <SelectChip
+              key={workspace.workspaceId}
+              styles={styles}
+              label={describeWorkspace(workspace)}
+              value={workspace.workspaceId}
+              selected={workspace.workspaceId === selectedWorkspace}
+              onSelect={onSelectWorkspace}
+            />
+          ))}
+        </View>
+      ) : null}
       <View style={styles.chipRow}>
         {providers.map((provider) => (
           <SelectChip
@@ -558,5 +584,401 @@ export function ProjectDetail({
         ))}
       </View>
     </View>
+  );
+}
+
+/** `HH:MM:SSZ`, which is enough for a glance and stable across locales. */
+function formatEventTime(ts: number): string {
+  return `${new Date(ts).toISOString().slice(11, 19)}Z`;
+}
+
+function describeEvent(event: RegistryEvent): string {
+  const reason = typeof event.payload.reason === "string" ? ` · ${event.payload.reason}` : "";
+  const subject = event.subject === "" ? "" : ` · ${event.subject}`;
+  return `#${event.seq} · ${formatEventTime(event.ts)}${subject}${reason}`;
+}
+
+function broadcastKey(entry: BroadcastEntry): string {
+  switch (entry.type) {
+    case "project":
+      return `project:${entry.project.project.id}`;
+    case "ai-capability":
+      return `ai-capability:${entry.resource.id}`;
+    case "revocation":
+      return `revocation:${entry.resourceId}:${entry.eventSeq}`;
+  }
+}
+
+function describeBroadcast(entry: BroadcastEntry): string {
+  switch (entry.type) {
+    case "project":
+      return `project · ${entry.project.project.name} · ${entry.project.members.length} members`;
+    case "ai-capability":
+      return `ai-capability · ${entry.resource.name}`;
+    case "revocation":
+      return `revocation · ${entry.resourceId} · ${entry.reason}`;
+  }
+}
+
+/**
+ * The registry's own audit trail and outbox, which are also the two things an
+ * operator debugging a refusal wants to see. Reads are cheap locally and the
+ * card refreshes after every mutation, so there is no polling here.
+ */
+export function ActivityCard({
+  styles,
+  events,
+  broadcasts,
+  pending,
+  onRefresh,
+}: {
+  styles: Styles;
+  events: RegistryEvent[];
+  broadcasts: BroadcastEntry[];
+  pending: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <View style={styles.row}>
+        <View style={styles.grow}>
+          <Text style={styles.title}>Activity</Text>
+          <Text style={styles.muted}>
+            {events.length} recent events · {broadcasts.length} broadcasts
+          </Text>
+        </View>
+        <Chip
+          styles={styles}
+          label="refresh"
+          variant="neutral"
+          onPress={onRefresh}
+          disabled={pending}
+        />
+      </View>
+
+      <Text style={styles.sectionTitle}>recent events</Text>
+      {events.map((event) => (
+        <View key={event.seq} style={styles.grow}>
+          <Text style={styles.title}>{event.type}</Text>
+          <Text style={styles.muted}>{describeEvent(event)}</Text>
+        </View>
+      ))}
+      {events.length === 0 ? <Text style={styles.muted}>No events yet.</Text> : null}
+
+      <Text style={styles.sectionTitle}>broadcasts</Text>
+      {broadcasts.map((entry) => (
+        <Text key={broadcastKey(entry)} style={styles.muted}>
+          {describeBroadcast(entry)}
+        </Text>
+      ))}
+      {broadcasts.length === 0 ? <Text style={styles.muted}>Nothing shared yet.</Text> : null}
+    </View>
+  );
+}
+
+/** Last eight characters of an id: enough to tell two of them apart in a chip. */
+function shortId(id: string): string {
+  const local = id.split("/").pop() ?? id;
+  return `…${local.slice(-8)}`;
+}
+
+function operatorLabel(operator: OperatorBinding): string {
+  const short = shortId(operator.id);
+  return operator.role ? `${operator.role} · ${short}` : short;
+}
+
+function resourceLabel(resourceId: string, resources: Resource[]): string {
+  return resources.find((resource) => resource.id === resourceId)?.name ?? shortId(resourceId);
+}
+
+function describeCapability(capability: Capability): string {
+  const parts = [capability.kind, shortId(capability.subject), shortId(capability.id)];
+  if (capability.revokedAt !== null) {
+    parts.push(`revoked: ${capability.revokedReason ?? "unknown"}`);
+  } else if (capability.expiresAt !== null) {
+    parts.push(`expires ${formatEventTime(capability.expiresAt)}`);
+  } else {
+    parts.push("no expiry");
+  }
+  return parts.join(" · ");
+}
+
+function CapabilityRow({
+  styles,
+  capability,
+  resourceName,
+  pending,
+  onRevoke,
+}: {
+  styles: Styles;
+  capability: Capability;
+  resourceName: string;
+  pending: boolean;
+  onRevoke: (id: string) => void;
+}) {
+  const revoked = capability.revokedAt !== null;
+  const handleRevoke = useCallback(() => onRevoke(capability.id), [capability.id, onRevoke]);
+  return (
+    <View style={styles.row}>
+      <View style={styles.grow}>
+        <Text style={styles.title}>{resourceName}</Text>
+        <Text style={styles.muted}>{describeCapability(capability)}</Text>
+      </View>
+      {revoked ? null : (
+        <Chip
+          styles={styles}
+          label="revoke"
+          variant="neutral"
+          onPress={handleRevoke}
+          disabled={pending}
+        />
+      )}
+    </View>
+  );
+}
+
+/**
+ * Issuing is deliberately explicit: the subject picker only lists active
+ * operators and the resource picker only lists project members, which are the
+ * two facts issuance checks. Scope stays a JSON field because it is free-form by
+ * design; the server refuses anything wider than the member's allocation.
+ */
+export function CapabilityPanel({
+  styles,
+  title,
+  errorMessage,
+  resources,
+  subjects,
+  capabilities,
+  issuedToken,
+  selectedSubject,
+  selectedResource,
+  selectedKind,
+  scopeValue,
+  ttlValue,
+  placeholderColor,
+  pending,
+  onSelectSubject,
+  onSelectResource,
+  onSelectKind,
+  onChangeScope,
+  onChangeTtl,
+  onIssue,
+  onRevoke,
+}: {
+  styles: Styles;
+  title: string;
+  errorMessage: string | null;
+  resources: Resource[];
+  subjects: OperatorBinding[];
+  capabilities: Capability[];
+  issuedToken: string;
+  selectedSubject: string;
+  selectedResource: string;
+  selectedKind: "access" | "approval";
+  scopeValue: string;
+  ttlValue: string;
+  placeholderColor: string;
+  pending: boolean;
+  onSelectSubject: (value: string) => void;
+  onSelectResource: (value: string) => void;
+  onSelectKind: (value: string) => void;
+  onChangeScope: (value: string) => void;
+  onChangeTtl: (value: string) => void;
+  onIssue: () => void;
+  onRevoke: (id: string) => void;
+}) {
+  const canIssue = subjects.length > 0 && resources.length > 0 && !pending;
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>{title}</Text>
+      {errorMessage ? <Text style={styles.danger}>{errorMessage}</Text> : null}
+
+      <Text style={styles.sectionTitle}>issue</Text>
+      <Text style={styles.muted}>subject</Text>
+      <View style={styles.chipRow}>
+        {subjects.map((operator) => (
+          <SelectChip
+            key={operator.id}
+            styles={styles}
+            label={operatorLabel(operator)}
+            value={operator.id}
+            selected={operator.id === selectedSubject}
+            onSelect={onSelectSubject}
+          />
+        ))}
+      </View>
+      {subjects.length === 0 ? (
+        <Text style={styles.muted}>
+          Bind an active operator first; every capability needs a subject.
+        </Text>
+      ) : null}
+
+      <Text style={styles.muted}>resource</Text>
+      <View style={styles.chipRow}>
+        {resources.map((resource) => (
+          <SelectChip
+            key={resource.id}
+            styles={styles}
+            label={resource.name}
+            value={resource.id}
+            selected={resource.id === selectedResource}
+            onSelect={onSelectResource}
+          />
+        ))}
+      </View>
+      {resources.length === 0 ? (
+        <Text style={styles.muted}>
+          Add a resource to the project first; issuance only covers project members.
+        </Text>
+      ) : null}
+
+      <Text style={styles.muted}>kind</Text>
+      <View style={styles.chipRow}>
+        <SelectChip
+          styles={styles}
+          label="access"
+          value="access"
+          selected={selectedKind === "access"}
+          onSelect={onSelectKind}
+        />
+        <SelectChip
+          styles={styles}
+          label="approval"
+          value="approval"
+          selected={selectedKind === "approval"}
+          onSelect={onSelectKind}
+        />
+      </View>
+
+      <View style={styles.row}>
+        <TextInput
+          style={styles.input}
+          placeholder='scope JSON, e.g. {"write":true}'
+          placeholderTextColor={placeholderColor}
+          value={scopeValue}
+          onChangeText={onChangeScope}
+          autoCapitalize="none"
+        />
+        <TextInput
+          style={styles.input}
+          placeholder="ttl seconds (optional)"
+          placeholderTextColor={placeholderColor}
+          value={ttlValue}
+          onChangeText={onChangeTtl}
+          keyboardType="numeric"
+        />
+      </View>
+      <View style={styles.row}>
+        <Pressable style={styles.primary} disabled={!canIssue} onPress={onIssue}>
+          <Text style={styles.primaryText}>Issue capability</Text>
+        </Pressable>
+      </View>
+
+      {issuedToken !== "" ? (
+        <View style={styles.tokenBox}>
+          <Text style={styles.sectionTitle}>issued token</Text>
+          <Text style={styles.mono} selectable>
+            {issuedToken}
+          </Text>
+          <Text style={styles.muted}>
+            Injected as LINGUS_CAPABILITIES when the session of this operator opens next.
+          </Text>
+        </View>
+      ) : null}
+
+      <Text style={styles.sectionTitle}>issued for this project</Text>
+      {capabilities.map((capability) => (
+        <CapabilityRow
+          key={capability.id}
+          styles={styles}
+          capability={capability}
+          resourceName={resourceLabel(capability.resourceId, resources)}
+          pending={pending}
+          onRevoke={onRevoke}
+        />
+      ))}
+      {capabilities.length === 0 ? <Text style={styles.muted}>No capabilities yet.</Text> : null}
+    </View>
+  );
+}
+
+/** Any token this registry issued can be checked here, project or not. */
+export function VerifyPanel({
+  styles,
+  tokenValue,
+  presenterValue,
+  result,
+  placeholderColor,
+  pending,
+  onChangeToken,
+  onChangePresenter,
+  onVerify,
+}: {
+  styles: Styles;
+  tokenValue: string;
+  presenterValue: string;
+  result: CapabilityVerification | null;
+  placeholderColor: string;
+  pending: boolean;
+  onChangeToken: (value: string) => void;
+  onChangePresenter: (value: string) => void;
+  onVerify: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.title}>Verify a token</Text>
+      <Text style={styles.muted}>
+        Checked against the signing key and revocation list of this registry; expiry and the
+        expected presenter are part of the verdict.
+      </Text>
+      <TextInput
+        style={styles.multiline}
+        multiline
+        placeholder="token"
+        placeholderTextColor={placeholderColor}
+        value={tokenValue}
+        onChangeText={onChangeToken}
+        autoCapitalize="none"
+      />
+      <TextInput
+        style={styles.input}
+        placeholder="expected presenter (optional)"
+        placeholderTextColor={placeholderColor}
+        value={presenterValue}
+        onChangeText={onChangePresenter}
+        autoCapitalize="none"
+      />
+      <Pressable
+        style={styles.primary}
+        disabled={tokenValue.trim() === "" || pending}
+        onPress={onVerify}
+      >
+        <Text style={styles.primaryText}>Verify</Text>
+      </Pressable>
+      {result === null ? null : <VerificationResult styles={styles} result={result} />}
+    </View>
+  );
+}
+
+/** The verdict, with the claims that survived a refusal when there are any. */
+function VerificationResult({
+  styles,
+  result,
+}: {
+  styles: Styles;
+  result: CapabilityVerification;
+}) {
+  if (result.ok) {
+    return (
+      <Text style={styles.success}>
+        ok · {result.subject ?? "unknown subject"} · {result.resourceId ?? "unknown resource"}
+      </Text>
+    );
+  }
+  return (
+    <Text style={styles.danger}>
+      {result.reason ?? "refused"} · {result.subject ?? "unknown subject"}
+    </Text>
   );
 }
