@@ -7,6 +7,8 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import {
+  broadcastList,
+  eventsList,
   operatorBind,
   operatorList,
   operatorSetStatus,
@@ -26,6 +28,7 @@ import {
 } from "../shared/contracts.js";
 import type { OperatorStatus } from "../shared/model.js";
 import {
+  ActivityCard,
   ErrorCard,
   HeaderCard,
   OperatorPanel,
@@ -59,6 +62,9 @@ export function Main({ theme, host }: PluginScreenProps) {
   const [operatorModel, setOperatorModel] = useState("");
   const [operatorRole, setOperatorRole] = useState("");
   const [operatorSession, setOperatorSession] = useState("");
+  // Which bound workspace a new operator session lands in. Only meaningful when
+  // the project has more than one; a single workspace needs no choice.
+  const [operatorWorkspace, setOperatorWorkspace] = useState("");
 
   const infoRpc = useRpc(registryInfo);
   const listResourcesRpc = useRpc(resourceList);
@@ -76,6 +82,8 @@ export function Main({ theme, host }: PluginScreenProps) {
   const bindWorkspaceRpc = useRpc(projectBindWorkspace);
   const bindOperatorRpc = useRpc(operatorBind);
   const setOperatorStatusRpc = useRpc(operatorSetStatus);
+  const listEventsRpc = useRpc(eventsList);
+  const listBroadcastsRpc = useRpc(broadcastList);
 
   const infoQuery = useQuery({ queryKey: ["lingus", "info"], queryFn: () => infoRpc({}) });
   const resourcesQuery = useQuery({
@@ -115,6 +123,16 @@ export function Main({ theme, host }: PluginScreenProps) {
     queryFn: () => listProviderModelsRpc({ provider: operatorProvider }),
     enabled: operatorProvider !== "",
   });
+  // The registry's own audit trail and outbox. Both are small locally, so the
+  // screen reads them whole and trims for display.
+  const eventsQuery = useQuery({
+    queryKey: ["lingus", "events"],
+    queryFn: () => listEventsRpc({ since: 0 }),
+  });
+  const broadcastsQuery = useQuery({
+    queryKey: ["lingus", "broadcasts"],
+    queryFn: () => listBroadcastsRpc({ since: 0 }),
+  });
 
   const providersData = providersQuery.data;
   const modelsData = modelsQuery.data;
@@ -150,38 +168,48 @@ export function Main({ theme, host }: PluginScreenProps) {
       ]),
     [queryClient],
   );
+  // Every write appends an audit event, and some change the broadcast outbox, so
+  // the activity card refreshes after any mutation rather than on a timer.
+  const invalidateActivity = useCallback(
+    () =>
+      Promise.all([
+        queryClient.invalidateQueries({ queryKey: ["lingus", "events"] }),
+        queryClient.invalidateQueries({ queryKey: ["lingus", "broadcasts"] }),
+      ]),
+    [queryClient],
+  );
 
   const registerMutation = useMutation({
     mutationFn: (input: { name: string; kind: string }) => registerResourceRpc(input),
     onSuccess: async () => {
       setResourceName("");
-      await invalidateResources();
+      await Promise.all([invalidateResources(), invalidateActivity()]);
     },
   });
   const setClassMutation = useMutation({
     mutationFn: (input: { id: string; class: "private" | "work" }) => setClassRpc(input),
     onSuccess: async () => {
-      await invalidateResources();
+      await Promise.all([invalidateResources(), invalidateActivity()]);
     },
   });
   const createProjectMutation = useMutation({
     mutationFn: (input: { name: string }) => createProjectRpc(input),
     onSuccess: async () => {
       setProjectName("");
-      await invalidateProjects();
+      await Promise.all([invalidateProjects(), invalidateActivity()]);
     },
   });
   const addMemberMutation = useMutation({
     mutationFn: (input: { projectId: string; resourceId: string }) => addMemberRpc(input),
     onSuccess: async (_data, variables) => {
-      await invalidateDetail(variables.projectId);
+      await Promise.all([invalidateDetail(variables.projectId), invalidateActivity()]);
     },
   });
   const bindWorkspaceMutation = useMutation({
     mutationFn: (input: { projectId: string; workspaceId: string }) => bindWorkspaceRpc(input),
     onSuccess: async (_data, variables) => {
       setWorkspaceValue("");
-      await invalidateDetail(variables.projectId);
+      await Promise.all([invalidateDetail(variables.projectId), invalidateActivity()]);
     },
   });
   const bindOperatorMutation = useMutation({
@@ -191,19 +219,54 @@ export function Main({ theme, host }: PluginScreenProps) {
       provider?: string;
       title?: string;
       agentSessionId?: string;
+      workspaceId?: string;
     }) => bindOperatorRpc(input),
     onSuccess: async (_data, variables) => {
       setOperatorRole("");
       setOperatorSession("");
-      await invalidateDetail(variables.projectId);
+      await Promise.all([invalidateDetail(variables.projectId), invalidateActivity()]);
     },
   });
   const setOperatorStatusMutation = useMutation({
     mutationFn: (input: { id: string; status: OperatorStatus }) => setOperatorStatusRpc(input),
     onSuccess: async () => {
-      if (selectedProject) await invalidateDetail(selectedProject);
+      const detail = selectedProject ? invalidateDetail(selectedProject) : Promise.resolve();
+      await Promise.all([detail, invalidateActivity()]);
     },
   });
+
+  // `?? []` allocated inline would be a fresh array on every render, which both
+  // defeats memoization and trips the react-perf array rule; memoize per query.
+  const resourcesData = resourcesQuery.data;
+  const projectsData = projectsQuery.data;
+  const membersData = membersQuery.data;
+  const workspacesData = workspacesQuery.data;
+  const operatorsData = operatorsQuery.data;
+  const eventsData = eventsQuery.data;
+  const broadcastsData = broadcastsQuery.data;
+  const resources = useMemo(() => resourcesData?.resources ?? [], [resourcesData]);
+  const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
+  const members = useMemo(() => membersData?.members ?? [], [membersData]);
+  const workspaces = useMemo(() => workspacesData?.workspaces ?? [], [workspacesData]);
+  const operators = useMemo(() => operatorsData?.operators ?? [], [operatorsData]);
+  // Newest first, and only the tail: the audit trail grows forever and the card
+  // is a glance, not a log viewer.
+  const recentEvents = useMemo(() => (eventsData?.events ?? []).slice(-12).reverse(), [eventsData]);
+  const broadcasts = useMemo(() => broadcastsData?.entries ?? [], [broadcastsData]);
+  const memberIds = useMemo(() => new Set(members.map((member) => member.resourceId)), [members]);
+  const addableResources = useMemo(
+    () => resources.filter((resource) => !resource.builtin && !memberIds.has(resource.id)),
+    [memberIds, resources],
+  );
+  // A new operator session lands in one bound workspace. With a single binding
+  // there is nothing to choose; with more, the server refuses to guess (D-P4), so
+  // fall back to the first when the stored pick is stale.
+  const activeWorkspace = useMemo(() => {
+    if (workspaces.some((workspace) => workspace.workspaceId === operatorWorkspace)) {
+      return operatorWorkspace;
+    }
+    return workspaces[0]?.workspaceId ?? "";
+  }, [operatorWorkspace, workspaces]);
 
   const handleRegisterResource = useCallback(
     (name: string, kind: string) => registerMutation.mutate({ name, kind }),
@@ -234,6 +297,10 @@ export function Main({ theme, host }: PluginScreenProps) {
   );
   const handleSelectProvider = useCallback((id: string) => setOperatorProvider(id), []);
   const handleSelectModel = useCallback((id: string) => setOperatorModel(id), []);
+  const handleSelectOperatorWorkspace = useCallback(
+    (workspaceId: string) => setOperatorWorkspace(workspaceId),
+    [],
+  );
   const handleChangeOperatorRole = useCallback((value: string) => setOperatorRole(value), []);
   const handleChangeOperatorSession = useCallback((value: string) => setOperatorSession(value), []);
   const handleCreateOperator = useCallback(() => {
@@ -241,11 +308,21 @@ export function Main({ theme, host }: PluginScreenProps) {
     const role = operatorRole.trim();
     bindOperatorMutation.mutate({
       projectId: selectedProject,
+      // Explicit rather than left to the server: with several bound workspaces
+      // the server refuses to guess, and the picker already showed the choice.
+      workspaceId: activeWorkspace === "" ? undefined : activeWorkspace,
       role: role === "" ? undefined : role,
       provider: `${operatorProvider}/${activeModel}`,
       title: role === "" ? undefined : role,
     });
-  }, [activeModel, bindOperatorMutation, operatorProvider, operatorRole, selectedProject]);
+  }, [
+    activeModel,
+    activeWorkspace,
+    bindOperatorMutation,
+    operatorProvider,
+    operatorRole,
+    selectedProject,
+  ]);
   const handleBackfillOperator = useCallback(() => {
     const agentSessionId = operatorSession.trim();
     if (!selectedProject || agentSessionId === "") return;
@@ -260,24 +337,9 @@ export function Main({ theme, host }: PluginScreenProps) {
     (id: string, status: OperatorStatus) => setOperatorStatusMutation.mutate({ id, status }),
     [setOperatorStatusMutation],
   );
-
-  // `?? []` allocated inline would be a fresh array on every render, which both
-  // defeats memoization and trips the react-perf array rule; memoize per query.
-  const resourcesData = resourcesQuery.data;
-  const projectsData = projectsQuery.data;
-  const membersData = membersQuery.data;
-  const workspacesData = workspacesQuery.data;
-  const operatorsData = operatorsQuery.data;
-  const resources = useMemo(() => resourcesData?.resources ?? [], [resourcesData]);
-  const projects = useMemo(() => projectsData?.projects ?? [], [projectsData]);
-  const members = useMemo(() => membersData?.members ?? [], [membersData]);
-  const workspaces = useMemo(() => workspacesData?.workspaces ?? [], [workspacesData]);
-  const operators = useMemo(() => operatorsData?.operators ?? [], [operatorsData]);
-  const memberIds = useMemo(() => new Set(members.map((member) => member.resourceId)), [members]);
-  const addableResources = useMemo(
-    () => resources.filter((resource) => !resource.builtin && !memberIds.has(resource.id)),
-    [memberIds, resources],
-  );
+  const handleRefreshActivity = useCallback(() => {
+    void invalidateActivity();
+  }, [invalidateActivity]);
 
   const lastError = firstError(
     registerMutation.error,
@@ -286,6 +348,8 @@ export function Main({ theme, host }: PluginScreenProps) {
     addMemberMutation.error,
     bindWorkspaceMutation.error,
     descriptorQuery.error,
+    eventsQuery.error,
+    broadcastsQuery.error,
   );
   // Operator failures stay next to the operator form instead of the page-level
   // banner: a rejected provider or a mistyped session id belongs to that panel.
@@ -388,6 +452,8 @@ export function Main({ theme, host }: PluginScreenProps) {
           providers={availableProviders}
           models={models}
           modelsPending={modelsQuery.isLoading}
+          workspaces={workspaces}
+          selectedWorkspace={activeWorkspace}
           selectedProvider={operatorProvider}
           selectedModel={activeModel}
           roleValue={operatorRole}
@@ -397,6 +463,7 @@ export function Main({ theme, host }: PluginScreenProps) {
           operators={operators}
           onSelectProvider={handleSelectProvider}
           onSelectModel={handleSelectModel}
+          onSelectWorkspace={handleSelectOperatorWorkspace}
           onChangeRole={handleChangeOperatorRole}
           onChangeSession={handleChangeOperatorSession}
           onCreate={handleCreateOperator}
@@ -404,6 +471,14 @@ export function Main({ theme, host }: PluginScreenProps) {
           onToggleStatus={handleToggleOperatorStatus}
         />
       ) : null}
+
+      <ActivityCard
+        styles={styles}
+        events={recentEvents}
+        broadcasts={broadcasts}
+        pending={eventsQuery.isFetching || broadcastsQuery.isFetching}
+        onRefresh={handleRefreshActivity}
+      />
     </ScrollView>
   );
 }

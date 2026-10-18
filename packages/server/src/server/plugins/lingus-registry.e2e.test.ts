@@ -76,6 +76,13 @@ test("lingus-registry creates operator sessions through its paseo API and back-f
     };
     expect(providers.providers.map((provider) => provider.id)).toContain("pi");
 
+    // `provider.models` is what the client uses to offer a model for the session it
+    // is about to create, so it goes through the same provider catalog as the app.
+    const models = (await client.invokePluginRpc("lingus-registry", "provider.models", {
+      provider: "pi",
+    })) as { models: Array<{ id: string; label: string; isDefault: boolean }> };
+    expect(models.models).toEqual([{ id: "test-model", label: "Test Model", isDefault: true }]);
+
     const project = (await client.invokePluginRpc("lingus-registry", "project.create", {
       name: "fleet",
     })) as { project: { id: string } };
@@ -134,6 +141,30 @@ test("lingus-registry creates operator sessions through its paseo API and back-f
       sessions: unknown[];
     };
     expect(afterReject.sessions).toHaveLength(1);
+
+    // With two bound workspaces the server refuses to guess (D-P4); the client's
+    // picker is what turns the ambiguity into an explicit choice.
+    const secondWorkspace = (
+      await client.createWorkspace({ source: { kind: "directory", path: daemon.staticDir } })
+    ).workspace?.id;
+    if (!secondWorkspace) throw new Error("the second test workspace was not created");
+    await client.invokePluginRpc("lingus-registry", "project.bind_workspace", {
+      projectId: other.project.id,
+      workspaceId: secondWorkspace,
+    });
+    await expect(
+      client.invokePluginRpc("lingus-registry", "operator.bind", {
+        projectId: other.project.id,
+        provider: "pi/test",
+      }),
+    ).rejects.toThrow(/workspace/i);
+    const picked = (await client.invokePluginRpc("lingus-registry", "operator.bind", {
+      projectId: other.project.id,
+      provider: "pi/test",
+      workspaceId: secondWorkspace,
+    })) as { created: boolean; operator: { workspaceId: string | null } };
+    expect(picked.created).toBe(true);
+    expect(picked.operator.workspaceId).toBe(secondWorkspace);
   } finally {
     await client.close();
     await daemon.close();
