@@ -1902,6 +1902,13 @@ export const zhCN: TranslationResources = {
       tooLargeToDisplay: "此文件过大，无法显示",
       failedToLoad: "加载文件失败",
       failedToLoadPreview: "加载文件预览失败",
+      outline: {
+        title: "大纲",
+        collapse: "折叠大纲",
+        expand: "展开大纲",
+        collapseItem: "折叠 {{title}}",
+        expandItem: "展开 {{title}}",
+      },
       editor: {
         fileSize: "文件大小 {{size}}",
         lines: "{{count}} 行",
@@ -2263,6 +2270,23 @@ export const zhCN: TranslationResources = {
       chatOutline: {
         title: "聊天大纲",
         description: "显示用于在提示词之间跳转的大纲",
+      },
+      markdownOutline: {
+        title: "Markdown 预览",
+        enabled: "文档大纲",
+        enabledDescription: "在 Markdown 预览旁显示可折叠的标题大纲",
+        position: {
+          label: "大纲位置",
+          description: "将大纲放在预览的左侧或右侧",
+          options: {
+            left: "左侧",
+            right: "右侧",
+          },
+        },
+        depth: {
+          label: "大纲深度",
+          description: "包含到此级别的标题",
+        },
       },
       sidebar: {
         header: {

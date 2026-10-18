@@ -7,6 +7,7 @@ import {
   DEFAULT_CLIENT_SETTINGS,
   DEFAULT_CODE_FONT_SIZE,
   DEFAULT_CONTENT_FONT_SIZE,
+  DEFAULT_MARKDOWN_OUTLINE_DEPTH,
   DEFAULT_UI_BASE_FONT_SIZE,
   defaultUiBaseFontSize,
   defaultContentFontSize,
@@ -197,6 +198,34 @@ describe("loadAppSettingsFromStorage", () => {
     const result = await loadAppSettingsFromStorage(deps);
 
     expect(result.chatOutlineEnabled).toBe(false);
+  });
+
+  it("shows the Markdown preview outline on the left at depth three by default", async () => {
+    const deps = makeDeps();
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.markdownOutlineEnabled).toBe(true);
+    expect(result.markdownOutlinePosition).toBe("left");
+    expect(result.markdownOutlineDepth).toBe(DEFAULT_MARKDOWN_OUTLINE_DEPTH);
+  });
+
+  it("loads and clamps a configured Markdown preview outline", async () => {
+    const deps = makeDeps({
+      storage: createInMemoryKeyValueStorage({
+        [APP_SETTINGS_KEY]: JSON.stringify({
+          markdownOutlineEnabled: false,
+          markdownOutlinePosition: "right",
+          markdownOutlineDepth: 99,
+        }),
+      }),
+    });
+
+    const result = await loadAppSettingsFromStorage(deps);
+
+    expect(result.markdownOutlineEnabled).toBe(false);
+    expect(result.markdownOutlinePosition).toBe("right");
+    expect(result.markdownOutlineDepth).toBe(6);
   });
 
   it("defaults sidebar navigation items to an empty preference list", async () => {

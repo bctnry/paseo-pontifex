@@ -10,6 +10,10 @@ Workspace file links use the shared file-link resolver. The workspace supplies i
 
 Resolve workspace image paths over the existing session RPC, then give the library a cached native file URL or web blob URL. HTTP(S) images pass through unchanged. This preserves relay, SSH and local socket connections, which do not expose a daemon HTTP endpoint. Each mounted renderer owns its image acquisition identity, so a later reply reads a rewritten path again while the earlier mounted reply retains its snapshot. Image taps open the attachment lightbox. File previews resolve relative images against the Markdown file's directory. An image alone on its line becomes its own paragraph before the library sees it, so it renders as a block on every platform; the library only treats sole-child paragraph images as blocks, and with hard soft breaks every newline is a break node, which left own-line images inline on iOS and web. Images that share a line with text stay inline.
 
+## File preview outline
+
+Markdown file previews show a collapsible heading outline. Chat settings choose its side and the deepest heading level it lists; headings deeper than the limit stay in the rendered body. Each heading that owns subheadings has its own disclosure control, and the outline list scrolls independently of the document. The preview splits the body at each listed top-level heading and mounts one renderer per section, because a section layout offset is the cross-platform scroll target the library exposes. Reference definitions are copied into sections that need them. Native selection cannot cross a section boundary; chat keeps one renderer per message for that reason.
+
 ## Engine constraints
 
 The pinned nightly has the same React Native package and core source trees as upstream commit `73ac5085eb1fdc743973b3473d4dba65abad5261`. Compatibility was checked with React Native 0.81.5. Native dependencies must be rebuilt when changing the highlighting configuration; JavaScript refresh cannot enable compiled grammars.
@@ -28,4 +32,4 @@ The library determines how incomplete Markdown appears during streaming. Complet
 
 ## Verification
 
-Follow [QA](qa.md) and [mobile testing](mobile-testing.md). Exercise chat, file preview, plan and PR content on all three platforms. Include cross-paragraph selection, progressive streaming, a file-link tap, code copy/highlighting, a table and a workspace image. On iPad, repeat preview selection after opening and closing Explorer and after rotation. Check web find, selection-copy and source-message navigation after DOM changes.
+Follow [QA](qa.md) and [mobile testing](mobile-testing.md). Exercise chat, file preview, plan and PR content on all three platforms. Include cross-paragraph selection, progressive streaming, a file-link tap, code copy/highlighting, a table, a workspace image and an outline jump in a long Markdown file. On iPad, repeat preview selection after opening and closing Explorer and after rotation. Check web find, selection-copy and source-message navigation after DOM changes.

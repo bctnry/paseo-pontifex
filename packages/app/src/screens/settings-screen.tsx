@@ -179,7 +179,17 @@ const SIDEBAR_SECTION_ITEMS: SidebarSectionItem[] = [
     id: "chat",
     labelKey: "settings.sections.chat",
     icon: MessageSquare,
-    keywords: ["messages", "markdown", "streaming", "code blocks"],
+    keywords: [
+      "messages",
+      "markdown",
+      "preview",
+      "outline",
+      "table of contents",
+      "toc",
+      "headings",
+      "streaming",
+      "code blocks",
+    ],
     Content: ChatSection,
   },
   {

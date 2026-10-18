@@ -1934,6 +1934,13 @@ export const ko: TranslationResources = {
       tooLargeToDisplay: "이 파일은 너무 커서 표시할 수 없습니다",
       failedToLoad: "파일을 불러오지 못했습니다",
       failedToLoadPreview: "파일 미리보기를 불러오지 못했습니다",
+      outline: {
+        title: "개요",
+        collapse: "개요 접기",
+        expand: "개요 펼치기",
+        collapseItem: "{{title}} 접기",
+        expandItem: "{{title}} 펼치기",
+      },
       editor: {
         fileSize: "파일 크기 {{size}}",
         lines: "{{count}} 라인",
@@ -2299,6 +2306,23 @@ export const ko: TranslationResources = {
       chatOutline: {
         title: "채팅 개요",
         description: "프롬프트 사이를 이동하기 위한 개요 표시",
+      },
+      markdownOutline: {
+        title: "Markdown 미리보기",
+        enabled: "문서 개요",
+        enabledDescription: "Markdown 미리보기 옆에 접을 수 있는 제목 개요를 표시합니다",
+        position: {
+          label: "개요 위치",
+          description: "미리보기의 왼쪽 또는 오른쪽에 개요를 배치합니다",
+          options: {
+            left: "왼쪽",
+            right: "오른쪽",
+          },
+        },
+        depth: {
+          label: "개요 깊이",
+          description: "이 수준까지의 제목을 포함합니다",
+        },
       },
       sidebar: {
         header: {

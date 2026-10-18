@@ -1969,6 +1969,13 @@ export const fr: TranslationResources = {
       tooLargeToDisplay: "Ce fichier est trop volumineux pour être affiché",
       failedToLoad: "Impossible de charger le fichier",
       failedToLoadPreview: "Impossible de charger l’aperçu du fichier",
+      outline: {
+        title: "Plan",
+        collapse: "Replier le plan",
+        expand: "Déplier le plan",
+        collapseItem: "Replier {{title}}",
+        expandItem: "Déplier {{title}}",
+      },
       editor: {
         fileSize: "Taille du fichier : {{size}}",
         lines: "{{count}} lignes",
@@ -2339,6 +2346,23 @@ export const fr: TranslationResources = {
       chatOutline: {
         title: "Plan de la discussion",
         description: "Afficher un plan pour naviguer entre les prompts",
+      },
+      markdownOutline: {
+        title: "Aperçu Markdown",
+        enabled: "Plan du document",
+        enabledDescription: "Afficher un plan repliable des titres à côté des aperçus Markdown",
+        position: {
+          label: "Position du plan",
+          description: "Placer le plan à gauche ou à droite de l'aperçu",
+          options: {
+            left: "Gauche",
+            right: "Droite",
+          },
+        },
+        depth: {
+          label: "Profondeur du plan",
+          description: "Inclure les titres jusqu'à ce niveau",
+        },
       },
       sidebar: {
         header: {

@@ -1972,6 +1972,13 @@ export const es: TranslationResources = {
       tooLargeToDisplay: "Este archivo es demasiado grande para mostrarlo",
       failedToLoad: "No se pudo cargar el archivo",
       failedToLoadPreview: "No se pudo cargar la vista previa del archivo",
+      outline: {
+        title: "Esquema",
+        collapse: "Contraer esquema",
+        expand: "Expandir esquema",
+        collapseItem: "Contraer {{title}}",
+        expandItem: "Expandir {{title}}",
+      },
       editor: {
         fileSize: "Tamaño {{size}}",
         lines: "{{count}} líneas",
@@ -2340,6 +2347,24 @@ export const es: TranslationResources = {
       chatOutline: {
         title: "Esquema del chat",
         description: "Muestra un esquema para saltar entre instrucciones",
+      },
+      markdownOutline: {
+        title: "Vista previa de Markdown",
+        enabled: "Esquema del documento",
+        enabledDescription:
+          "Muestra un esquema plegable de los encabezados junto a las vistas previas de Markdown",
+        position: {
+          label: "Posición del esquema",
+          description: "Coloca el esquema a la izquierda o a la derecha de la vista previa",
+          options: {
+            left: "Izquierda",
+            right: "Derecha",
+          },
+        },
+        depth: {
+          label: "Profundidad del esquema",
+          description: "Incluye encabezados hasta este nivel",
+        },
       },
       sidebar: {
         header: {

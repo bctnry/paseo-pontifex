@@ -1957,6 +1957,13 @@ export const ptBR: TranslationResources = {
       tooLargeToDisplay: "Este arquivo é grande demais para exibir",
       failedToLoad: "Falha ao carregar arquivo",
       failedToLoadPreview: "Falha ao carregar prévia do arquivo",
+      outline: {
+        title: "Estrutura",
+        collapse: "Recolher estrutura",
+        expand: "Expandir estrutura",
+        collapseItem: "Recolher {{title}}",
+        expandItem: "Expandir {{title}}",
+      },
       editor: {
         fileSize: "Tamanho {{size}}",
         lines: "{{count}} linhas",
@@ -2323,6 +2330,24 @@ export const ptBR: TranslationResources = {
       chatOutline: {
         title: "Estrutura do chat",
         description: "Mostrar uma estrutura para navegar entre prompts",
+      },
+      markdownOutline: {
+        title: "Prévia de Markdown",
+        enabled: "Estrutura do documento",
+        enabledDescription:
+          "Mostrar uma estrutura recolhível de títulos ao lado das prévias de Markdown",
+        position: {
+          label: "Posição da estrutura",
+          description: "Colocar a estrutura à esquerda ou à direita da prévia",
+          options: {
+            left: "Esquerda",
+            right: "Direita",
+          },
+        },
+        depth: {
+          label: "Profundidade da estrutura",
+          description: "Incluir títulos até este nível",
+        },
       },
       sidebar: {
         header: {

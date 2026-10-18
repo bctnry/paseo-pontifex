@@ -1924,6 +1924,13 @@ export const ar: TranslationResources = {
       tooLargeToDisplay: "هذا الملف كبير جدًا بحيث لا يمكن عرضه",
       failedToLoad: "فشل تحميل الملف",
       failedToLoadPreview: "فشل تحميل معاينة الملف",
+      outline: {
+        title: "المخطط",
+        collapse: "طي المخطط",
+        expand: "توسيع المخطط",
+        collapseItem: "طي {{title}}",
+        expandItem: "توسيع {{title}}",
+      },
       editor: {
         fileSize: "حجم الملف {{size}}",
         lines: "{{count}} سطر",
@@ -2288,6 +2295,23 @@ export const ar: TranslationResources = {
       chatOutline: {
         title: "مخطط المحادثة",
         description: "عرض مخطط للتنقل بين المطالبات",
+      },
+      markdownOutline: {
+        title: "معاينة Markdown",
+        enabled: "مخطط المستند",
+        enabledDescription: "عرض مخطط قابل للطي للعناوين بجانب معاينات Markdown",
+        position: {
+          label: "موضع المخطط",
+          description: "ضع المخطط على يسار المعاينة أو يمينها",
+          options: {
+            left: "يسار",
+            right: "يمين",
+          },
+        },
+        depth: {
+          label: "عمق المخطط",
+          description: "تضمين العناوين حتى هذا المستوى",
+        },
       },
       sidebar: {
         header: {

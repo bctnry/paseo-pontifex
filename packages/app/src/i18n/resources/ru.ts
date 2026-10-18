@@ -1956,6 +1956,13 @@ export const ru: TranslationResources = {
       tooLargeToDisplay: "Этот файл слишком велик для отображения",
       failedToLoad: "Не удалось загрузить файл",
       failedToLoadPreview: "Не удалось загрузить предварительный просмотр файла.",
+      outline: {
+        title: "Оглавление",
+        collapse: "Свернуть оглавление",
+        expand: "Развернуть оглавление",
+        collapseItem: "Свернуть {{title}}",
+        expandItem: "Развернуть {{title}}",
+      },
       editor: {
         fileSize: "Размер файла {{size}}",
         lines: "Строк: {{count}}",
@@ -2326,6 +2333,24 @@ export const ru: TranslationResources = {
       chatOutline: {
         title: "Оглавление чата",
         description: "Показывать оглавление для перехода между запросами",
+      },
+      markdownOutline: {
+        title: "Предпросмотр Markdown",
+        enabled: "Оглавление документа",
+        enabledDescription:
+          "Показывать сворачиваемое оглавление заголовков рядом с предпросмотром Markdown",
+        position: {
+          label: "Положение оглавления",
+          description: "Разместить оглавление слева или справа от предпросмотра",
+          options: {
+            left: "Слева",
+            right: "Справа",
+          },
+        },
+        depth: {
+          label: "Глубина оглавления",
+          description: "Включать заголовки до этого уровня",
+        },
       },
       sidebar: {
         header: {

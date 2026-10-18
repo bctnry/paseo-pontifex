@@ -1,15 +1,8 @@
 import { Button } from "@/components/ui/button";
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import React, {
-  useCallback,
-  useEffect,
-  useMemo,
-  useRef,
-  useState,
-  useSyncExternalStore,
-} from "react";
+import React, { useCallback, useEffect, useMemo, useState, useSyncExternalStore } from "react";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
-import { ScrollView as RNScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet, UnistylesRuntime, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -151,8 +144,6 @@ function FilePreviewBody({
       ? filePreviewRenderKind(filePath)
       : null;
 
-  const previewScrollRef = useRef<RNScrollView>(null);
-
   if (isLoading && !preview) {
     return (
       <View style={styles.centerState} testID="file-preview-loading">
@@ -183,19 +174,13 @@ function FilePreviewBody({
     if (renderKind === "markdown") {
       return (
         <View style={styles.previewScrollContainer}>
-          <RNScrollView
-            ref={previewScrollRef}
-            style={styles.previewContent}
-            showsVerticalScrollIndicator
-          >
-            <FileMarkdownPreview
-              source={preview.content ?? ""}
-              filePath={filePath}
-              workspaceRoot={workspaceRoot}
-              client={client}
-              serverId={serverId}
-            />
-          </RNScrollView>
+          <FileMarkdownPreview
+            source={preview.content ?? ""}
+            filePath={filePath}
+            workspaceRoot={workspaceRoot}
+            client={client}
+            serverId={serverId}
+          />
         </View>
       );
     }
@@ -710,10 +695,6 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
   },
   previewScrollContainer: {
-    flex: 1,
-    minHeight: 0,
-  },
-  previewContent: {
     flex: 1,
     minHeight: 0,
   },

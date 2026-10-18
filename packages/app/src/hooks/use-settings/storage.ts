@@ -41,6 +41,7 @@ export type PullRequestOpenLocation = "main" | "side" | "explorer";
 /** What a sidebar workspace row shows in the space to the right of its title. */
 export type SidebarWorkspaceTrailing = "diff" | "timestamp" | "none";
 export type ToolCallDetailLevel = "overview" | "detailed";
+export type MarkdownOutlinePosition = "left" | "right";
 /** Keybinding preset for the source editor on web and desktop. */
 export type EditorKeybindings = "default" | "vim" | "emacs";
 
@@ -53,6 +54,9 @@ export const DEFAULT_THEME_PREFERENCE = "auto" satisfies ThemePreference;
 export const DEFAULT_TERMINAL_SCROLLBACK_LINES = 10_000;
 export const MIN_TERMINAL_SCROLLBACK_LINES = 0;
 export const MAX_TERMINAL_SCROLLBACK_LINES = 1_000_000;
+export const DEFAULT_MARKDOWN_OUTLINE_DEPTH = 3;
+export const MIN_MARKDOWN_OUTLINE_DEPTH = 1;
+export const MAX_MARKDOWN_OUTLINE_DEPTH = 6;
 export function defaultUiBaseFontSize(native: boolean): number {
   return native ? 15 : FONT_SIZE.base;
 }
@@ -105,6 +109,9 @@ export interface AppSettings {
   autoExpandReasoning: boolean;
   toolCallDetailLevel: ToolCallDetailLevel;
   chatOutlineEnabled: boolean;
+  markdownOutlineEnabled: boolean;
+  markdownOutlinePosition: MarkdownOutlinePosition;
+  markdownOutlineDepth: number;
   editorKeybindings: EditorKeybindings;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
@@ -161,6 +168,9 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   autoExpandReasoning: false,
   toolCallDetailLevel: "detailed",
   chatOutlineEnabled: true,
+  markdownOutlineEnabled: true,
+  markdownOutlinePosition: "left",
+  markdownOutlineDepth: DEFAULT_MARKDOWN_OUTLINE_DEPTH,
   editorKeybindings: "default",
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
@@ -264,6 +274,12 @@ const StoredAppSettingsSchema = z
     // COMPAT(compactToolCalls): migrated in v0.1.105, remove after 2027-01-12.
     compactToolCalls: z.boolean().optional().catch(undefined),
     chatOutlineEnabled: z.boolean().catch(true),
+    markdownOutlineEnabled: z.boolean().catch(true),
+    markdownOutlinePosition: z.enum(["left", "right"]).catch("left"),
+    markdownOutlineDepth: clampedNumber(
+      MIN_MARKDOWN_OUTLINE_DEPTH,
+      MAX_MARKDOWN_OUTLINE_DEPTH,
+    ).catch(DEFAULT_MARKDOWN_OUTLINE_DEPTH),
     editorKeybindings: z.enum(["default", "vim", "emacs"]).optional().catch(undefined),
     // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
     vimKeybindings: z.boolean().optional().catch(undefined),

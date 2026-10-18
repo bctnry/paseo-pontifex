@@ -1949,6 +1949,13 @@ export const en = {
       tooLargeToDisplay: "This file is too large to display",
       failedToLoad: "Failed to load file",
       failedToLoadPreview: "Failed to load file preview",
+      outline: {
+        title: "Outline",
+        collapse: "Collapse outline",
+        expand: "Expand outline",
+        collapseItem: "Collapse {{title}}",
+        expandItem: "Expand {{title}}",
+      },
       editor: {
         fileSize: "File size {{size}}",
         lines: "{{count}} lines",
@@ -2412,6 +2419,23 @@ export const en = {
       chatOutline: {
         title: "Chat outline",
         description: "Show an outline for jumping between prompts",
+      },
+      markdownOutline: {
+        title: "Markdown preview",
+        enabled: "Document outline",
+        enabledDescription: "Show a collapsible outline of headings beside Markdown previews",
+        position: {
+          label: "Outline position",
+          description: "Place the outline on the left or right of the preview",
+          options: {
+            left: "Left",
+            right: "Right",
+          },
+        },
+        depth: {
+          label: "Outline depth",
+          description: "Include headings up to this level",
+        },
       },
       sidebar: {
         header: {

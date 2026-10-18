@@ -1943,6 +1943,13 @@ export const ja: TranslationResources = {
       tooLargeToDisplay: "このファイルは大きすぎて表示できません",
       failedToLoad: "ファイルの読み込みに失敗しました",
       failedToLoadPreview: "ファイルプレビューの読み込みに失敗しました",
+      outline: {
+        title: "アウトライン",
+        collapse: "アウトラインを折りたたむ",
+        expand: "アウトラインを展開",
+        collapseItem: "{{title}} を折りたたむ",
+        expandItem: "{{title}} を展開",
+      },
       editor: {
         fileSize: "ファイルサイズ {{size}}",
         lines: "{{count}} 行",
@@ -2308,6 +2315,24 @@ export const ja: TranslationResources = {
       chatOutline: {
         title: "チャットのアウトライン",
         description: "プロンプト間を移動するためのアウトラインを表示します",
+      },
+      markdownOutline: {
+        title: "Markdown プレビュー",
+        enabled: "ドキュメントのアウトライン",
+        enabledDescription:
+          "Markdown プレビューの横に折りたたみ可能な見出しのアウトラインを表示します",
+        position: {
+          label: "アウトラインの位置",
+          description: "プレビューの左または右にアウトラインを配置します",
+          options: {
+            left: "左",
+            right: "右",
+          },
+        },
+        depth: {
+          label: "アウトラインの深さ",
+          description: "このレベルまでの見出しを含めます",
+        },
       },
       sidebar: {
         header: {
