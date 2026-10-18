@@ -74,6 +74,32 @@ export function createStyles(theme: PluginTheme) {
     fontSize: 12,
     fontWeight: "600",
   };
+  // Tokens and JSON are read character by character, so they get a monospace
+  // face and their own box instead of the muted body style.
+  const mono: TextStyle = {
+    color: theme.colors.foreground,
+    fontSize: 11,
+    fontFamily: "monospace",
+  };
+  const multiline: TextStyle = {
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    borderRadius: 0,
+    paddingHorizontal: 10,
+    paddingVertical: 7,
+    color: theme.colors.foreground,
+    backgroundColor: theme.colors.surface2,
+    minHeight: 56,
+    textAlignVertical: "top",
+  };
+  const tokenBox: ViewStyle = {
+    backgroundColor: theme.colors.surface2,
+    borderColor: theme.colors.border,
+    borderWidth: 1,
+    padding: 8,
+    gap: 6,
+  };
+  const success: TextStyle = { color: theme.colors.statusSuccess, fontSize: 12 };
 
   return {
     screen,
@@ -93,6 +119,10 @@ export function createStyles(theme: PluginTheme) {
     chipNeutral,
     chipLabel,
     chipLabelWork,
+    mono,
+    multiline,
+    tokenBox,
+    success,
   };
 }
 

@@ -8,6 +8,10 @@ import { useCallback, useMemo, useState } from "react";
 import { ScrollView, Text, View } from "react-native";
 import {
   broadcastList,
+  capabilityIssue,
+  capabilityList,
+  capabilityRevoke,
+  capabilityVerify,
   eventsList,
   operatorBind,
   operatorList,
@@ -29,6 +33,7 @@ import {
 import type { OperatorStatus } from "../shared/model.js";
 import {
   ActivityCard,
+  CapabilityPanel,
   ErrorCard,
   HeaderCard,
   OperatorPanel,
@@ -37,6 +42,7 @@ import {
   ProjectRow,
   ResourceForm,
   ResourceRow,
+  VerifyPanel,
 } from "./components.js";
 import { createStyles } from "./styles.js";
 
@@ -45,6 +51,15 @@ function firstError(...errors: unknown[]): Error | null {
     if (error instanceof Error) return error;
   }
   return null;
+}
+
+/**
+ * Local validation wins over RPC errors: a rejected scope is the most recent
+ * thing that happened, and a mutation error stays set until the next attempt.
+ */
+function capabilityMessage(capError: string | null, ...errors: unknown[]): string | null {
+  if (capError !== null) return capError;
+  return firstError(...errors)?.message ?? null;
 }
 
 export function Main({ theme, host }: PluginScreenProps) {
@@ -65,6 +80,17 @@ export function Main({ theme, host }: PluginScreenProps) {
   // Which bound workspace a new operator session lands in. Only meaningful when
   // the project has more than one; a single workspace needs no choice.
   const [operatorWorkspace, setOperatorWorkspace] = useState("");
+  // Capability issuance for the selected project, plus a verifier that accepts
+  // any token this registry issued (it does not need the project to be open).
+  const [capSubject, setCapSubject] = useState("");
+  const [capResource, setCapResource] = useState("");
+  const [capKind, setCapKind] = useState<"access" | "approval">("access");
+  const [capScope, setCapScope] = useState("{}");
+  const [capTtl, setCapTtl] = useState("");
+  const [capError, setCapError] = useState<string | null>(null);
+  const [issuedToken, setIssuedToken] = useState("");
+  const [verifyToken, setVerifyToken] = useState("");
+  const [verifyPresenter, setVerifyPresenter] = useState("");
 
   const infoRpc = useRpc(registryInfo);
   const listResourcesRpc = useRpc(resourceList);
@@ -84,6 +110,10 @@ export function Main({ theme, host }: PluginScreenProps) {
   const setOperatorStatusRpc = useRpc(operatorSetStatus);
   const listEventsRpc = useRpc(eventsList);
   const listBroadcastsRpc = useRpc(broadcastList);
+  const listCapabilitiesRpc = useRpc(capabilityList);
+  const issueCapabilityRpc = useRpc(capabilityIssue);
+  const revokeCapabilityRpc = useRpc(capabilityRevoke);
+  const verifyCapabilityRpc = useRpc(capabilityVerify);
 
   const infoQuery = useQuery({ queryKey: ["lingus", "info"], queryFn: () => infoRpc({}) });
   const resourcesQuery = useQuery({
@@ -133,6 +163,11 @@ export function Main({ theme, host }: PluginScreenProps) {
     queryKey: ["lingus", "broadcasts"],
     queryFn: () => listBroadcastsRpc({ since: 0 }),
   });
+  const capabilitiesQuery = useQuery({
+    queryKey: ["lingus", "capabilities", selectedProject],
+    queryFn: () => listCapabilitiesRpc({ projectId: selectedProject as string }),
+    enabled: selectedProject !== null,
+  });
 
   const providersData = providersQuery.data;
   const modelsData = modelsQuery.data;
@@ -165,6 +200,7 @@ export function Main({ theme, host }: PluginScreenProps) {
         queryClient.invalidateQueries({ queryKey: ["lingus", "members", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["lingus", "workspaces", projectId] }),
         queryClient.invalidateQueries({ queryKey: ["lingus", "operators", projectId] }),
+        queryClient.invalidateQueries({ queryKey: ["lingus", "capabilities", projectId] }),
       ]),
     [queryClient],
   );
@@ -234,6 +270,31 @@ export function Main({ theme, host }: PluginScreenProps) {
       await Promise.all([detail, invalidateActivity()]);
     },
   });
+  const issueCapabilityMutation = useMutation({
+    mutationFn: (input: {
+      projectId: string;
+      resourceId: string;
+      subject: string;
+      kind: "access" | "approval";
+      scope: Record<string, unknown>;
+      ttlSec?: number;
+    }) => issueCapabilityRpc(input),
+    onSuccess: async (data, variables) => {
+      setIssuedToken(data.token);
+      setCapError(null);
+      await Promise.all([invalidateDetail(variables.projectId), invalidateActivity()]);
+    },
+  });
+  const revokeCapabilityMutation = useMutation({
+    mutationFn: (input: { id: string }) => revokeCapabilityRpc(input),
+    onSuccess: async () => {
+      const detail = selectedProject ? invalidateDetail(selectedProject) : Promise.resolve();
+      await Promise.all([detail, invalidateActivity()]);
+    },
+  });
+  const verifyCapabilityMutation = useMutation({
+    mutationFn: (input: { token: string; presenter?: string }) => verifyCapabilityRpc(input),
+  });
 
   // `?? []` allocated inline would be a fresh array on every render, which both
   // defeats memoization and trips the react-perf array rule; memoize per query.
@@ -267,6 +328,30 @@ export function Main({ theme, host }: PluginScreenProps) {
     }
     return workspaces[0]?.workspaceId ?? "";
   }, [operatorWorkspace, workspaces]);
+  const capabilitiesData = capabilitiesQuery.data;
+  const capabilities = useMemo(() => capabilitiesData?.capabilities ?? [], [capabilitiesData]);
+  // Only an active operator can be a subject, and only a project member resource
+  // can be a target; the pickers offer exactly what issuance will accept.
+  const subjects = useMemo(
+    () => operators.filter((operator) => operator.status === "active"),
+    [operators],
+  );
+  const memberResources = useMemo(() => {
+    const byId = new Map(resources.map((resource) => [resource.id, resource]));
+    return members.flatMap((member) => {
+      const resource = byId.get(member.resourceId);
+      return resource ? [resource] : [];
+    });
+  }, [members, resources]);
+  const activeSubject = useMemo(() => {
+    if (subjects.some((operator) => operator.id === capSubject)) return capSubject;
+    return subjects[0]?.id ?? "";
+  }, [capSubject, subjects]);
+  const activeCapResource = useMemo(() => {
+    if (memberResources.some((resource) => resource.id === capResource)) return capResource;
+    return memberResources[0]?.id ?? "";
+  }, [capResource, memberResources]);
+  const projectTitle = descriptorQuery.data?.descriptor.project.name ?? selectedProject ?? "";
 
   const handleRegisterResource = useCallback(
     (name: string, kind: string) => registerMutation.mutate({ name, kind }),
@@ -340,6 +425,76 @@ export function Main({ theme, host }: PluginScreenProps) {
   const handleRefreshActivity = useCallback(() => {
     void invalidateActivity();
   }, [invalidateActivity]);
+  const handleSelectCapabilitySubject = useCallback((id: string) => setCapSubject(id), []);
+  const handleSelectCapabilityResource = useCallback((id: string) => setCapResource(id), []);
+  const handleSelectCapabilityKind = useCallback((value: string) => {
+    if (value === "access" || value === "approval") setCapKind(value);
+  }, []);
+  const handleChangeCapabilityScope = useCallback((value: string) => setCapScope(value), []);
+  const handleChangeCapabilityTtl = useCallback((value: string) => setCapTtl(value), []);
+  const handleChangeVerifyToken = useCallback((value: string) => setVerifyToken(value), []);
+  const handleChangeVerifyPresenter = useCallback((value: string) => setVerifyPresenter(value), []);
+  const handleIssueCapability = useCallback(() => {
+    if (!selectedProject || activeSubject === "" || activeCapResource === "") return;
+    // The server validates scope against the member's allocation; parsing here
+    // only turns "not JSON" into a message next to the form instead of an RPC
+    // round trip.
+    let scope: Record<string, unknown> = {};
+    const scopeRaw = capScope.trim();
+    if (scopeRaw !== "") {
+      try {
+        const parsed: unknown = JSON.parse(scopeRaw);
+        if (parsed === null || typeof parsed !== "object" || Array.isArray(parsed)) {
+          setCapError("scope must be a JSON object");
+          return;
+        }
+        scope = parsed as Record<string, unknown>;
+      } catch {
+        setCapError("scope is not valid JSON");
+        return;
+      }
+    }
+    let ttlSec: number | undefined;
+    const ttlRaw = capTtl.trim();
+    if (ttlRaw !== "") {
+      const parsed = Number(ttlRaw);
+      if (!Number.isInteger(parsed) || parsed <= 0) {
+        setCapError("ttl must be a positive whole number of seconds");
+        return;
+      }
+      ttlSec = parsed;
+    }
+    setCapError(null);
+    issueCapabilityMutation.mutate({
+      projectId: selectedProject,
+      resourceId: activeCapResource,
+      subject: activeSubject,
+      kind: capKind,
+      scope,
+      ttlSec,
+    });
+  }, [
+    activeCapResource,
+    activeSubject,
+    capKind,
+    capScope,
+    capTtl,
+    issueCapabilityMutation,
+    selectedProject,
+  ]);
+  const handleRevokeCapability = useCallback(
+    (id: string) => revokeCapabilityMutation.mutate({ id }),
+    [revokeCapabilityMutation],
+  );
+  const handleVerifyToken = useCallback(() => {
+    const token = verifyToken.trim();
+    if (token === "") return;
+    const presenter = verifyPresenter.trim();
+    verifyCapabilityMutation.mutate({
+      token,
+      presenter: presenter === "" ? undefined : presenter,
+    });
+  }, [verifyCapabilityMutation, verifyPresenter, verifyToken]);
 
   const lastError = firstError(
     registerMutation.error,
@@ -358,6 +513,12 @@ export function Main({ theme, host }: PluginScreenProps) {
     setOperatorStatusMutation.error,
     providersQuery.error,
     modelsQuery.error,
+  );
+  const capabilityError = capabilityMessage(
+    capError,
+    issueCapabilityMutation.error,
+    revokeCapabilityMutation.error,
+    capabilitiesQuery.error,
   );
   const placeholderColor = theme.colors.foregroundMuted;
   const operatorPending = bindOperatorMutation.isPending || setOperatorStatusMutation.isPending;
@@ -425,52 +586,88 @@ export function Main({ theme, host }: PluginScreenProps) {
       </View>
 
       {selectedProject ? (
-        <ProjectDetail
-          styles={styles}
-          title={descriptorQuery.data?.descriptor.project.name ?? selectedProject}
-          memberCount={members.length}
-          workspaceValue={workspaceValue}
-          placeholderColor={placeholderColor}
-          workspaces={workspaces}
-          members={members}
-          resources={resources}
-          addable={addableResources}
-          bindPending={bindWorkspaceMutation.isPending}
-          addPending={addMemberMutation.isPending}
-          onChangeWorkspace={setWorkspaceValue}
-          onBindWorkspace={handleBindWorkspace}
-          onAddMember={handleAddMember}
-        />
+        <>
+          <ProjectDetail
+            styles={styles}
+            title={projectTitle}
+            memberCount={members.length}
+            workspaceValue={workspaceValue}
+            placeholderColor={placeholderColor}
+            workspaces={workspaces}
+            members={members}
+            resources={resources}
+            addable={addableResources}
+            bindPending={bindWorkspaceMutation.isPending}
+            addPending={addMemberMutation.isPending}
+            onChangeWorkspace={setWorkspaceValue}
+            onBindWorkspace={handleBindWorkspace}
+            onAddMember={handleAddMember}
+          />
+
+          <OperatorPanel
+            styles={styles}
+            title={`Operators · ${projectTitle}`}
+            errorMessage={operatorError ? operatorError.message : null}
+            canBind={workspaces.length > 0}
+            providers={availableProviders}
+            models={models}
+            modelsPending={modelsQuery.isLoading}
+            workspaces={workspaces}
+            selectedWorkspace={activeWorkspace}
+            selectedProvider={operatorProvider}
+            selectedModel={activeModel}
+            roleValue={operatorRole}
+            sessionValue={operatorSession}
+            placeholderColor={placeholderColor}
+            pending={operatorPending}
+            operators={operators}
+            onSelectProvider={handleSelectProvider}
+            onSelectModel={handleSelectModel}
+            onSelectWorkspace={handleSelectOperatorWorkspace}
+            onChangeRole={handleChangeOperatorRole}
+            onChangeSession={handleChangeOperatorSession}
+            onCreate={handleCreateOperator}
+            onBackfill={handleBackfillOperator}
+            onToggleStatus={handleToggleOperatorStatus}
+          />
+
+          <CapabilityPanel
+            styles={styles}
+            title={`Capabilities · ${projectTitle}`}
+            errorMessage={capabilityError}
+            resources={memberResources}
+            subjects={subjects}
+            capabilities={capabilities}
+            issuedToken={issuedToken}
+            selectedSubject={activeSubject}
+            selectedResource={activeCapResource}
+            selectedKind={capKind}
+            scopeValue={capScope}
+            ttlValue={capTtl}
+            placeholderColor={placeholderColor}
+            pending={issueCapabilityMutation.isPending || revokeCapabilityMutation.isPending}
+            onSelectSubject={handleSelectCapabilitySubject}
+            onSelectResource={handleSelectCapabilityResource}
+            onSelectKind={handleSelectCapabilityKind}
+            onChangeScope={handleChangeCapabilityScope}
+            onChangeTtl={handleChangeCapabilityTtl}
+            onIssue={handleIssueCapability}
+            onRevoke={handleRevokeCapability}
+          />
+        </>
       ) : null}
 
-      {selectedProject ? (
-        <OperatorPanel
-          styles={styles}
-          title={`Operators · ${descriptorQuery.data?.descriptor.project.name ?? selectedProject}`}
-          errorMessage={operatorError ? operatorError.message : null}
-          canBind={workspaces.length > 0}
-          providers={availableProviders}
-          models={models}
-          modelsPending={modelsQuery.isLoading}
-          workspaces={workspaces}
-          selectedWorkspace={activeWorkspace}
-          selectedProvider={operatorProvider}
-          selectedModel={activeModel}
-          roleValue={operatorRole}
-          sessionValue={operatorSession}
-          placeholderColor={placeholderColor}
-          pending={operatorPending}
-          operators={operators}
-          onSelectProvider={handleSelectProvider}
-          onSelectModel={handleSelectModel}
-          onSelectWorkspace={handleSelectOperatorWorkspace}
-          onChangeRole={handleChangeOperatorRole}
-          onChangeSession={handleChangeOperatorSession}
-          onCreate={handleCreateOperator}
-          onBackfill={handleBackfillOperator}
-          onToggleStatus={handleToggleOperatorStatus}
-        />
-      ) : null}
+      <VerifyPanel
+        styles={styles}
+        tokenValue={verifyToken}
+        presenterValue={verifyPresenter}
+        result={verifyCapabilityMutation.data?.verification ?? null}
+        placeholderColor={placeholderColor}
+        pending={verifyCapabilityMutation.isPending}
+        onChangeToken={handleChangeVerifyToken}
+        onChangePresenter={handleChangeVerifyPresenter}
+        onVerify={handleVerifyToken}
+      />
 
       <ActivityCard
         styles={styles}
