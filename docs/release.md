@@ -2,6 +2,9 @@
 
 All workspaces share one version and release together.
 
+Deploy and release targets are fork-specific. Read [Fork isolation](fork-isolation.md) before
+resolving an upstream sync or changing a workflow.
+
 ## Two steps
 
 A release has exactly two steps. The agent does the first, the user authorizes the second.

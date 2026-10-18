@@ -652,6 +652,9 @@ agents, and an aggressive service worker can strand installed users on stale web
 code. If offline behavior becomes a product requirement, add it deliberately
 with an update strategy and test the installed-app upgrade path.
 
+Deploy and release targets are fork-specific. See [Fork isolation](fork-isolation.md)
+before changing a workflow or resolving an upstream sync.
+
 ## Expo troubleshooting
 
 ```bash
