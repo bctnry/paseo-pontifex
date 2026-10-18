@@ -2,6 +2,12 @@ import { existsSync, readFileSync, realpathSync } from "node:fs";
 import { createRequire, isBuiltin } from "node:module";
 import path from "node:path";
 import { createPluginImportReader, type PluginImportKind } from "./compiler-imports.js";
+import {
+  buildPluginCompileCacheKey,
+  readPluginCompileCache,
+  writePluginCompileCache,
+  type PluginCompileCacheOptions,
+} from "./compiler-cache.js";
 import type { Metafile, OnResolveResult, Plugin } from "esbuild";
 import {
   isPluginClientOnlySdkSpecifier,
@@ -425,16 +431,41 @@ async function compileTarget(entryPath: string, target: PluginBuildTarget): Prom
   return wrapCommonJsBundle(makeHermesInteropEager(output));
 }
 
-export async function compilePlugin(entryPaths: {
-  client: string | null;
-  server: string | null;
-}): Promise<{
+export async function compilePlugin(
+  entryPaths: {
+    client: string | null;
+    server: string | null;
+  },
+  cache?: PluginCompileCacheOptions,
+): Promise<{
   clientBundle: string | null;
   serverBundle: string | null;
 }> {
+  const entryPath = entryPaths.client ?? entryPaths.server;
+  let cacheKey: string | null = null;
+  if (cache && entryPath) {
+    try {
+      cacheKey = await buildPluginCompileCacheKey(
+        cache,
+        realpathSync.native(path.dirname(entryPath)),
+      );
+    } catch {
+      // Cache invalidation must never prevent a plugin from starting.
+      cacheKey = null;
+    }
+  }
+  if (cache && cacheKey) {
+    const cached = await readPluginCompileCache(cache, cacheKey);
+    if (cached) {
+      return { clientBundle: cached.clientBundle, serverBundle: cached.serverBundle };
+    }
+  }
   const [clientBundle, serverBundle] = await Promise.all([
     entryPaths.client ? compileTarget(entryPaths.client, "client") : null,
     entryPaths.server ? compileTarget(entryPaths.server, "server") : null,
   ]);
+  if (cache && cacheKey) {
+    await writePluginCompileCache(cache, { key: cacheKey, clientBundle, serverBundle });
+  }
   return { clientBundle, serverBundle };
 }

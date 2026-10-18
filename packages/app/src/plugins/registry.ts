@@ -13,6 +13,7 @@ type CatalogPlugin = Awaited<ReturnType<DaemonClient["getPluginCatalog"]>>[numbe
 
 export class PluginRegistry {
   private readonly byHost = new Map<string, InstalledPlugin[]>();
+  private readonly catalogHosts = new Set<string>();
   private readonly listeners = new Set<() => void>();
   private snapshot: InstalledPlugin[] = [];
   private readonly disposed = new WeakSet<InstalledPlugin>();
@@ -45,6 +46,7 @@ export class PluginRegistry {
       audio: Pick<AudioEngine, "play">;
     },
   ): boolean {
+    this.catalogHosts.add(serverId);
     const previous = this.byHost.get(serverId) ?? [];
     const previousTimelineBundles = previous
       .filter((plugin) => plugin.timelineTransformers.length > 0)
@@ -145,7 +147,12 @@ export class PluginRegistry {
     );
   }
 
+  hasCatalog(serverId: string): boolean {
+    return this.catalogHosts.has(serverId);
+  }
+
   removeHost(serverId: string): void {
+    this.catalogHosts.delete(serverId);
     const installed = this.byHost.get(serverId);
     if (!installed) return;
     for (const plugin of installed) this.dispose(plugin);

@@ -632,6 +632,7 @@ export async function createPaseoDaemon(
     builtinPlugins: resolveBuiltinPluginLoader(dependencies),
     settingsDirectory: path.join(config.paseoHome, "plugin-settings"),
     dataDirectory: path.join(config.paseoHome, "plugin-data"),
+    compileCacheDirectory: path.join(config.paseoHome, "plugin-compile-cache"),
     serverId,
   });
 

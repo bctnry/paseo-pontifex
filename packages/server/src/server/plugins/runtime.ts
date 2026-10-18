@@ -23,6 +23,7 @@ import {
 } from "@getpaseo/plugin/server/provider";
 import type { PluginLogEntry } from "@getpaseo/protocol/messages";
 import { compilePlugin } from "./compiler.js";
+import type { PluginCompileCacheOptions } from "./compiler-cache.js";
 import { readPluginManifest } from "./manifest.js";
 import type { PluginRequirements } from "@getpaseo/protocol/messages";
 import { assertPluginCompatibility } from "@getpaseo/protocol/plugin-requirements";
@@ -124,6 +125,7 @@ interface RemoteProviderConnection {
 interface PluginRuntimeDependencies {
   settingsDirectory?: string;
   dataDirectory?: string;
+  compileCacheDirectory?: string;
   serverId?: string;
   onSettingsChanged?: (pluginId: string, settingsId: string) => void;
   spawnChild?: () => PluginChild;
@@ -354,7 +356,10 @@ export class PluginRuntime {
       throw new Error(`Built-in plugin ${input.id} has manifest ID ${manifest.id}`);
     }
     assertPluginCompatibility({ ...manifest, version: this.daemonVersion, runtime: "daemon" });
-    const bundles = await compilePlugin(await resolveEntryPaths(directory));
+    const bundles = await compilePlugin(
+      await resolveEntryPaths(directory),
+      this.compileCache(input.id),
+    );
     if (!bundles.serverBundle) throw new Error(`Built-in plugin ${input.id} needs a server entry`);
     const loaded = await this.launchPlugin({
       pluginId: input.id,
@@ -368,12 +373,12 @@ export class PluginRuntime {
     this.appendLog(input.id, "stdout", "[paseo] Plugin ready");
   }
 
-  async validatePlugin(configuredPath: string): Promise<void> {
+  async validatePlugin(configuredPath: string, pluginId?: string): Promise<void> {
     const directory = path.resolve(configuredPath);
     const manifest = await readPluginManifest(directory);
     assertPluginCompatibility({ ...manifest, version: this.daemonVersion, runtime: "daemon" });
     const entryPaths = await resolveEntryPaths(directory);
-    await compilePlugin(entryPaths);
+    await compilePlugin(entryPaths, this.compileCache(pluginId ?? directory));
   }
 
   async stopPluginById(pluginId: string): Promise<boolean> {
@@ -630,6 +635,12 @@ export class PluginRuntime {
     await Promise.all(loaded.map((plugin) => this.stopPlugin(plugin)));
   }
 
+  private compileCache(cacheKey: string): PluginCompileCacheOptions | undefined {
+    const directory = this.dependencies.compileCacheDirectory;
+    if (!directory) return undefined;
+    return { directory, key: cacheKey, version: this.daemonVersion };
+  }
+
   private async loadDirectoryPlugin(
     pluginId: string,
     configuredPath: string,
@@ -638,7 +649,7 @@ export class PluginRuntime {
     const manifest = await readPluginManifest(directory);
     assertPluginCompatibility({ ...manifest, version: this.daemonVersion, runtime: "daemon" });
     const entryPaths = await resolveEntryPaths(directory);
-    const bundles = await compilePlugin(entryPaths);
+    const bundles = await compilePlugin(entryPaths, this.compileCache(pluginId));
     const serverBundle = bundles.serverBundle;
     if (!serverBundle) {
       return {

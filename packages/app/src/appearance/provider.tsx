@@ -19,6 +19,11 @@ import {
   usePluginThemeCatalog,
   type PluginThemeOption,
 } from "@/plugins/themes";
+import {
+  clearBootPluginTheme,
+  readBootPluginTheme,
+  rememberBootPluginTheme,
+} from "@/styles/boot-plugin-theme";
 import { PLUGIN_THEME_NAMES, PLUGIN_THEME_PREFERENCE, THEME_TO_UNISTYLES } from "@/styles/theme";
 import { applyAppearance } from "./apply";
 import { AppearanceSystemBars } from "./system-bars";
@@ -59,11 +64,19 @@ function applyTheme({ preference, contributedTheme }: ApplyThemeInput): void {
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { settings, updateSettings, isLoading } = useAppSettings();
   const [hasAppliedAppearance, setHasAppliedAppearance] = useState(false);
-  const options = usePluginThemeCatalog();
+  const bootTheme = useMemo(() => {
+    if (settings.theme !== PLUGIN_THEME_PREFERENCE) return null;
+    const stored = readBootPluginTheme();
+    return stored && stored.id === settings.pluginThemeId ? stored : null;
+  }, [settings.pluginThemeId, settings.theme]);
+  const { options, ready: catalogReady } = usePluginThemeCatalog(bootTheme?.serverId);
   const selected = useMemo(() => {
     if (settings.theme !== PLUGIN_THEME_PREFERENCE) return null;
-    return options.find((option) => option.id === settings.pluginThemeId) ?? null;
-  }, [options, settings.pluginThemeId, settings.theme]);
+    return (
+      options.find((option) => option.id === settings.pluginThemeId) ??
+      (catalogReady ? null : bootTheme)
+    );
+  }, [bootTheme, catalogReady, options, settings.pluginThemeId, settings.theme]);
 
   useEffect(() => {
     if (isLoading) return;
@@ -77,9 +90,22 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       contentMaxWidth: resolveContentMaxWidth({ contentMaxWidth: settings.contentMaxWidth }),
       syntaxTheme: settings.syntaxTheme,
     });
+    const liveTheme = options.find((option) => option.id === settings.pluginThemeId);
+    const pluginThemeSelected = settings.theme === PLUGIN_THEME_PREFERENCE;
+    if (pluginThemeSelected && liveTheme) {
+      rememberBootPluginTheme({
+        id: liveTheme.id,
+        serverId: liveTheme.serverId,
+        contribution: liveTheme.contribution,
+      });
+    } else if (!pluginThemeSelected || catalogReady) {
+      clearBootPluginTheme();
+    }
     setHasAppliedAppearance(true);
   }, [
+    catalogReady,
     isLoading,
+    options,
     selected,
     settings.theme,
     settings.uiFontFamily,
@@ -89,6 +115,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     settings.codeFontSize,
     settings.contentMaxWidth,
     settings.syntaxTheme,
+    settings.pluginThemeId,
   ]);
 
   const select = useCallback(

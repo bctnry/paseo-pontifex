@@ -322,16 +322,11 @@ This is one of the rare places `useUnistyles()` is the right tool: there is no `
 
 Unistyles [`initialTheme`](https://www.unistyl.es/v3/guides/theming#select-theme) and [`adaptiveThemes`](https://www.unistyl.es/v3/guides/theming#adaptive-themes) are mutually exclusive. `initialTheme` can be a string or a synchronous function, but it cannot wait on async storage.
 
-Paseo currently stores app settings in AsyncStorage and loads them through react-query. That means the app can mount under adaptive/system theme first, then switch after settings load:
+On web and Electron, app settings are in `localStorage`, so `packages/app/src/styles/unistyles.ts` reads the saved theme synchronously before `StyleSheet.configure`. Built-in preferences pass `initialTheme`; `auto` keeps `adaptiveThemes`.
 
-1. Unistyles config starts with `adaptiveThemes: true`.
-2. The device may report system light.
-3. Settings load a persisted non-auto preference, such as dark.
-4. The app calls `setAdaptiveThemes(false)` and `setTheme("dark")`.
+Plugin themes need the contribution built from the async plugin catalog. The appearance provider caches the selected contribution in `@paseo:boot-plugin-theme`, and `readBootThemeSettings` restores it into `REGISTERED_THEMES` before configure. The provider keeps using that cached contribution until the host catalog resolves, then clears it if the contribution is gone. The first launch after selecting a plugin theme still uses the adaptive theme because there is no cache entry yet.
 
-That brief transition is expected with the current storage model. It makes tracking-compatible styles important: anything mounted during the initial adaptive theme must update correctly after the persisted preference applies. [Issue #550](https://github.com/jpudysz/react-native-unistyles/issues/550) was a separate ScrollView sticky-header bug, but it is still useful context for why ScrollView theme updates deserve extra suspicion.
-
-If we ever need to avoid the transition entirely, store at least the theme preference in synchronous storage and configure Unistyles with `initialTheme`.
+Native starts with `adaptiveThemes` and applies the persisted preference after the settings query. In either case, anything mounted before the final preference applies must update correctly when the theme changes. [Issue #550](https://github.com/jpudysz/react-native-unistyles/issues/550) was a separate ScrollView sticky-header bug, but it is still useful context for why ScrollView theme updates deserve extra suspicion.
 
 ## Runtime Theme Patching For User Preferences
 

@@ -67,6 +67,7 @@ $PASEO_HOME/
 ├── plugins/
 │   ├── sources.json                      # Managed kind and Git acquisition remote
 │   └── {pluginId}/{uuid}/                # Git checkout or npm package/lockfile/dependency tree
+├── plugin-compile-cache/                 # Content-hashed plugin bundles; safe to delete
 └── push-tokens.json                     # Expo push notification tokens
 ```
 

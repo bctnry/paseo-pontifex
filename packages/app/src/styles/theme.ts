@@ -863,8 +863,8 @@ type ThemeSwatches = {
 type RegisteredThemes = {
   [Option in ConcreteThemeOption as Option["unistylesName"]]: Option["theme"];
 } & {
-  pluginLight: typeof lightTheme;
-  pluginDark: typeof darkTheme;
+  pluginLight: Theme;
+  pluginDark: Theme;
 };
 
 export const THEME_TO_UNISTYLES = Object.fromEntries(

@@ -86,6 +86,12 @@ plugin before compiling and starting from disk. A failed reload stays failed; Pa
 the old code. Use `enable`, `disable`, and `remove` to manage one plugin. Removing a directory source
 never deletes it. The global `pluginsEnabled` switch remains available.
 
+Compiled bundles are cached under `$PASEO_HOME/plugin-compile-cache`, keyed by a content hash of
+everything in the plugin directory except `node_modules` and `.git`, plus the daemon version.
+Editing source invalidates the cache automatically. A change made directly inside `node_modules`
+does not, so reinstall dependencies instead of patching them in place. Reload and install both
+read the cache, which is why a plugin update still validates its new source.
+
 ## Built-in plugins
 
 Built-in plugins ship from `plugins/<id>/`, with `paseo-plugin.json`, `index.server.ts`,

@@ -51,7 +51,7 @@ interface PluginRuntimePort {
   connectProvider: PluginRuntime["connectProvider"];
   getProviderCatalogCacheKey?: PluginRuntime["getProviderCatalogCacheKey"];
   getProviderStatus?: PluginRuntime["getProviderStatus"];
-  validatePlugin?(path: string): Promise<void>;
+  validatePlugin?(path: string, pluginId?: string): Promise<void>;
   startPlugin(pluginId: string, path: string, canPublish: () => boolean): Promise<void>;
   startBuiltinPlugin?(plugin: BuiltinPlugin): Promise<void>;
   stopPluginById(pluginId: string): Promise<boolean>;
@@ -64,6 +64,7 @@ interface PluginServiceDependencies {
   usageAgents?: AgentUsageLookup;
   settingsDirectory?: string;
   dataDirectory?: string;
+  compileCacheDirectory?: string;
   serverId?: string;
   runtime?: PluginRuntimePort;
   managedSources?: ManagedPluginSources;
@@ -115,6 +116,7 @@ export class PluginService {
       new PluginRuntime(logger, daemonVersion, {
         settingsDirectory: dependencies.settingsDirectory,
         dataDirectory: dependencies.dataDirectory,
+        compileCacheDirectory: dependencies.compileCacheDirectory,
         serverId: dependencies.serverId,
         onSettingsChanged: (pluginId, settingsId) => {
           for (const listener of this.settingsListeners) listener(pluginId, settingsId);
@@ -326,7 +328,7 @@ export class PluginService {
         }
         await runPluginBuild(candidate.directory, candidate.build, this.logger);
         candidate = await managedSources.place(pluginId, candidate);
-        await this.validateCandidate(candidate);
+        await this.validateCandidate(candidate, pluginId);
         await managedSources.verifyCandidate(pluginId, candidate);
       } catch (error) {
         await managedSources.discard(candidate);
@@ -706,7 +708,7 @@ export class PluginService {
       await this.checkRequirements(candidate.directory);
       await runPluginBuild(candidate.directory, candidate.build, this.logger);
       candidate = await managedSources.place(pluginId, candidate);
-      await this.validateCandidate(candidate);
+      await this.validateCandidate(candidate, pluginId);
       await managedSources.verifyCandidate(pluginId, candidate, proposal.target);
       await managedSources.assertCurrent(proposal, this.requireSource(pluginId).path);
     } catch (error) {
@@ -765,11 +767,11 @@ export class PluginService {
     };
   }
 
-  private validateCandidate(candidate: ManagedPluginCandidate): Promise<void> {
+  private validateCandidate(candidate: ManagedPluginCandidate, pluginId: string): Promise<void> {
     if (!this.runtime.validatePlugin) {
       throw new Error("Plugin runtime cannot validate managed sources");
     }
-    return this.runtime.validatePlugin(candidate.directory);
+    return this.runtime.validatePlugin(candidate.directory, pluginId);
   }
 
   private requireManagedSources(): ManagedPluginSources {

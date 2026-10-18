@@ -1,42 +1,17 @@
 import { useMemo } from "react";
-import { z } from "zod";
 import type { PluginThemeContribution } from "@getpaseo/plugin";
-import { useHostFeatureMap } from "@/runtime/host-features";
-import {
-  buildDarkSemanticColors,
-  buildDarkTheme,
-  buildLightSemanticColors,
-  buildLightTheme,
-  darkTheme,
-  lightTheme,
-  type Theme,
-} from "@/styles/theme";
+import { useHostFeatureAvailabilityMap, useHostFeatureMap } from "@/runtime/host-features";
+import { useHosts } from "@/runtime/host-runtime";
+import { buildPluginTheme } from "@/styles/plugin-theme";
+import type { Theme } from "@/styles/theme";
 import {
   getPreferredPluginContributionHost,
   rememberPluginContributionHost,
 } from "../contribution-host";
-import { useInstalledPlugins } from "../registry";
+import { pluginRegistry, useInstalledPlugins } from "../registry";
 import type { InstalledPlugin } from "../types";
 
-const hexColorSchema = z
-  .string()
-  .regex(/^#(?:[0-9a-fA-F]{3}|[0-9a-fA-F]{6}|[0-9a-fA-F]{8})$/, "Must be a hex color");
-
-const contributionSchema: z.ZodType<PluginThemeContribution> = z.strictObject({
-  id: z.string(),
-  name: z.string().trim().min(1).max(60),
-  appearance: z.enum(["light", "dark"]),
-  colors: z.strictObject({
-    background: hexColorSchema,
-    foreground: hexColorSchema,
-    raised: hexColorSchema,
-    control: hexColorSchema,
-    border: hexColorSchema,
-    accent: hexColorSchema.optional(),
-    mutedForeground: hexColorSchema,
-    ring: hexColorSchema,
-  }),
-});
+export { parsePluginThemeContribution } from "@/styles/plugin-theme";
 
 export interface PluginThemeOption {
   id: string;
@@ -44,79 +19,12 @@ export interface PluginThemeOption {
   name: string;
   swatch: string;
   theme: Theme;
+  contribution: PluginThemeContribution;
 }
 
 interface PluginThemeTarget {
   serverId: string;
   contribution: PluginThemeContribution;
-}
-
-export function parsePluginThemeContribution(value: unknown): PluginThemeContribution {
-  return contributionSchema.parse(value);
-}
-
-function buildDarkPluginTheme(contribution: PluginThemeContribution): Theme {
-  const colors = contribution.colors;
-  const accent = colors.accent ?? colors.foreground;
-  return buildDarkTheme(
-    buildDarkSemanticColors({
-      surface0: colors.background,
-      surface1: colors.raised,
-      surface2: colors.control,
-      surface3: colors.border,
-      surface4: colors.ring,
-      surfaceDiffEmpty: colors.raised,
-      surfaceSidebar: colors.background,
-      foreground: colors.foreground,
-      foregroundMuted: colors.mutedForeground,
-      foregroundExtraMuted: colors.ring,
-      border: colors.border,
-      borderAccent: colors.border,
-      accent,
-      accentBright: accent,
-      accentForeground: colors.background,
-      destructive: darkTheme.colors.destructive,
-      terminalBlack: colors.control,
-      terminalBrightBlack: colors.ring,
-      ring: colors.ring,
-    }),
-  );
-}
-
-function buildLightPluginTheme(contribution: PluginThemeContribution): Theme {
-  const colors = contribution.colors;
-  const accent = colors.accent ?? colors.foreground;
-  return buildLightTheme(
-    buildLightSemanticColors({
-      surface0: colors.background,
-      surface1: colors.raised,
-      surface2: colors.control,
-      surface3: colors.border,
-      surface4: colors.ring,
-      surfaceDiffEmpty: colors.raised,
-      surfaceSidebar: colors.control,
-      foreground: colors.foreground,
-      foregroundMuted: colors.mutedForeground,
-      foregroundExtraMuted: colors.ring,
-      border: colors.border,
-      borderAccent: colors.border,
-      accent,
-      accentBright: accent,
-      accentForeground: colors.background,
-      primary: colors.foreground,
-      primaryForeground: colors.background,
-      destructive: lightTheme.colors.destructive,
-      terminalBlack: colors.foreground,
-      terminalBrightBlack: colors.ring,
-      ring: colors.ring,
-    }),
-  );
-}
-
-function buildPluginTheme(contribution: PluginThemeContribution): Theme {
-  return contribution.appearance === "light"
-    ? buildLightPluginTheme(contribution)
-    : buildDarkPluginTheme(contribution);
 }
 
 function selectTarget(id: string, targets: PluginThemeTarget[]): PluginThemeTarget {
@@ -148,6 +56,7 @@ export function collectPluginThemes(
       name: target.contribution.name,
       swatch: target.contribution.colors.background,
       theme: buildPluginTheme(target.contribution),
+      contribution: target.contribution,
     };
   });
 }
@@ -164,16 +73,40 @@ function supportedThemeHosts(support: ReadonlyMap<string, boolean>): Set<string>
   return serverIds;
 }
 
-export function usePluginThemeCatalog(): PluginThemeOption[] {
+export interface PluginThemeCatalog {
+  options: PluginThemeOption[];
+  /**
+   * True once the relevant host has resolved its plugin catalog, or has told us it does not
+   * support plugin themes. Until then a cached theme covers the gap before the catalog arrives.
+   */
+  ready: boolean;
+}
+
+function isCatalogReady(
+  serverId: string,
+  availability: ReadonlyMap<string, boolean | null | undefined>,
+): boolean {
+  const supported = availability.get(serverId);
+  return supported === false || (supported === true && pluginRegistry.hasCatalog(serverId));
+}
+
+export function usePluginThemeCatalog(preferredServerId?: string): PluginThemeCatalog {
   const plugins = useInstalledPlugins();
+  const hosts = useHosts();
   const serverIds = useMemo(
     () => [...new Set(plugins.map((plugin) => plugin.serverId))],
     [plugins],
   );
+  const hostIds = useMemo(() => [...new Set(hosts.map((host) => host.serverId))], [hosts]);
   // COMPAT(pluginThemes): added in v0.5.0, remove gate after 2027-08-20.
   const support = useHostFeatureMap(serverIds, "pluginThemes");
-  return useMemo(
+  const availability = useHostFeatureAvailabilityMap(hostIds, "pluginThemes");
+  const options = useMemo(
     () => collectPluginThemes(plugins, supportedThemeHosts(support)),
     [plugins, support],
   );
+  const ready = preferredServerId
+    ? isCatalogReady(preferredServerId, availability)
+    : hostIds.some((serverId) => isCatalogReady(serverId, availability));
+  return { options, ready };
 }

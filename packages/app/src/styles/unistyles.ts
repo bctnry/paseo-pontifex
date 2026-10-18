@@ -1,4 +1,5 @@
 import { StyleSheet } from "react-native-unistyles";
+import { readBootThemeSettings } from "./boot-plugin-theme";
 import { REGISTERED_THEMES } from "./theme";
 
 StyleSheet.configure({
@@ -10,9 +11,7 @@ StyleSheet.configure({
     lg: 992,
     xl: 1200,
   },
-  settings: {
-    adaptiveThemes: true,
-  },
+  settings: readBootThemeSettings(),
 });
 
 // Type augmentation for TypeScript
