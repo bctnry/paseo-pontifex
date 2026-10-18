@@ -5,7 +5,7 @@ import type { PluginScreenProps } from "@getpaseo/plugin/client";
 import { useRpc } from "@getpaseo/plugin/client";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCallback, useMemo, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import {
   broadcastList,
   capabilityIssue,
@@ -38,10 +38,8 @@ import {
   HeaderCard,
   OperatorPanel,
   ProjectDetail,
-  ProjectForm,
-  ProjectRow,
-  ResourceForm,
-  ResourceRow,
+  ProjectsCard,
+  ResourcesCard,
   VerifyPanel,
 } from "./components.js";
 import { createStyles } from "./styles.js";
@@ -535,139 +533,129 @@ export function Main({ theme, host }: PluginScreenProps) {
       />
       {lastError ? <ErrorCard styles={styles} message={lastError.message} /> : null}
 
-      <View>
-        <Text style={styles.sectionTitle}>Resources</Text>
-        <View style={styles.card}>
-          <ResourceForm
+      <View style={styles.grid}>
+        <View style={styles.cell}>
+          <ResourcesCard
             styles={styles}
+            resources={resources}
             name={resourceName}
             kind={resourceKind}
             placeholderColor={placeholderColor}
-            pending={registerMutation.isPending}
+            pending={registerMutation.isPending || setClassMutation.isPending}
             onChangeName={setResourceName}
             onChangeKind={setResourceKind}
-            onSubmit={handleRegisterResource}
+            onCreate={handleRegisterResource}
+            onToggleClass={handleToggleClass}
           />
-          {resources.map((resource) => (
-            <ResourceRow
-              key={resource.id}
-              styles={styles}
-              resource={resource}
-              pending={setClassMutation.isPending}
-              onToggleClass={handleToggleClass}
-            />
-          ))}
-          {resources.length === 0 ? <Text style={styles.muted}>No resources yet.</Text> : null}
         </View>
-      </View>
-
-      <View>
-        <Text style={styles.sectionTitle}>Draft projects</Text>
-        <View style={styles.card}>
-          <ProjectForm
+        <View style={styles.cell}>
+          <ProjectsCard
             styles={styles}
+            projects={projects}
             name={projectName}
+            selectedProjectId={selectedProject}
             placeholderColor={placeholderColor}
             pending={createProjectMutation.isPending}
             onChangeName={setProjectName}
-            onSubmit={handleCreateProject}
+            onCreate={handleCreateProject}
+            onOpen={handleOpenProject}
           />
-          {projects.map((project) => (
-            <ProjectRow
-              key={project.id}
-              styles={styles}
-              project={project}
-              selected={selectedProject === project.id}
-              onOpen={handleOpenProject}
-            />
-          ))}
-          {projects.length === 0 ? <Text style={styles.muted}>No projects yet.</Text> : null}
         </View>
       </View>
 
       {selectedProject ? (
-        <>
-          <ProjectDetail
-            styles={styles}
-            title={projectTitle}
-            memberCount={members.length}
-            workspaceValue={workspaceValue}
-            placeholderColor={placeholderColor}
-            workspaces={workspaces}
-            members={members}
-            resources={resources}
-            addable={addableResources}
-            bindPending={bindWorkspaceMutation.isPending}
-            addPending={addMemberMutation.isPending}
-            onChangeWorkspace={setWorkspaceValue}
-            onBindWorkspace={handleBindWorkspace}
-            onAddMember={handleAddMember}
-          />
-
-          <OperatorPanel
-            styles={styles}
-            title={`Operators · ${projectTitle}`}
-            errorMessage={operatorError ? operatorError.message : null}
-            canBind={workspaces.length > 0}
-            providers={availableProviders}
-            models={models}
-            modelsPending={modelsQuery.isLoading}
-            workspaces={workspaces}
-            selectedWorkspace={activeWorkspace}
-            selectedProvider={operatorProvider}
-            selectedModel={activeModel}
-            roleValue={operatorRole}
-            sessionValue={operatorSession}
-            placeholderColor={placeholderColor}
-            pending={operatorPending}
-            operators={operators}
-            onSelectProvider={handleSelectProvider}
-            onSelectModel={handleSelectModel}
-            onSelectWorkspace={handleSelectOperatorWorkspace}
-            onChangeRole={handleChangeOperatorRole}
-            onChangeSession={handleChangeOperatorSession}
-            onCreate={handleCreateOperator}
-            onBackfill={handleBackfillOperator}
-            onToggleStatus={handleToggleOperatorStatus}
-          />
-
-          <CapabilityPanel
-            styles={styles}
-            title={`Capabilities · ${projectTitle}`}
-            errorMessage={capabilityError}
-            resources={memberResources}
-            subjects={subjects}
-            capabilities={capabilities}
-            issuedToken={issuedToken}
-            selectedSubject={activeSubject}
-            selectedResource={activeCapResource}
-            selectedKind={capKind}
-            scopeValue={capScope}
-            ttlValue={capTtl}
-            placeholderColor={placeholderColor}
-            pending={issueCapabilityMutation.isPending || revokeCapabilityMutation.isPending}
-            onSelectSubject={handleSelectCapabilitySubject}
-            onSelectResource={handleSelectCapabilityResource}
-            onSelectKind={handleSelectCapabilityKind}
-            onChangeScope={handleChangeCapabilityScope}
-            onChangeTtl={handleChangeCapabilityTtl}
-            onIssue={handleIssueCapability}
-            onRevoke={handleRevokeCapability}
-          />
-        </>
+        <View style={styles.grid}>
+          <View style={styles.cell}>
+            <ProjectDetail
+              styles={styles}
+              title={projectTitle}
+              memberCount={members.length}
+              workspaceValue={workspaceValue}
+              placeholderColor={placeholderColor}
+              workspaces={workspaces}
+              members={members}
+              resources={resources}
+              addable={addableResources}
+              bindPending={bindWorkspaceMutation.isPending}
+              addPending={addMemberMutation.isPending}
+              onChangeWorkspace={setWorkspaceValue}
+              onBindWorkspace={handleBindWorkspace}
+              onAddMember={handleAddMember}
+            />
+          </View>
+          <View style={styles.cell}>
+            <OperatorPanel
+              styles={styles}
+              title={`Operators · ${projectTitle}`}
+              errorMessage={operatorError ? operatorError.message : null}
+              canBind={workspaces.length > 0}
+              providers={availableProviders}
+              models={models}
+              modelsPending={modelsQuery.isLoading}
+              workspaces={workspaces}
+              selectedWorkspace={activeWorkspace}
+              selectedProvider={operatorProvider}
+              selectedModel={activeModel}
+              roleValue={operatorRole}
+              sessionValue={operatorSession}
+              placeholderColor={placeholderColor}
+              pending={operatorPending}
+              operators={operators}
+              onSelectProvider={handleSelectProvider}
+              onSelectModel={handleSelectModel}
+              onSelectWorkspace={handleSelectOperatorWorkspace}
+              onChangeRole={handleChangeOperatorRole}
+              onChangeSession={handleChangeOperatorSession}
+              onCreate={handleCreateOperator}
+              onBackfill={handleBackfillOperator}
+              onToggleStatus={handleToggleOperatorStatus}
+            />
+          </View>
+        </View>
       ) : null}
 
-      <VerifyPanel
-        styles={styles}
-        tokenValue={verifyToken}
-        presenterValue={verifyPresenter}
-        result={verifyCapabilityMutation.data?.verification ?? null}
-        placeholderColor={placeholderColor}
-        pending={verifyCapabilityMutation.isPending}
-        onChangeToken={handleChangeVerifyToken}
-        onChangePresenter={handleChangeVerifyPresenter}
-        onVerify={handleVerifyToken}
-      />
+      <View style={styles.grid}>
+        {selectedProject ? (
+          <View style={styles.cell}>
+            <CapabilityPanel
+              styles={styles}
+              title={`Capabilities · ${projectTitle}`}
+              errorMessage={capabilityError}
+              resources={memberResources}
+              subjects={subjects}
+              capabilities={capabilities}
+              issuedToken={issuedToken}
+              selectedSubject={activeSubject}
+              selectedResource={activeCapResource}
+              selectedKind={capKind}
+              scopeValue={capScope}
+              ttlValue={capTtl}
+              placeholderColor={placeholderColor}
+              pending={issueCapabilityMutation.isPending || revokeCapabilityMutation.isPending}
+              onSelectSubject={handleSelectCapabilitySubject}
+              onSelectResource={handleSelectCapabilityResource}
+              onSelectKind={handleSelectCapabilityKind}
+              onChangeScope={handleChangeCapabilityScope}
+              onChangeTtl={handleChangeCapabilityTtl}
+              onIssue={handleIssueCapability}
+              onRevoke={handleRevokeCapability}
+            />
+          </View>
+        ) : null}
+        <View style={styles.cell}>
+          <VerifyPanel
+            styles={styles}
+            tokenValue={verifyToken}
+            presenterValue={verifyPresenter}
+            result={verifyCapabilityMutation.data?.verification ?? null}
+            placeholderColor={placeholderColor}
+            pending={verifyCapabilityMutation.isPending}
+            onChangeToken={handleChangeVerifyToken}
+            onChangePresenter={handleChangeVerifyPresenter}
+            onVerify={handleVerifyToken}
+          />
+        </View>
+      </View>
 
       <ActivityCard
         styles={styles}

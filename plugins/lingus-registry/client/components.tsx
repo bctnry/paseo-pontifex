@@ -1,7 +1,9 @@
 // Presentational pieces of the registry screen.
 //
 // react-perf rules require stable props: handlers arrive from the parent or are
-// wrapped in `useCallback` here, and every style is a `styles` entry.
+// wrapped in `useCallback` here, and every style is a `styles` entry. Rows are
+// separate components for the same reason: an inline arrow in a `.map` would be
+// a new function prop on every render.
 import { useCallback } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import type {
@@ -69,6 +71,20 @@ export function SelectChip({
   );
 }
 
+/** `1 project` / `3 projects`, with an explicit plural where `s` is wrong. */
+function count(n: number, singular: string, plural?: string): string {
+  return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
+}
+
+function Stat({ styles, label, value }: { styles: Styles; label: string; value: string }) {
+  return (
+    <View style={styles.stat}>
+      <Text style={styles.statValue}>{value}</Text>
+      <Text style={styles.statLabel}>{label}</Text>
+    </View>
+  );
+}
+
 export function HeaderCard({
   styles,
   hostLabel,
@@ -85,14 +101,21 @@ export function HeaderCard({
   projectCount: number;
 }) {
   return (
-    <View style={styles.card}>
-      <Text style={styles.title}>Lingus registry</Text>
-      <Text style={styles.muted}>
-        host {hostLabel} · {hostId}
-      </Text>
-      <Text style={styles.muted}>
-        schema v{schemaVersion} · {resourceCount} resources · {projectCount} projects
-      </Text>
+    <View style={styles.hero}>
+      <View style={styles.heroBody}>
+        <Text style={styles.heroTitle}>Lingus registry</Text>
+        <Text style={styles.muted}>
+          Resources, projects and capability tokens owned by this host.
+        </Text>
+        <Text style={styles.heroMeta}>
+          host {hostLabel} · {hostId}
+        </Text>
+      </View>
+      <View style={styles.statRow}>
+        <Stat styles={styles} label="resources" value={String(resourceCount)} />
+        <Stat styles={styles} label="projects" value={String(projectCount)} />
+        <Stat styles={styles} label="schema" value={`v${schemaVersion}`} />
+      </View>
     </View>
   );
 }
@@ -105,7 +128,44 @@ export function ErrorCard({ styles, message }: { styles: Styles; message: string
   );
 }
 
-export function ResourceForm({
+function CardHeader({
+  styles,
+  title,
+  meta,
+  actionLabel,
+  actionDisabled,
+  onAction,
+}: {
+  styles: Styles;
+  title: string;
+  meta: string;
+  actionLabel?: string;
+  actionDisabled?: boolean;
+  onAction?: () => void;
+}) {
+  const handleAction = useCallback(() => {
+    if (onAction) onAction();
+  }, [onAction]);
+  return (
+    <View style={styles.cardHeader}>
+      <View style={styles.grow}>
+        <Text style={styles.cardTitle}>{title}</Text>
+        {meta === "" ? null : <Text style={styles.cardMeta}>{meta}</Text>}
+      </View>
+      {actionLabel ? (
+        <Chip
+          styles={styles}
+          label={actionLabel}
+          variant="neutral"
+          onPress={handleAction}
+          disabled={actionDisabled === true}
+        />
+      ) : null}
+    </View>
+  );
+}
+
+function ResourceForm({
   styles,
   name,
   kind,
@@ -159,7 +219,7 @@ function describeResource(resource: Resource): string {
   return parts.join(" · ");
 }
 
-export function ResourceRow({
+function ResourceRow({
   styles,
   resource,
   pending,
@@ -176,9 +236,9 @@ export function ResourceRow({
     [isWork, onToggleClass, resource.id],
   );
   return (
-    <View style={styles.row}>
+    <View style={styles.listItem}>
       <View style={styles.grow}>
-        <Text style={styles.title}>{resource.name}</Text>
+        <Text style={styles.itemTitle}>{resource.name}</Text>
         <Text style={styles.muted}>{describeResource(resource)}</Text>
       </View>
       <Chip
@@ -192,7 +252,63 @@ export function ResourceRow({
   );
 }
 
-export function ProjectForm({
+export function ResourcesCard({
+  styles,
+  resources,
+  name,
+  kind,
+  placeholderColor,
+  pending,
+  onChangeName,
+  onChangeKind,
+  onCreate,
+  onToggleClass,
+}: {
+  styles: Styles;
+  resources: Resource[];
+  name: string;
+  kind: string;
+  placeholderColor: string;
+  pending: boolean;
+  onChangeName: (value: string) => void;
+  onChangeKind: (value: string) => void;
+  onCreate: (name: string, kind: string) => void;
+  onToggleClass: (id: string, next: "private" | "work") => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <CardHeader
+        styles={styles}
+        title="Resources"
+        meta={`${count(resources.length, "resource")} registered · class decides whether peers can see them`}
+      />
+      <ResourceForm
+        styles={styles}
+        name={name}
+        kind={kind}
+        placeholderColor={placeholderColor}
+        pending={pending}
+        onChangeName={onChangeName}
+        onChangeKind={onChangeKind}
+        onSubmit={onCreate}
+      />
+      {resources.map((resource) => (
+        <ResourceRow
+          key={resource.id}
+          styles={styles}
+          resource={resource}
+          pending={pending}
+          onToggleClass={onToggleClass}
+        />
+      ))}
+      {resources.length === 0 ? (
+        <Text style={styles.empty}>No resources registered yet.</Text>
+      ) : null}
+    </View>
+  );
+}
+
+function ProjectForm({
   styles,
   name,
   placeholderColor,
@@ -228,7 +344,7 @@ export function ProjectForm({
   );
 }
 
-export function ProjectRow({
+function ProjectRow({
   styles,
   project,
   selected,
@@ -241,17 +357,67 @@ export function ProjectRow({
 }) {
   const handleOpen = useCallback(() => onOpen(project.id), [onOpen, project.id]);
   return (
-    <Pressable style={styles.row} onPress={handleOpen}>
+    <Pressable style={styles.listItem} onPress={handleOpen}>
       <View style={styles.grow}>
-        <Text style={styles.title}>{project.name}</Text>
-        <Text style={styles.muted}>{project.id}</Text>
+        <Text style={styles.itemTitle}>{project.name}</Text>
+        <Text style={styles.mono}>{project.id}</Text>
       </View>
       <Chip styles={styles} label={selected ? "selected" : "open"} variant="neutral" />
     </Pressable>
   );
 }
 
-export function BindWorkspaceForm({
+export function ProjectsCard({
+  styles,
+  projects,
+  name,
+  selectedProjectId,
+  placeholderColor,
+  pending,
+  onChangeName,
+  onCreate,
+  onOpen,
+}: {
+  styles: Styles;
+  projects: RegistryProject[];
+  name: string;
+  selectedProjectId: string | null;
+  placeholderColor: string;
+  pending: boolean;
+  onChangeName: (value: string) => void;
+  onCreate: (name: string) => void;
+  onOpen: (id: string) => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <CardHeader
+        styles={styles}
+        title="Projects"
+        meta={`${count(projects.length, "project")} · members, operators and capabilities hang off these`}
+      />
+      <ProjectForm
+        styles={styles}
+        name={name}
+        placeholderColor={placeholderColor}
+        pending={pending}
+        onChangeName={onChangeName}
+        onSubmit={onCreate}
+      />
+      {projects.map((project) => (
+        <ProjectRow
+          key={project.id}
+          styles={styles}
+          project={project}
+          selected={selectedProjectId === project.id}
+          onOpen={onOpen}
+        />
+      ))}
+      {projects.length === 0 ? <Text style={styles.empty}>No projects yet.</Text> : null}
+    </View>
+  );
+}
+
+function BindWorkspaceForm({
   styles,
   value,
   placeholderColor,
@@ -288,7 +454,37 @@ export function BindWorkspaceForm({
   );
 }
 
-export function AddMemberChip({
+function WorkspaceRow({ styles, workspace }: { styles: Styles; workspace: ProjectWorkspace }) {
+  return (
+    <View style={styles.listItem}>
+      <View style={styles.grow}>
+        <Text style={styles.mono}>{workspace.workspaceId}</Text>
+        {workspace.role === null ? null : <Text style={styles.muted}>{workspace.role}</Text>}
+      </View>
+    </View>
+  );
+}
+
+function MemberRow({
+  styles,
+  member,
+  resource,
+}: {
+  styles: Styles;
+  member: ProjectMember;
+  resource: Resource | undefined;
+}) {
+  return (
+    <View style={styles.listItem}>
+      <View style={styles.grow}>
+        <Text style={styles.itemTitle}>{resource ? resource.name : member.resourceId}</Text>
+        <Text style={styles.mono}>allocation {JSON.stringify(member.allocation)}</Text>
+      </View>
+    </View>
+  );
+}
+
+function AddMemberChip({
   styles,
   resource,
   pending,
@@ -311,15 +507,100 @@ export function AddMemberChip({
   );
 }
 
+export function ProjectDetail({
+  styles,
+  title,
+  memberCount,
+  workspaceValue,
+  placeholderColor,
+  workspaces,
+  members,
+  resources,
+  addable,
+  bindPending,
+  addPending,
+  onChangeWorkspace,
+  onBindWorkspace,
+  onAddMember,
+}: {
+  styles: Styles;
+  title: string;
+  memberCount: number;
+  workspaceValue: string;
+  placeholderColor: string;
+  workspaces: ProjectWorkspace[];
+  members: ProjectMember[];
+  resources: Resource[];
+  addable: Resource[];
+  bindPending: boolean;
+  addPending: boolean;
+  onChangeWorkspace: (value: string) => void;
+  onBindWorkspace: (workspaceId: string) => void;
+  onAddMember: (resourceId: string) => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <CardHeader
+        styles={styles}
+        title={title}
+        meta={`${count(memberCount, "member")} · ${count(workspaces.length, "workspace")}`}
+      />
+
+      <Text style={styles.sectionTitle}>paseo workspaces</Text>
+      {workspaces.map((workspace) => (
+        <WorkspaceRow key={workspace.workspaceId} styles={styles} workspace={workspace} />
+      ))}
+      {workspaces.length === 0 ? (
+        <Text style={styles.empty}>No workspace bound; an operator needs one.</Text>
+      ) : null}
+      <BindWorkspaceForm
+        styles={styles}
+        value={workspaceValue}
+        placeholderColor={placeholderColor}
+        pending={bindPending}
+        onChangeValue={onChangeWorkspace}
+        onSubmit={onBindWorkspace}
+      />
+
+      <Text style={styles.sectionTitle}>members</Text>
+      {members.map((member) => (
+        <MemberRow
+          key={member.resourceId}
+          styles={styles}
+          member={member}
+          resource={resources.find((resource) => resource.id === member.resourceId)}
+        />
+      ))}
+      {members.length === 0 ? (
+        <Text style={styles.empty}>No members; a capability needs a member resource.</Text>
+      ) : null}
+      <View style={styles.chipRow}>
+        {addable.map((resource) => (
+          <AddMemberChip
+            key={resource.id}
+            styles={styles}
+            resource={resource}
+            pending={addPending}
+            onAdd={onAddMember}
+          />
+        ))}
+      </View>
+    </View>
+  );
+}
+
+function operatorLabel(operator: OperatorBinding): string {
+  const short = shortId(operator.id);
+  return operator.role ? `${operator.role} · ${short}` : short;
+}
+
 function describeOperator(operator: OperatorBinding): string {
-  const parts = [operator.id, operator.status];
-  if (operator.role) parts.push(operator.role);
-  // Which workspace it runs in matters once a project binds more than one.
-  if (operator.workspaceId) parts.push(operator.workspaceId);
+  const parts = [shortId(operator.id), operator.status];
+  if (operator.workspaceId) parts.push(shortId(operator.workspaceId));
   return parts.join(" · ");
 }
 
-export function OperatorRow({
+function OperatorRow({
   styles,
   operator,
   pending,
@@ -336,8 +617,9 @@ export function OperatorRow({
     [isActive, onToggleStatus, operator.id],
   );
   return (
-    <View style={styles.row}>
+    <View style={styles.listItem}>
       <View style={styles.grow}>
+        <Text style={styles.itemTitle}>{operator.role ?? "operator"}</Text>
         <Text style={styles.muted}>{describeOperator(operator)}</Text>
       </View>
       <Chip
@@ -406,24 +688,32 @@ export function OperatorPanel({
   const canBackfill = canBind && sessionValue.trim() !== "" && !pending;
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
+      <CardHeader
+        styles={styles}
+        title={title}
+        meta={`${count(operators.length, "operator")} bound`}
+      />
       {errorMessage ? <Text style={styles.danger}>{errorMessage}</Text> : null}
 
       <Text style={styles.sectionTitle}>new paseo agent session</Text>
       {workspaces.length > 1 ? (
-        <View style={styles.chipRow}>
-          {workspaces.map((workspace) => (
-            <SelectChip
-              key={workspace.workspaceId}
-              styles={styles}
-              label={describeWorkspace(workspace)}
-              value={workspace.workspaceId}
-              selected={workspace.workspaceId === selectedWorkspace}
-              onSelect={onSelectWorkspace}
-            />
-          ))}
-        </View>
+        <>
+          <Text style={styles.fieldLabel}>workspace</Text>
+          <View style={styles.chipRow}>
+            {workspaces.map((workspace) => (
+              <SelectChip
+                key={workspace.workspaceId}
+                styles={styles}
+                label={workspace.role ?? shortId(workspace.workspaceId)}
+                value={workspace.workspaceId}
+                selected={workspace.workspaceId === selectedWorkspace}
+                onSelect={onSelectWorkspace}
+              />
+            ))}
+          </View>
+        </>
       ) : null}
+      <Text style={styles.fieldLabel}>provider</Text>
       <View style={styles.chipRow}>
         {providers.map((provider) => (
           <SelectChip
@@ -460,7 +750,7 @@ export function OperatorPanel({
       <View style={styles.row}>
         <TextInput
           style={styles.input}
-          placeholder="role (optional)"
+          placeholder="role (optional), e.g. builder"
           placeholderTextColor={placeholderColor}
           value={roleValue}
           onChangeText={onChangeRole}
@@ -470,7 +760,7 @@ export function OperatorPanel({
         </Pressable>
       </View>
 
-      <Text style={styles.sectionTitle}>existing paseo agent session</Text>
+      <Text style={styles.sectionTitle}>bind an existing session</Text>
       <View style={styles.row}>
         <TextInput
           style={styles.input}
@@ -490,6 +780,7 @@ export function OperatorPanel({
         </Text>
       )}
 
+      <Text style={styles.sectionTitle}>operators</Text>
       {operators.map((operator) => (
         <OperatorRow
           key={operator.id}
@@ -499,179 +790,7 @@ export function OperatorPanel({
           onToggleStatus={onToggleStatus}
         />
       ))}
-      {operators.length === 0 ? <Text style={styles.muted}>No operators yet.</Text> : null}
-    </View>
-  );
-}
-
-function describeWorkspace(workspace: ProjectWorkspace): string {
-  return workspace.role ? `${workspace.workspaceId} · ${workspace.role}` : workspace.workspaceId;
-}
-
-function describeMember(member: ProjectMember, resources: Resource[]): string {
-  const name = resources.find((resource) => resource.id === member.resourceId)?.name;
-  return name ? `${name} (${member.resourceId})` : member.resourceId;
-}
-
-export function ProjectDetail({
-  styles,
-  title,
-  memberCount,
-  workspaceValue,
-  placeholderColor,
-  workspaces,
-  members,
-  resources,
-  addable,
-  bindPending,
-  addPending,
-  onChangeWorkspace,
-  onBindWorkspace,
-  onAddMember,
-}: {
-  styles: Styles;
-  title: string;
-  memberCount: number;
-  workspaceValue: string;
-  placeholderColor: string;
-  workspaces: ProjectWorkspace[];
-  members: ProjectMember[];
-  resources: Resource[];
-  addable: Resource[];
-  bindPending: boolean;
-  addPending: boolean;
-  onChangeWorkspace: (value: string) => void;
-  onBindWorkspace: (workspaceId: string) => void;
-  onAddMember: (resourceId: string) => void;
-}) {
-  return (
-    <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
-      <Text style={styles.muted}>
-        {memberCount} members · {workspaces.length} workspaces
-      </Text>
-
-      <Text style={styles.sectionTitle}>paseo workspaces</Text>
-      {workspaces.map((workspace) => (
-        <Text key={workspace.workspaceId} style={styles.muted}>
-          {describeWorkspace(workspace)}
-        </Text>
-      ))}
-      <BindWorkspaceForm
-        styles={styles}
-        value={workspaceValue}
-        placeholderColor={placeholderColor}
-        pending={bindPending}
-        onChangeValue={onChangeWorkspace}
-        onSubmit={onBindWorkspace}
-      />
-
-      <Text style={styles.sectionTitle}>members</Text>
-      {members.map((member) => (
-        <Text key={member.resourceId} style={styles.muted}>
-          {describeMember(member, resources)}
-        </Text>
-      ))}
-      <View style={styles.chipRow}>
-        {addable.map((resource) => (
-          <AddMemberChip
-            key={resource.id}
-            styles={styles}
-            resource={resource}
-            pending={addPending}
-            onAdd={onAddMember}
-          />
-        ))}
-      </View>
-    </View>
-  );
-}
-
-/** `HH:MM:SSZ`, which is enough for a glance and stable across locales. */
-function formatEventTime(ts: number): string {
-  return `${new Date(ts).toISOString().slice(11, 19)}Z`;
-}
-
-function describeEvent(event: RegistryEvent): string {
-  const reason = typeof event.payload.reason === "string" ? ` · ${event.payload.reason}` : "";
-  const subject = event.subject === "" ? "" : ` · ${event.subject}`;
-  return `#${event.seq} · ${formatEventTime(event.ts)}${subject}${reason}`;
-}
-
-function broadcastKey(entry: BroadcastEntry): string {
-  switch (entry.type) {
-    case "project":
-      return `project:${entry.project.project.id}`;
-    case "ai-capability":
-      return `ai-capability:${entry.resource.id}`;
-    case "revocation":
-      return `revocation:${entry.resourceId}:${entry.eventSeq}`;
-  }
-}
-
-function describeBroadcast(entry: BroadcastEntry): string {
-  switch (entry.type) {
-    case "project":
-      return `project · ${entry.project.project.name} · ${entry.project.members.length} members`;
-    case "ai-capability":
-      return `ai-capability · ${entry.resource.name}`;
-    case "revocation":
-      return `revocation · ${entry.resourceId} · ${entry.reason}`;
-  }
-}
-
-/**
- * The registry's own audit trail and outbox, which are also the two things an
- * operator debugging a refusal wants to see. Reads are cheap locally and the
- * card refreshes after every mutation, so there is no polling here.
- */
-export function ActivityCard({
-  styles,
-  events,
-  broadcasts,
-  pending,
-  onRefresh,
-}: {
-  styles: Styles;
-  events: RegistryEvent[];
-  broadcasts: BroadcastEntry[];
-  pending: boolean;
-  onRefresh: () => void;
-}) {
-  return (
-    <View style={styles.card}>
-      <View style={styles.row}>
-        <View style={styles.grow}>
-          <Text style={styles.title}>Activity</Text>
-          <Text style={styles.muted}>
-            {events.length} recent events · {broadcasts.length} broadcasts
-          </Text>
-        </View>
-        <Chip
-          styles={styles}
-          label="refresh"
-          variant="neutral"
-          onPress={onRefresh}
-          disabled={pending}
-        />
-      </View>
-
-      <Text style={styles.sectionTitle}>recent events</Text>
-      {events.map((event) => (
-        <View key={event.seq} style={styles.grow}>
-          <Text style={styles.title}>{event.type}</Text>
-          <Text style={styles.muted}>{describeEvent(event)}</Text>
-        </View>
-      ))}
-      {events.length === 0 ? <Text style={styles.muted}>No events yet.</Text> : null}
-
-      <Text style={styles.sectionTitle}>broadcasts</Text>
-      {broadcasts.map((entry) => (
-        <Text key={broadcastKey(entry)} style={styles.muted}>
-          {describeBroadcast(entry)}
-        </Text>
-      ))}
-      {broadcasts.length === 0 ? <Text style={styles.muted}>Nothing shared yet.</Text> : null}
+      {operators.length === 0 ? <Text style={styles.empty}>No operators bound yet.</Text> : null}
     </View>
   );
 }
@@ -680,11 +799,6 @@ export function ActivityCard({
 function shortId(id: string): string {
   const local = id.split("/").pop() ?? id;
   return `…${local.slice(-8)}`;
-}
-
-function operatorLabel(operator: OperatorBinding): string {
-  const short = shortId(operator.id);
-  return operator.role ? `${operator.role} · ${short}` : short;
 }
 
 function resourceLabel(resourceId: string, resources: Resource[]): string {
@@ -696,7 +810,7 @@ function describeCapability(capability: Capability): string {
   if (capability.revokedAt !== null) {
     parts.push(`revoked: ${capability.revokedReason ?? "unknown"}`);
   } else if (capability.expiresAt !== null) {
-    parts.push(`expires ${formatEventTime(capability.expiresAt)}`);
+    parts.push(`expires ${formatTime(capability.expiresAt)}`);
   } else {
     parts.push("no expiry");
   }
@@ -719,9 +833,9 @@ function CapabilityRow({
   const revoked = capability.revokedAt !== null;
   const handleRevoke = useCallback(() => onRevoke(capability.id), [capability.id, onRevoke]);
   return (
-    <View style={styles.row}>
+    <View style={styles.listItem}>
       <View style={styles.grow}>
-        <Text style={styles.title}>{resourceName}</Text>
+        <Text style={styles.itemTitle}>{resourceName}</Text>
         <Text style={styles.muted}>{describeCapability(capability)}</Text>
       </View>
       {revoked ? null : (
@@ -791,11 +905,15 @@ export function CapabilityPanel({
   const canIssue = subjects.length > 0 && resources.length > 0 && !pending;
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>{title}</Text>
+      <CardHeader
+        styles={styles}
+        title={title}
+        meta={`${count(capabilities.length, "capability", "capabilities")} issued · signed grants of one resource to one operator`}
+      />
       {errorMessage ? <Text style={styles.danger}>{errorMessage}</Text> : null}
 
       <Text style={styles.sectionTitle}>issue</Text>
-      <Text style={styles.muted}>subject</Text>
+      <Text style={styles.fieldLabel}>subject</Text>
       <View style={styles.chipRow}>
         {subjects.map((operator) => (
           <SelectChip
@@ -814,7 +932,7 @@ export function CapabilityPanel({
         </Text>
       ) : null}
 
-      <Text style={styles.muted}>resource</Text>
+      <Text style={styles.fieldLabel}>resource</Text>
       <View style={styles.chipRow}>
         {resources.map((resource) => (
           <SelectChip
@@ -833,7 +951,7 @@ export function CapabilityPanel({
         </Text>
       ) : null}
 
-      <Text style={styles.muted}>kind</Text>
+      <Text style={styles.fieldLabel}>kind</Text>
       <View style={styles.chipRow}>
         <SelectChip
           styles={styles}
@@ -877,7 +995,7 @@ export function CapabilityPanel({
 
       {issuedToken !== "" ? (
         <View style={styles.tokenBox}>
-          <Text style={styles.sectionTitle}>issued token</Text>
+          <Text style={styles.fieldLabel}>issued token</Text>
           <Text style={styles.mono} selectable>
             {issuedToken}
           </Text>
@@ -898,7 +1016,9 @@ export function CapabilityPanel({
           onRevoke={onRevoke}
         />
       ))}
-      {capabilities.length === 0 ? <Text style={styles.muted}>No capabilities yet.</Text> : null}
+      {capabilities.length === 0 ? (
+        <Text style={styles.empty}>No capabilities issued yet.</Text>
+      ) : null}
     </View>
   );
 }
@@ -927,15 +1047,15 @@ export function VerifyPanel({
 }) {
   return (
     <View style={styles.card}>
-      <Text style={styles.title}>Verify a token</Text>
-      <Text style={styles.muted}>
-        Checked against the signing key and revocation list of this registry; expiry and the
-        expected presenter are part of the verdict.
-      </Text>
+      <CardHeader
+        styles={styles}
+        title="Verify a token"
+        meta="signature, expiry, revocation and the expected presenter"
+      />
       <TextInput
         style={styles.multiline}
         multiline
-        placeholder="token"
+        placeholder="paste a capability token"
         placeholderTextColor={placeholderColor}
         value={tokenValue}
         onChangeText={onChangeToken}
@@ -949,13 +1069,15 @@ export function VerifyPanel({
         onChangeText={onChangePresenter}
         autoCapitalize="none"
       />
-      <Pressable
-        style={styles.primary}
-        disabled={tokenValue.trim() === "" || pending}
-        onPress={onVerify}
-      >
-        <Text style={styles.primaryText}>Verify</Text>
-      </Pressable>
+      <View style={styles.row}>
+        <Pressable
+          style={styles.primary}
+          disabled={tokenValue.trim() === "" || pending}
+          onPress={onVerify}
+        >
+          <Text style={styles.primaryText}>Verify</Text>
+        </Pressable>
+      </View>
       {result === null ? null : <VerificationResult styles={styles} result={result} />}
     </View>
   );
@@ -971,14 +1093,166 @@ function VerificationResult({
 }) {
   if (result.ok) {
     return (
-      <Text style={styles.success}>
-        ok · {result.subject ?? "unknown subject"} · {result.resourceId ?? "unknown resource"}
-      </Text>
+      <View style={styles.tokenBox}>
+        <Text style={styles.success}>ok</Text>
+        <Text style={styles.mono}>{result.subject ?? "unknown subject"}</Text>
+        <Text style={styles.mono}>{result.resourceId ?? "unknown resource"}</Text>
+      </View>
     );
   }
   return (
-    <Text style={styles.danger}>
-      {result.reason ?? "refused"} · {result.subject ?? "unknown subject"}
-    </Text>
+    <View style={styles.tokenBox}>
+      <Text style={styles.danger}>{result.reason ?? "refused"}</Text>
+      <Text style={styles.mono}>{result.subject ?? "unknown subject"}</Text>
+      <Text style={styles.mono}>{result.resourceId ?? "unknown resource"}</Text>
+    </View>
   );
+}
+
+const EVENT_LABELS: Record<string, string> = {
+  resource_registered: "Resource registered",
+  resource_status: "Resource status changed",
+  class_changed: "Resource reclassified",
+  revocation: "Resource revoked",
+  project_created: "Project created",
+  project_renamed: "Project renamed",
+  member_added: "Member added",
+  member_removed: "Member removed",
+  workspace_bound: "Workspace bound",
+  workspace_unbound: "Workspace unbound",
+  share_added: "Project shared",
+  share_removed: "Share removed",
+  operator_bound: "Operator bound",
+  operator_status: "Operator status changed",
+  session_indexed: "Session indexed",
+  capability_issued: "Capability issued",
+  capability_revoked: "Capability revoked",
+  capability_denied: "Capability refused",
+};
+
+function eventLabel(type: string): string {
+  return EVENT_LABELS[type] ?? type;
+}
+
+/** Refusals and revocations are the events worth spotting from across the room. */
+function eventDot(styles: Styles, type: string) {
+  if (type === "capability_denied" || type === "capability_revoked" || type === "revocation") {
+    return styles.dotDanger;
+  }
+  if (
+    type.endsWith("_added") ||
+    type.endsWith("_registered") ||
+    type.endsWith("_bound") ||
+    type === "capability_issued"
+  ) {
+    return styles.dotSuccess;
+  }
+  return styles.dotNeutral;
+}
+
+function EventRow({ styles, event }: { styles: Styles; event: RegistryEvent }) {
+  const reason = typeof event.payload.reason === "string" ? ` · ${event.payload.reason}` : "";
+  return (
+    <View style={styles.listItem}>
+      <View style={eventDot(styles, event.type)} />
+      <View style={styles.grow}>
+        <Text style={styles.itemTitle}>{eventLabel(event.type)}</Text>
+        <Text style={styles.muted}>
+          {formatTime(event.ts)} · {shortId(event.subject)}
+          {reason}
+        </Text>
+      </View>
+    </View>
+  );
+}
+
+function broadcastTitle(entry: BroadcastEntry): string {
+  switch (entry.type) {
+    case "project":
+      return entry.project.project.name;
+    case "ai-capability":
+      return entry.resource.name;
+    case "revocation":
+      return shortId(entry.resourceId);
+  }
+}
+
+function broadcastDetail(entry: BroadcastEntry): string {
+  switch (entry.type) {
+    case "project":
+      return `project · ${entry.project.members.length} members`;
+    case "ai-capability":
+      return `ai-capability · ${entry.resource.locality}`;
+    case "revocation":
+      return `revocation · ${entry.reason}`;
+  }
+}
+
+function broadcastKey(entry: BroadcastEntry): string {
+  switch (entry.type) {
+    case "project":
+      return `project:${entry.project.project.id}`;
+    case "ai-capability":
+      return `ai-capability:${entry.resource.id}`;
+    case "revocation":
+      return `revocation:${entry.resourceId}:${entry.eventSeq}`;
+  }
+}
+
+function BroadcastRow({ styles, entry }: { styles: Styles; entry: BroadcastEntry }) {
+  return (
+    <View style={styles.listItem}>
+      <View style={styles.grow}>
+        <Text style={styles.itemTitle}>{broadcastTitle(entry)}</Text>
+        <Text style={styles.muted}>{broadcastDetail(entry)}</Text>
+      </View>
+    </View>
+  );
+}
+
+/**
+ * The registry's own audit trail and outbox, which are also the two things an
+ * operator debugging a refusal wants to see. Reads are cheap locally and the
+ * card refreshes after every mutation, so there is no polling here.
+ */
+export function ActivityCard({
+  styles,
+  events,
+  broadcasts,
+  pending,
+  onRefresh,
+}: {
+  styles: Styles;
+  events: RegistryEvent[];
+  broadcasts: BroadcastEntry[];
+  pending: boolean;
+  onRefresh: () => void;
+}) {
+  return (
+    <View style={styles.card}>
+      <CardHeader
+        styles={styles}
+        title="Activity"
+        meta={`${count(events.length, "recent event")} · ${count(broadcasts.length, "broadcast")}`}
+        actionLabel="refresh"
+        actionDisabled={pending}
+        onAction={onRefresh}
+      />
+      <Text style={styles.sectionTitle}>recent events</Text>
+      {events.map((event) => (
+        <EventRow key={event.seq} styles={styles} event={event} />
+      ))}
+      {events.length === 0 ? <Text style={styles.empty}>No events yet.</Text> : null}
+
+      <Text style={styles.sectionTitle}>broadcasts</Text>
+      {broadcasts.map((entry) => (
+        <BroadcastRow key={broadcastKey(entry)} styles={styles} entry={entry} />
+      ))}
+      {broadcasts.length === 0 ? <Text style={styles.empty}>Nothing shared yet.</Text> : null}
+    </View>
+  );
+}
+
+function formatTime(ts: number): string {
+  return `${new Date(ts).toISOString().slice(11, 19)}Z`;
 }
