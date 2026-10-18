@@ -2,16 +2,22 @@ import { mkdtempSync, rmSync } from "node:fs";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, test } from "vitest";
+import { generateIssuerPem, loadIssuerKeys } from "../server/capability.js";
 import { openRegistryDatabase } from "../server/db.js";
 import { Registry, RegistryError } from "../server/registry.js";
 
 const roots: string[] = [];
 
+/** A fresh in-memory signing key; the tests never need the key file. */
+function makeKeys() {
+  return loadIssuerKeys(generateIssuerPem().privateKeyPem);
+}
+
 function makeRegistry(hostId = "srv_test"): Registry {
   const directory = mkdtempSync(path.join(os.tmpdir(), "lingus-registry-"));
   roots.push(directory);
   const db = openRegistryDatabase(path.join(directory, "registry.db"));
-  const registry = new Registry(db, hostId);
+  const registry = new Registry(db, hostId, makeKeys());
   registry.bootstrap();
   return registry;
 }

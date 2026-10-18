@@ -6,6 +6,9 @@ import { defineRpc } from "@getpaseo/plugin";
 import { z } from "zod";
 import {
   BroadcastEntrySchema,
+  CapabilityKindSchema,
+  CapabilitySchema,
+  CapabilityVerificationSchema,
   ClassSchema,
   DescriptorSchema,
   JsonObjectSchema,
@@ -253,6 +256,59 @@ export const sessionList = defineRpc({
   name: "session.list",
   input: z.object({}),
   output: z.object({ sessions: z.array(SessionRefSchema) }),
+});
+
+// --- capabilities ----------------------------------------------------------
+
+export const capabilityIssue = defineRpc({
+  name: "capability.issue",
+  input: z.object({
+    projectId: z.string().min(1),
+    resourceId: z.string().min(1),
+    subject: z.string().min(1),
+    kind: CapabilityKindSchema,
+    /** Must stay inside the project member's allocation. */
+    scope: JsonObjectSchema.optional(),
+    caveats: JsonObjectSchema.optional(),
+    /** Seconds of validity; null means no expiry. Defaults by kind (D-B-6). */
+    ttlSec: z.number().int().positive().nullable().optional(),
+    serial: z.string().min(1).optional(),
+  }),
+  output: z.object({ capability: CapabilitySchema, token: z.string().min(1) }),
+});
+
+export const capabilityGet = defineRpc({
+  name: "capability.get",
+  input: z.object({ id: z.string().min(1) }),
+  output: z.object({ capability: CapabilitySchema }),
+});
+
+export const capabilityList = defineRpc({
+  name: "capability.list",
+  input: z.object({
+    subject: z.string().min(1).optional(),
+    projectId: z.string().min(1).optional(),
+    resourceId: z.string().min(1).optional(),
+  }),
+  output: z.object({ capabilities: z.array(CapabilitySchema) }),
+});
+
+export const capabilityRevoke = defineRpc({
+  name: "capability.revoke",
+  input: z.object({ id: z.string().min(1) }),
+  output: z.object({ capability: CapabilitySchema }),
+});
+
+export const capabilityVerify = defineRpc({
+  name: "capability.verify",
+  input: z.object({
+    token: z.string().min(1),
+    /** Expected presenter; denied with `subject_mismatch` when it is not the subject. */
+    presenter: z.string().min(1).optional(),
+    resourceId: z.string().min(1).optional(),
+    kind: CapabilityKindSchema.optional(),
+  }),
+  output: z.object({ verification: CapabilityVerificationSchema }),
 });
 
 // --- projection and audit --------------------------------------------------

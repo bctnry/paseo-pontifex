@@ -5,7 +5,7 @@ import { mkdirSync } from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 
-export const SCHEMA_VERSION = 1;
+export const SCHEMA_VERSION = 2;
 
 const SCHEMA_SQL = `
 CREATE TABLE resources(
@@ -91,6 +91,52 @@ CREATE TABLE events(
 CREATE INDEX idx_events_type ON events(type);
 `;
 
+/**
+ * Schema v2: capability tokens and the revocation list. Kept beside the v1 body
+ * above so the same DDL serves a fresh install and the v1 migration, and so the
+ * tables an upgrade adds are visible in one place.
+ *
+ * `token` holds the exact signed string rather than its signature: injection
+ * hands tokens out verbatim, and re-deriving one from columns would have to
+ * reproduce the canonical JSON the signature covers.
+ */
+const CAPABILITY_SQL = `
+CREATE TABLE IF NOT EXISTS capabilities(
+  id          TEXT PRIMARY KEY,
+  serial      TEXT NOT NULL UNIQUE,
+  kid         TEXT NOT NULL,
+  issuer      TEXT NOT NULL,
+  subject     TEXT NOT NULL,
+  project_id  TEXT REFERENCES projects(id) ON DELETE RESTRICT,
+  resource_id TEXT NOT NULL REFERENCES resources(id) ON DELETE RESTRICT,
+  kind        TEXT NOT NULL CHECK(kind IN ('access','approval')),
+  scope       TEXT NOT NULL DEFAULT '{}',
+  caveats     TEXT NOT NULL DEFAULT '{}',
+  issued_at   INTEGER NOT NULL,
+  expires_at  INTEGER,
+  token       TEXT NOT NULL
+);
+CREATE INDEX IF NOT EXISTS idx_capabilities_resource ON capabilities(resource_id);
+CREATE INDEX IF NOT EXISTS idx_capabilities_subject ON capabilities(subject);
+CREATE INDEX IF NOT EXISTS idx_capabilities_project ON capabilities(project_id, resource_id);
+
+CREATE TABLE IF NOT EXISTS revocations(
+  serial TEXT PRIMARY KEY,
+  at     INTEGER NOT NULL,
+  reason TEXT NOT NULL,
+  source TEXT NOT NULL
+);
+`;
+
+interface Migration {
+  /** Schema version this migration produces. */
+  to: number;
+  sql: string;
+}
+
+/** In-order migrations for databases written by an earlier schema version. */
+const MIGRATIONS: readonly Migration[] = [{ to: 2, sql: CAPABILITY_SQL }];
+
 /** Opens (creating if needed) the registry database and applies migrations. */
 export function openRegistryDatabase(dbPath: string): DatabaseSync {
   mkdirSync(path.dirname(dbPath), { recursive: true });
@@ -102,12 +148,22 @@ export function openRegistryDatabase(dbPath: string): DatabaseSync {
   const row = db.prepare("SELECT value FROM meta WHERE key='schema_version'").get() as
     | { value?: string }
     | undefined;
-  if (!row) {
-    db.exec(SCHEMA_SQL);
-    db.prepare("INSERT INTO meta(key,value) VALUES('schema_version', ?)").run(
-      String(SCHEMA_VERSION),
+  // 0 means "no database yet"; anything else is the version that wrote it.
+  const current = row?.value ? Number(row.value) : 0;
+  if (current > SCHEMA_VERSION) {
+    throw new Error(
+      `registry database schema v${current} is newer than this plugin understands (v${SCHEMA_VERSION})`,
     );
   }
+  if (current === 0) {
+    db.exec(SCHEMA_SQL);
+    db.exec(CAPABILITY_SQL);
+  } else {
+    for (const migration of MIGRATIONS) {
+      if (current < migration.to) db.exec(migration.sql);
+    }
+  }
+  setMeta(db, "schema_version", String(SCHEMA_VERSION));
   return db;
 }
 
