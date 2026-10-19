@@ -8,7 +8,6 @@ import {
   AttachmentThumbnail,
 } from "@/components/attachment-pill";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
-import { useRetainedPanelActive } from "@/components/retained-panel";
 import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { TaskListRow } from "@/components/task-list-row";
@@ -121,7 +120,6 @@ const ThemedChevronRightIcon = withUnistyles(ChevronRight);
 const ThemedNotificationInfo = withUnistyles(Info);
 const ThemedNotificationWarning = withUnistyles(TriangleAlertIcon);
 const ThemedNotificationError = withUnistyles(XCircle);
-const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -881,10 +879,6 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   secondaryLabelActive: {
     color: theme.colors.foreground,
   },
-  loadingSpinner: {
-    flexShrink: 0,
-    marginRight: theme.spacing[1],
-  },
   spacer: {
     flex: 1,
   },
@@ -1341,7 +1335,6 @@ interface ExpandableBadgeLabelRowProps {
   labelStyle: StyleProp<TextStyle>;
   secondaryLabel?: string;
   secondaryLabelStyle: StyleProp<TextStyle>;
-  showLoadingSpinner: boolean;
   showOpenFileButton: boolean;
   isOpenFileHovered: boolean;
   onOpenFilePress: (event: GestureResponderEvent) => void;
@@ -1354,7 +1347,6 @@ function ExpandableBadgeLabelRow({
   labelStyle,
   secondaryLabel,
   secondaryLabelStyle,
-  showLoadingSpinner,
   showOpenFileButton,
   isOpenFileHovered,
   onOpenFilePress,
@@ -1364,11 +1356,6 @@ function ExpandableBadgeLabelRow({
   const { t } = useTranslation();
   return (
     <View style={expandableBadgeStylesheet.labelRow}>
-      {showLoadingSpinner ? (
-        <View style={expandableBadgeStylesheet.loadingSpinner}>
-          <ThemedLoadingSpinner size={14} uniProps={foregroundMutedColorMapping} />
-        </View>
-      ) : null}
       <Text style={labelStyle} numberOfLines={1}>
         {label}
       </Text>
@@ -1539,8 +1526,6 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   const handleOpenFileHoverIn = useCallback(() => setIsOpenFileHovered(true), []);
   const handleOpenFileHoverOut = useCallback(() => setIsOpenFileHovered(false), []);
 
-  const isPanelActive = useRetainedPanelActive();
-
   useDetailWheelPropagationBlocker({
     detailWrapperRef,
     enabled: !isNative && isExpanded && hasDetailContent,
@@ -1648,7 +1633,6 @@ export const ExpandableBadge = memo(function ExpandableBadge({
             labelStyle={labelStyle}
             secondaryLabel={secondaryLabel}
             secondaryLabelStyle={secondaryLabelStyle}
-            showLoadingSpinner={isLoading && isPanelActive}
             showOpenFileButton={Boolean(onOpenFile && isHovered)}
             isOpenFileHovered={isOpenFileHovered}
             onOpenFilePress={handleOpenFilePress}

@@ -17,6 +17,7 @@ import {
 } from "@/components/sidebar/workspace-trailing";
 import { useAppSettings } from "@/hooks/use-settings";
 import { densityIconBox } from "@/styles/density";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import type { Theme } from "@/styles/theme";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { getStatusDotColor } from "@/utils/status-dot-color";
@@ -127,7 +128,7 @@ export const SidebarWorkspaceRowContent = memo(function SidebarWorkspaceRowConte
   const workspaceBranchTextStyle = useMemo(
     () => [
       styles.workspaceBranchText,
-      isHovered && styles.workspaceBranchTextHovered,
+      isHovered && !isCreating && hoveredBranchTextStyle,
       isCreating && styles.workspaceBranchTextCreating,
     ],
     [isHovered, isCreating],
@@ -326,11 +327,6 @@ export const sidebarWorkspaceRowStyles = StyleSheet.create((theme) => ({
     alignItems: "flex-end",
     justifyContent: "flex-start",
   },
-  trailingActionOverlay: {
-    position: "absolute",
-    top: 0,
-    right: 0,
-  },
 }));
 
 export function SidebarWorkspaceShortcutBadge({ number }: { number: number }) {
@@ -448,13 +444,23 @@ export function SidebarWorkspaceTrailingActionOverlay({
       {scrimBackdrop ? (
         <TrailingActionScrim backdrop={scrimBackdrop} testID="sidebar-workspace-trailing-scrim" />
       ) : null}
-      <View style={sidebarWorkspaceRowStyles.trailingActionOverlay}>{children}</View>
+      <View style={trailingActionOverlayStyle}>{children}</View>
     </>
   );
 }
 
 // The status dot centres on the title's first line, so both share its line height.
 const TITLE_LINE_HEIGHT = 20;
+
+// Plain styles for hover-only changes. Hover is web-only, and routing these through Unistyles
+// would add and remove a class each time the pointer crosses a row, rebuilding the full
+// stylesheet. The row fill and title opacity are simple enough to sit outside that registry.
+const hoveredBranchTextStyle = inlineUnistylesStyle({ opacity: 1 });
+const trailingActionOverlayStyle = inlineUnistylesStyle<ViewStyle>({
+  position: "absolute",
+  top: 0,
+  right: 0,
+});
 
 const styles = StyleSheet.create((theme) => ({
   workspaceRowContent: {
@@ -525,9 +531,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceBranchTextCreating: {
     opacity: 0.92,
-  },
-  workspaceBranchTextHovered: {
-    opacity: 1,
   },
   statusDotNeedsInput: {
     backgroundColor: getStatusDotColor({ theme, bucket: "needs_input" }) ?? undefined,

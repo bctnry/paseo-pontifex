@@ -195,6 +195,8 @@ Terminology:
 
 Loading is inline by default. `<LoadingSpinner size={14} color={foregroundMuted} />` sits next to the thing it relates to (`packages/app/src/screens/settings/providers-section.tsx:227-231`). Page-level loading is a centered `<LoadingSpinner size="large">` (`packages/app/src/screens/sessions-screen.tsx:69-72`). Card-level loading is a single short line, not a spinner. In-row dropdown items use `<DropdownMenuItem status="pending" pendingLabel="Removing...">`; the menu item handles its own pending state.
 
+`LoadingSpinner` is the only spinner. Its instances share one six-dot clock, so mounting another one does not start another animation. Do not add a spinner to every pending tool call or thinking row: one running turn already has the footer loader, and that is the turn-level pending signal.
+
 Screen-level empty states use a centered, muted noun phrase and at most one ghost button (`packages/app/src/screens/sessions-screen.tsx`). Sidebar list empty states use a quiet bordered card with a left-aligned `sm` title, a muted `sm` description, and `xs` `<Button>` actions. Use `secondary` for the primary action and `outline` for a secondary action (`packages/app/src/components/sidebar/empty-states.tsx`). Keep both forms short and free of illustrations.
 
 Inline errors are a single sentence in `palette.red[300]` `xs`, sitting under the field or inside the card it relates to (`packages/app/src/screens/settings/providers-section.tsx:115-119`).

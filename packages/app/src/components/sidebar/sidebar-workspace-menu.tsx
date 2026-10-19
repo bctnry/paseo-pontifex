@@ -1,7 +1,9 @@
 import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { type PressableStateCallbackType } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { type PressableStateCallbackType, type ViewStyle } from "react-native";
+import { withUnistyles } from "react-native-unistyles";
+import { isWeb as platformIsWeb } from "@/constants/platform";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import {
   Archive,
   Circle,
@@ -13,7 +15,6 @@ import {
   PinOff,
   Tag,
 } from "lucide-react-native";
-import { isWeb } from "@/constants/platform";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -282,7 +283,7 @@ export function SidebarWorkspaceMenu({
       <DropdownMenuTrigger
         hitSlop={8}
         style={triggerStyle}
-        accessibilityRole={isWeb ? undefined : "button"}
+        accessibilityRole={platformIsWeb ? undefined : "button"}
         accessibilityLabel={t("sidebar.workspace.actions.menu")}
         testID={`sidebar-workspace-kebab-${workspaceKey}`}
       >
@@ -433,20 +434,21 @@ export function SidebarWorkspaceContextMenu({
   );
 }
 
-function triggerStyle({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) {
-  return [styles.trigger, hovered && styles.triggerHovered];
-}
+// The trigger appears only while the row is hovered. Keeping its base style out of Unistyles
+// means mounting it cannot add and later remove a class, which would rebuild the stylesheet on
+// every row crossed.
+const triggerBaseStyle: ViewStyle = inlineUnistylesStyle({
+  padding: 2,
+  borderRadius: 0,
+  marginLeft: 2,
+  // MoreVertical paints only around the center of its SVG. Keep the padded hit box, but pull
+  // the painted dots through that unused view-box space onto the trailing-content rail.
+  marginRight: -7,
+});
+const triggerHoveredStyle: ViewStyle | undefined = platformIsWeb
+  ? inlineUnistylesStyle({ backgroundColor: "var(--colors-surface2)" })
+  : undefined;
 
-const styles = StyleSheet.create((theme) => ({
-  trigger: {
-    padding: 2,
-    borderRadius: 0,
-    marginLeft: 2,
-    // MoreVertical paints only around the center of its SVG. Keep the padded hit box, but
-    // pull the painted dots through that unused view-box space onto the trailing-content rail.
-    marginRight: -7,
-  },
-  triggerHovered: {
-    backgroundColor: theme.colors.surface2,
-  },
-}));
+function triggerStyle({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) {
+  return [triggerBaseStyle, hovered && triggerHoveredStyle];
+}

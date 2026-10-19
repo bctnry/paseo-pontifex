@@ -41,6 +41,7 @@ interface HoverCardContextValue {
   triggerRef: RefObject<View | null>;
   contentRef: RefObject<View | null>;
   openNow: () => void;
+  openWithIntent: () => void;
   scheduleClose: () => void;
 }
 
@@ -60,30 +61,51 @@ const HoverCardContext = createContext<HoverCardContextValue | null>(null);
  */
 export function HoverCard({
   disabled = false,
+  openDelay = 0,
   children,
 }: {
   /** Closes the card and keeps it closed, e.g. while its trigger is dragged. */
   disabled?: boolean;
+  /**
+   * How long the pointer has to rest on the trigger before the card opens. Use this on rows in a
+   * list: without it, skimming the list mounts and measures a card for every row crossed. Focus
+   * and keyboard activation still open immediately.
+   */
+  openDelay?: number;
   children: ReactNode;
 }): ReactNode {
   if (!isWeb) return children;
-  return <WebHoverCard disabled={disabled}>{children}</WebHoverCard>;
+  return (
+    <WebHoverCard disabled={disabled} openDelay={openDelay}>
+      {children}
+    </WebHoverCard>
+  );
 }
 
 function WebHoverCard({
   disabled,
+  openDelay,
   children,
 }: {
   disabled: boolean;
+  openDelay: number;
   children: ReactNode;
 }): ReactElement {
   const layer = useOverlayLayer("floating");
   const triggerRef = useRef<View>(null);
   const contentRef = useRef<View>(null);
   const [open, setOpen] = useState(false);
+  const openTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const graceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   // Read when focus arrives: by focusout the element losing focus no longer matches :focus-visible.
   const keyboardFocusedRef = useRef(false);
+
+  const clearOpenTimer = useCallback(() => {
+    if (openTimerRef.current) {
+      clearTimeout(openTimerRef.current);
+      openTimerRef.current = null;
+    }
+  }, []);
 
   const clearGraceTimer = useCallback(() => {
     if (graceTimerRef.current) {
@@ -107,21 +129,41 @@ function WebHoverCard({
   }, [focusInside]);
 
   const scheduleClose = useCallback(() => {
+    clearOpenTimer();
     if (keyboardFocusInside()) return;
+    if (!open) return;
     if (graceTimerRef.current) return;
     graceTimerRef.current = setTimeout(() => {
       graceTimerRef.current = null;
       if (keyboardFocusInside()) return;
       setOpen(false);
     }, CLOSE_GRACE_MS);
-  }, [keyboardFocusInside]);
+  }, [clearOpenTimer, keyboardFocusInside, open]);
 
   const openNow = useCallback(() => {
+    clearOpenTimer();
     clearGraceTimer();
     if (!disabled) {
       setOpen(true);
     }
-  }, [clearGraceTimer, disabled]);
+  }, [clearGraceTimer, clearOpenTimer, disabled]);
+
+  const openWithIntent = useCallback(() => {
+    if (disabled) return;
+    clearGraceTimer();
+    if (open) return;
+    if (openTimerRef.current) return;
+    if (openDelay <= 0) {
+      openNow();
+      return;
+    }
+    openTimerRef.current = setTimeout(() => {
+      openTimerRef.current = null;
+      if (!disabled) {
+        setOpen(true);
+      }
+    }, openDelay);
+  }, [clearGraceTimer, disabled, open, openDelay, openNow]);
 
   const keyPressed = useCallback(
     (event: KeyboardEvent): boolean => {
@@ -131,6 +173,7 @@ function WebHoverCard({
       if (event.key === "Escape" && open) {
         event.preventDefault();
         if (focusInside()) trigger.focus();
+        clearOpenTimer();
         clearGraceTimer();
         setOpen(false);
         return true;
@@ -152,7 +195,7 @@ function WebHoverCard({
       }
       return false;
     },
-    [clearGraceTimer, focusInside, open, openNow],
+    [clearGraceTimer, clearOpenTimer, focusInside, open, openNow],
   );
 
   const setOverlayScope = useWebOverlayRegistration({
@@ -174,6 +217,7 @@ function WebHoverCard({
     const trigger = triggerRef.current as unknown as HTMLElement | null;
     if (!trigger) return;
     const close = () => {
+      clearOpenTimer();
       clearGraceTimer();
       setOpen(false);
     };
@@ -223,7 +267,7 @@ function WebHoverCard({
       document.removeEventListener("scroll", scrolled, true);
       window.removeEventListener("resize", close);
     };
-  }, [clearGraceTimer, keyPressed, open, openNow, scheduleClose]);
+  }, [clearGraceTimer, clearOpenTimer, keyPressed, open, openNow, scheduleClose]);
 
   // While open, the safe zone covers trigger + content + the bridge between
   // them. Close only fires when the pointer leaves the safe zone; re-entering
@@ -238,16 +282,32 @@ function WebHoverCard({
 
   useEffect(() => {
     if (disabled) {
+      clearOpenTimer();
       clearGraceTimer();
       setOpen(false);
     }
-  }, [clearGraceTimer, disabled]);
+  }, [clearGraceTimer, clearOpenTimer, disabled]);
 
-  useEffect(() => clearGraceTimer, [clearGraceTimer]);
+  useEffect(
+    () => () => {
+      clearOpenTimer();
+      clearGraceTimer();
+    },
+    [clearGraceTimer, clearOpenTimer],
+  );
 
   const value = useMemo<HoverCardContextValue>(
-    () => ({ open, layer, setTriggerRef, triggerRef, contentRef, openNow, scheduleClose }),
-    [open, layer, setTriggerRef, openNow, scheduleClose],
+    () => ({
+      open,
+      layer,
+      setTriggerRef,
+      triggerRef,
+      contentRef,
+      openNow,
+      openWithIntent,
+      scheduleClose,
+    }),
+    [open, layer, setTriggerRef, openNow, openWithIntent, scheduleClose],
   );
 
   return (
@@ -275,7 +335,7 @@ export function HoverCardTrigger({
       accessibilityRole={focusable ? "button" : undefined}
       accessibilityLabel={accessibilityLabel}
       collapsable={false}
-      onPointerEnter={ctx.openNow}
+      onPointerEnter={ctx.openWithIntent}
       onPointerLeave={ctx.scheduleClose}
     >
       {children}

@@ -1,12 +1,22 @@
 import { useId } from "react";
-import { View } from "react-native";
+import { View, type ViewStyle } from "react-native";
 import Svg, { Defs, LinearGradient as SvgLinearGradient, Rect, Stop } from "react-native-svg";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { withUnistyles } from "react-native-unistyles";
 import type { SurfaceBackdrop } from "@/styles/surface-backdrop";
 import type { Theme } from "@/styles/theme";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 
 export const SCRIM_WIDTH = 48;
 const SCRIM_SOLID_OFFSET = "55%";
+// Mounted and unmounted with the hover-revealed kebab. Keep it out of Unistyles so that
+// transition cannot add and remove a stylesheet class.
+const scrimStyle: ViewStyle = inlineUnistylesStyle({
+  position: "absolute",
+  top: 0,
+  bottom: 0,
+  right: 0,
+  width: SCRIM_WIDTH,
+});
 
 function TrailingActionScrimSvg({ gradientId, color }: { gradientId: string; color: string }) {
   return (
@@ -47,7 +57,7 @@ export function TrailingActionScrim({
   // React-generated ids contain characters that are invalid inside SVG fragment references.
   const gradientId = `trailing-action-scrim-${useId().replace(/[^a-zA-Z0-9_-]/g, "")}`;
   return (
-    <View style={styles.scrim} pointerEvents="none" testID={testID}>
+    <View style={scrimStyle} pointerEvents="none" testID={testID}>
       <ThemedTrailingActionScrimSvg
         gradientId={gradientId}
         uniProps={backdropColorMappings[backdrop]}
@@ -55,13 +65,3 @@ export function TrailingActionScrim({
     </View>
   );
 }
-
-const styles = StyleSheet.create({
-  scrim: {
-    position: "absolute",
-    top: 0,
-    bottom: 0,
-    right: 0,
-    width: SCRIM_WIDTH,
-  },
-});

@@ -31,6 +31,7 @@ import {
 } from "@/stores/navigation-active-workspace-store";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { density, densityIconBox } from "@/styles/density";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import type { Theme } from "@/styles/theme";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 import { getSidebarRowBackdrop } from "@/components/sidebar/sidebar-row-backdrop";
@@ -355,10 +356,24 @@ export function PrBadge({ hint, style }: { hint: PrHint; style?: StyleProp<ViewS
   );
 }
 
+// Hover is web-only, and Unistyles rebuilds the whole stylesheet whenever a style class enters
+// or leaves the registry. These inline CSS-variable fills keep the row highlight out of that
+// registry, so skimming the sidebar does not rewrite the stylesheet for every row.
+const webSidebarHoverSurface: ViewStyle | undefined = platformIsWeb
+  ? inlineUnistylesStyle({ backgroundColor: "var(--colors-surface-sidebar-hover)" })
+  : undefined;
+const webHoverSurface2: ViewStyle | undefined = platformIsWeb
+  ? inlineUnistylesStyle({ backgroundColor: "var(--colors-surface2)" })
+  : undefined;
+const hiddenControl: ViewStyle = inlineUnistylesStyle({ opacity: 0 });
+
 function projectKebabStyle({
   hovered = false,
 }: PressableStateCallbackType & { hovered?: boolean }) {
-  return [styles.projectKebabButton, hovered && styles.projectKebabButtonHovered];
+  return [
+    styles.projectKebabButton,
+    hovered && (webHoverSurface2 ?? styles.projectKebabButtonHovered),
+  ];
 }
 
 function getProjectWorkspaceRowStyle({
@@ -374,7 +389,11 @@ function getProjectWorkspaceRowStyle({
 }) {
   return [
     styles.workspaceRow,
-    isHovered && styles.workspaceRowHovered,
+    isHovered &&
+      !selected &&
+      !isDragging &&
+      !isPressed &&
+      (webSidebarHoverSurface ?? styles.workspaceRowHovered),
     selected && styles.sidebarRowSelected,
     isDragging && styles.workspaceRowDragging,
     isPressed && styles.workspaceRowPressed,
@@ -442,7 +461,7 @@ function ProjectRowTrailingActions({
       ) : null}
       {onRemoveProject ? (
         <View
-          style={!actionsVisible && styles.projectKebabButtonHidden}
+          style={!actionsVisible && hiddenControl}
           pointerEvents={actionsVisible ? "auto" : "none"}
         >
           <ProjectKebabMenu
@@ -726,8 +745,10 @@ function NewWorktreeButton({
   const pressableStyle = useCallback(
     ({ hovered, pressed }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.projectIconActionButton,
-      !visible && styles.projectIconActionButtonHidden,
-      (Boolean(hovered) || pressed) && !loading && styles.projectIconActionButtonHovered,
+      !visible && hiddenControl,
+      (Boolean(hovered) || pressed) &&
+        !loading &&
+        (webHoverSurface2 ?? styles.projectIconActionButtonHovered),
     ],
     [visible, loading],
   );
@@ -937,7 +958,11 @@ function ProjectHeaderRow({
       styles.projectRow,
       isDragging && styles.projectRowDragging,
       selected && styles.sidebarRowSelected,
-      isHovered && styles.projectRowHovered,
+      isHovered &&
+        !selected &&
+        !isDragging &&
+        !pressed &&
+        (webSidebarHoverSurface ?? styles.projectRowHovered),
       pressed && styles.projectRowPressed,
     ],
     [isDragging, selected, isHovered],
@@ -2650,9 +2675,6 @@ const styles = StyleSheet.create((theme) => ({
   projectIconActionButtonHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
   },
-  projectIconActionButtonHidden: {
-    opacity: 0,
-  },
   projectTrailingActions: {
     flexDirection: "row",
     alignItems: "center",
@@ -2669,9 +2691,6 @@ const styles = StyleSheet.create((theme) => ({
     alignItems: "center",
     justifyContent: "center",
     flexShrink: 0,
-  },
-  projectKebabButtonHidden: {
-    opacity: 0,
   },
   projectKebabButtonHovered: {
     backgroundColor: theme.colors.surface2,
@@ -2786,9 +2805,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   workspaceBranchTextCreating: {
     opacity: 0.92,
-  },
-  workspaceBranchTextHovered: {
-    opacity: 1,
   },
   workspacePrBadgeRow: {
     flexDirection: "row",

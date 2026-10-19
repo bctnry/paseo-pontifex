@@ -41,6 +41,9 @@ import { CheckPresentationIcon, getCheckPresentationTone } from "@/git/check-pre
 import { buildForgeChecksUrl } from "@/git/forge-url";
 
 const HOVER_CARD_WIDTH = 260;
+// The row highlight reads the pointer immediately; the card is supplementary and waits so that
+// skimming the sidebar does not mount a portal card for every row crossed.
+const HOVER_CARD_OPEN_DELAY_MS = 300;
 
 interface WorkspaceHoverCardProps {
   workspace: SidebarWorkspaceEntry;
@@ -64,7 +67,7 @@ export function WorkspaceHoverCard({
   }
 
   return (
-    <HoverCard disabled={isDragging || disabled}>
+    <HoverCard disabled={isDragging || disabled} openDelay={HOVER_CARD_OPEN_DELAY_MS}>
       <HoverCardTrigger>{children}</HoverCardTrigger>
       <HoverCardContent
         placement="right"

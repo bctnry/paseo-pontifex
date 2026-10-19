@@ -1,6 +1,8 @@
-import { ActivityIndicator, View, type ViewStyle } from "react-native";
+import { View, type ViewStyle } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
+import { isWeb as platformIsWeb } from "@/constants/platform";
+import { inlineUnistylesStyle } from "@/styles/unistyles-inline-style";
 import { ChevronDown, ChevronRight, CircleAlert } from "lucide-react-native";
 import { ProjectIconView } from "@/components/project-icon-view";
 import { getStatusBucketLabel } from "@/hooks/sidebar-status-view-model";
@@ -20,6 +22,7 @@ import {
 } from "@/utils/status-indicator-geometry";
 import { StatusRing } from "@/components/status-ring";
 import { getStatusRingOffset } from "@/components/status-ring/geometry";
+import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import type { SidebarSurfaceBackdrop } from "@/styles/surface-backdrop";
 
 // Every surfaced status shares one badge shell, so the badge never changes size or position
@@ -32,6 +35,11 @@ const STATUS_BADGE_SIZE = 12;
 // centered on the corner it reads as hanging off the icon rather than sitting on it, and the
 // sidebar row has no padding there to absorb the overhang.
 const STATUS_BADGE_OFFSET = -4;
+// The badge knockout follows the row fill. On web the hover fill is an inline CSS variable, so
+// the badge has to follow it without registering another Unistyles class on every hover.
+const webHoverBadgeBackground: ViewStyle | undefined = platformIsWeb
+  ? inlineUnistylesStyle({ backgroundColor: "var(--colors-surface-sidebar-hover)" })
+  : undefined;
 // Both glyphs must be EVEN. A centered glyph of size N sits at a (12 - N) / 2 offset — fractional
 // for odd N, which the browser snaps to a device-pixel boundary and renders visibly off-center (an
 // odd size measured 1.5 device px right and down at 3x, ~3px of asymmetry between opposite gaps).
@@ -42,7 +50,7 @@ const STATUS_BADGE_OFFSET = -4;
 const DensityProjectIconView = withUnistyles(ProjectIconView);
 const projectIconProps = densityIconProps("md", () => ({}));
 
-const ThemedActivityIndicator = withUnistyles(ActivityIndicator);
+const ThemedLoadingSpinner = withUnistyles(LoadingSpinner);
 const ThemedCircleAlert = withUnistyles(CircleAlert);
 
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -89,7 +97,7 @@ export function ProjectLeadingVisual({
   if (isArchiving) {
     return (
       <View style={styles.projectLeadingVisualSlot} testID="project-status-indicator-archiving">
-        <ThemedActivityIndicator size={8} uniProps={foregroundMutedColorMapping} />
+        <ThemedLoadingSpinner size={8} uniProps={foregroundMutedColorMapping} />
       </View>
     );
   }
@@ -211,7 +219,7 @@ function getStatusBadgeBackdropStyle(backdrop: SidebarSurfaceBackdrop): ViewStyl
     case "surfaceSidebar":
       return styles.statusBadgeOnSidebar;
     case "surfaceSidebarHover":
-      return styles.statusBadgeOnSidebarHover;
+      return webHoverBadgeBackground ?? styles.statusBadgeOnSidebarHover;
     case "surfaceSidebarSelected":
       return styles.statusBadgeOnSidebarSelected;
     case "surface2":
