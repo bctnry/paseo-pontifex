@@ -31,15 +31,19 @@ import {
   resourceSetClass,
 } from "../shared/contracts.js";
 import type { OperatorStatus } from "../shared/model.js";
+import type { TabItem } from "./components.js";
 import {
   ActivityCard,
   CapabilityPanel,
   ErrorCard,
   HeaderCard,
+  HintCard,
   OperatorPanel,
   ProjectDetail,
   ProjectsCard,
   ResourcesCard,
+  TabBar,
+  TabPane,
   VerifyPanel,
 } from "./components.js";
 import { createStyles } from "./styles.js";
@@ -89,6 +93,8 @@ export function Main({ theme, host }: PluginScreenProps) {
   const [issuedToken, setIssuedToken] = useState("");
   const [verifyToken, setVerifyToken] = useState("");
   const [verifyPresenter, setVerifyPresenter] = useState("");
+  // One tab at a time; the selected project survives tab switches.
+  const [activeTab, setActiveTab] = useState("resources");
 
   const infoRpc = useRpc(registryInfo);
   const listResourcesRpc = useRpc(resourceList);
@@ -350,6 +356,18 @@ export function Main({ theme, host }: PluginScreenProps) {
     return memberResources[0]?.id ?? "";
   }, [capResource, memberResources]);
   const projectTitle = descriptorQuery.data?.descriptor.project.name ?? selectedProject ?? "";
+  // Only the host-wide tabs carry counts: operators and capabilities are scoped
+  // to the open project, and a "0" before one is open would read as "none exist".
+  const tabs = useMemo<TabItem[]>(
+    () => [
+      { id: "resources", label: "Resources", count: resources.length },
+      { id: "projects", label: "Projects", count: projects.length },
+      { id: "operators", label: "Operators" },
+      { id: "capabilities", label: "Capabilities" },
+      { id: "activity", label: "Activity" },
+    ],
+    [projects.length, resources.length],
+  );
 
   const handleRegisterResource = useCallback(
     (name: string, kind: string) => registerMutation.mutate({ name, kind }),
@@ -423,6 +441,7 @@ export function Main({ theme, host }: PluginScreenProps) {
   const handleRefreshActivity = useCallback(() => {
     void invalidateActivity();
   }, [invalidateActivity]);
+  const handleSelectTab = useCallback((id: string) => setActiveTab(id), []);
   const handleSelectCapabilitySubject = useCallback((id: string) => setCapSubject(id), []);
   const handleSelectCapabilityResource = useCallback((id: string) => setCapResource(id), []);
   const handleSelectCapabilityKind = useCallback((value: string) => {
@@ -533,8 +552,10 @@ export function Main({ theme, host }: PluginScreenProps) {
       />
       {lastError ? <ErrorCard styles={styles} message={lastError.message} /> : null}
 
-      <View style={styles.grid}>
-        <View style={styles.cell}>
+      <TabBar styles={styles} tabs={tabs} activeTab={activeTab} onSelect={handleSelectTab} />
+
+      <TabPane active={activeTab} id="resources">
+        <View style={styles.narrow}>
           <ResourcesCard
             styles={styles}
             resources={resources}
@@ -548,42 +569,54 @@ export function Main({ theme, host }: PluginScreenProps) {
             onToggleClass={handleToggleClass}
           />
         </View>
-        <View style={styles.cell}>
-          <ProjectsCard
-            styles={styles}
-            projects={projects}
-            name={projectName}
-            selectedProjectId={selectedProject}
-            placeholderColor={placeholderColor}
-            pending={createProjectMutation.isPending}
-            onChangeName={setProjectName}
-            onCreate={handleCreateProject}
-            onOpen={handleOpenProject}
-          />
-        </View>
-      </View>
+      </TabPane>
 
-      {selectedProject ? (
+      <TabPane active={activeTab} id="projects">
         <View style={styles.grid}>
           <View style={styles.cell}>
-            <ProjectDetail
+            <ProjectsCard
               styles={styles}
-              title={projectTitle}
-              memberCount={members.length}
-              workspaceValue={workspaceValue}
+              projects={projects}
+              name={projectName}
+              selectedProjectId={selectedProject}
               placeholderColor={placeholderColor}
-              workspaces={workspaces}
-              members={members}
-              resources={resources}
-              addable={addableResources}
-              bindPending={bindWorkspaceMutation.isPending}
-              addPending={addMemberMutation.isPending}
-              onChangeWorkspace={setWorkspaceValue}
-              onBindWorkspace={handleBindWorkspace}
-              onAddMember={handleAddMember}
+              pending={createProjectMutation.isPending}
+              onChangeName={setProjectName}
+              onCreate={handleCreateProject}
+              onOpen={handleOpenProject}
             />
           </View>
           <View style={styles.cell}>
+            {selectedProject ? (
+              <ProjectDetail
+                styles={styles}
+                title={projectTitle}
+                memberCount={members.length}
+                workspaceValue={workspaceValue}
+                placeholderColor={placeholderColor}
+                workspaces={workspaces}
+                members={members}
+                resources={resources}
+                addable={addableResources}
+                bindPending={bindWorkspaceMutation.isPending}
+                addPending={addMemberMutation.isPending}
+                onChangeWorkspace={setWorkspaceValue}
+                onBindWorkspace={handleBindWorkspace}
+                onAddMember={handleAddMember}
+              />
+            ) : (
+              <HintCard
+                styles={styles}
+                message="Open a project to see the workspaces and members it carries."
+              />
+            )}
+          </View>
+        </View>
+      </TabPane>
+
+      <TabPane active={activeTab} id="operators">
+        <View style={styles.narrow}>
+          {selectedProject ? (
             <OperatorPanel
               styles={styles}
               title={`Operators · ${projectTitle}`}
@@ -610,60 +643,71 @@ export function Main({ theme, host }: PluginScreenProps) {
               onBackfill={handleBackfillOperator}
               onToggleStatus={handleToggleOperatorStatus}
             />
-          </View>
+          ) : (
+            <HintCard styles={styles} message="Open a project first: an operator belongs to one." />
+          )}
         </View>
-      ) : null}
+      </TabPane>
 
-      <View style={styles.grid}>
-        {selectedProject ? (
+      <TabPane active={activeTab} id="capabilities">
+        <View style={styles.grid}>
           <View style={styles.cell}>
-            <CapabilityPanel
+            {selectedProject ? (
+              <CapabilityPanel
+                styles={styles}
+                title={`Capabilities · ${projectTitle}`}
+                errorMessage={capabilityError}
+                resources={memberResources}
+                subjects={subjects}
+                capabilities={capabilities}
+                issuedToken={issuedToken}
+                selectedSubject={activeSubject}
+                selectedResource={activeCapResource}
+                selectedKind={capKind}
+                scopeValue={capScope}
+                ttlValue={capTtl}
+                placeholderColor={placeholderColor}
+                pending={issueCapabilityMutation.isPending || revokeCapabilityMutation.isPending}
+                onSelectSubject={handleSelectCapabilitySubject}
+                onSelectResource={handleSelectCapabilityResource}
+                onSelectKind={handleSelectCapabilityKind}
+                onChangeScope={handleChangeCapabilityScope}
+                onChangeTtl={handleChangeCapabilityTtl}
+                onIssue={handleIssueCapability}
+                onRevoke={handleRevokeCapability}
+              />
+            ) : (
+              <HintCard
+                styles={styles}
+                message="Open a project to issue a capability; verification works on any token."
+              />
+            )}
+          </View>
+          <View style={styles.cell}>
+            <VerifyPanel
               styles={styles}
-              title={`Capabilities · ${projectTitle}`}
-              errorMessage={capabilityError}
-              resources={memberResources}
-              subjects={subjects}
-              capabilities={capabilities}
-              issuedToken={issuedToken}
-              selectedSubject={activeSubject}
-              selectedResource={activeCapResource}
-              selectedKind={capKind}
-              scopeValue={capScope}
-              ttlValue={capTtl}
+              tokenValue={verifyToken}
+              presenterValue={verifyPresenter}
+              result={verifyCapabilityMutation.data?.verification ?? null}
               placeholderColor={placeholderColor}
-              pending={issueCapabilityMutation.isPending || revokeCapabilityMutation.isPending}
-              onSelectSubject={handleSelectCapabilitySubject}
-              onSelectResource={handleSelectCapabilityResource}
-              onSelectKind={handleSelectCapabilityKind}
-              onChangeScope={handleChangeCapabilityScope}
-              onChangeTtl={handleChangeCapabilityTtl}
-              onIssue={handleIssueCapability}
-              onRevoke={handleRevokeCapability}
+              pending={verifyCapabilityMutation.isPending}
+              onChangeToken={handleChangeVerifyToken}
+              onChangePresenter={handleChangeVerifyPresenter}
+              onVerify={handleVerifyToken}
             />
           </View>
-        ) : null}
-        <View style={styles.cell}>
-          <VerifyPanel
-            styles={styles}
-            tokenValue={verifyToken}
-            presenterValue={verifyPresenter}
-            result={verifyCapabilityMutation.data?.verification ?? null}
-            placeholderColor={placeholderColor}
-            pending={verifyCapabilityMutation.isPending}
-            onChangeToken={handleChangeVerifyToken}
-            onChangePresenter={handleChangeVerifyPresenter}
-            onVerify={handleVerifyToken}
-          />
         </View>
-      </View>
+      </TabPane>
 
-      <ActivityCard
-        styles={styles}
-        events={recentEvents}
-        broadcasts={broadcasts}
-        pending={eventsQuery.isFetching || broadcastsQuery.isFetching}
-        onRefresh={handleRefreshActivity}
-      />
+      <TabPane active={activeTab} id="activity">
+        <ActivityCard
+          styles={styles}
+          events={recentEvents}
+          broadcasts={broadcasts}
+          pending={eventsQuery.isFetching || broadcastsQuery.isFetching}
+          onRefresh={handleRefreshActivity}
+        />
+      </TabPane>
     </ScrollView>
   );
 }

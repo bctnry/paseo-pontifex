@@ -4,7 +4,7 @@
 // wrapped in `useCallback` here, and every style is a `styles` entry. Rows are
 // separate components for the same reason: an inline arrow in a `.map` would be
 // a new function prop on every render.
-import { useCallback } from "react";
+import { useCallback, type ReactNode } from "react";
 import { Pressable, Text, TextInput, View } from "react-native";
 import type {
   BroadcastEntry,
@@ -74,6 +74,87 @@ export function SelectChip({
 /** `1 project` / `3 projects`, with an explicit plural where `s` is wrong. */
 function count(n: number, singular: string, plural?: string): string {
   return `${n} ${n === 1 ? singular : (plural ?? `${singular}s`)}`;
+}
+
+export interface TabItem {
+  id: string;
+  label: string;
+  count?: number;
+}
+
+function TabButton({
+  styles,
+  item,
+  active,
+  onSelect,
+}: {
+  styles: Styles;
+  item: TabItem;
+  active: boolean;
+  onSelect: (id: string) => void;
+}) {
+  const handlePress = useCallback(() => onSelect(item.id), [item.id, onSelect]);
+  return (
+    <Pressable style={active ? styles.tabItemActive : styles.tabItem} onPress={handlePress}>
+      <Text style={active ? styles.tabLabelActive : styles.tabLabel}>{item.label}</Text>
+      {item.count === undefined ? null : (
+        <Text style={active ? styles.tabCountActive : styles.tabCount}>{String(item.count)}</Text>
+      )}
+    </Pressable>
+  );
+}
+
+export function TabBar({
+  styles,
+  tabs,
+  activeTab,
+  onSelect,
+}: {
+  styles: Styles;
+  tabs: ReadonlyArray<TabItem>;
+  activeTab: string;
+  onSelect: (id: string) => void;
+}) {
+  return (
+    <View style={styles.tabBar}>
+      {tabs.map((item) => (
+        <TabButton
+          key={item.id}
+          styles={styles}
+          item={item}
+          active={item.id === activeTab}
+          onSelect={onSelect}
+        />
+      ))}
+    </View>
+  );
+}
+
+/**
+ * Renders its children only while it is the active tab. Keeping the selection
+ * here rather than as a ternary per pane keeps the screen component's branching
+ * inside the lint budget.
+ */
+export function TabPane({
+  active,
+  id,
+  children,
+}: {
+  active: string;
+  id: string;
+  children: ReactNode;
+}) {
+  if (active !== id) return null;
+  return children;
+}
+
+/** Placeholder for a tab that needs a project before it can show anything. */
+export function HintCard({ styles, message }: { styles: Styles; message: string }) {
+  return (
+    <View style={styles.card}>
+      <Text style={styles.empty}>{message}</Text>
+    </View>
+  );
 }
 
 function Stat({ styles, label, value }: { styles: Styles; label: string; value: string }) {

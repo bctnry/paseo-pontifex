@@ -76,6 +76,50 @@ export function createStyles(theme: PluginTheme) {
   };
   const cell: ViewStyle = { flexGrow: 1, flexBasis: 420, minWidth: 300 };
 
+  // One section at a time, so the screen stops being a single long column. The
+  // active tab keeps a short accent underline sitting on the bar's rule.
+  const tabBar: ViewStyle = {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 4,
+    borderBottomWidth: 1,
+    borderBottomColor: theme.colors.border,
+  };
+  const tabItem: ViewStyle = {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: "transparent",
+    marginBottom: -1,
+  };
+  const tabItemActive: ViewStyle = {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderBottomWidth: 2,
+    borderBottomColor: theme.colors.accent,
+    marginBottom: -1,
+  };
+  const tabLabel: TextStyle = {
+    color: theme.colors.foregroundMuted,
+    fontSize: 13,
+    fontWeight: "600",
+  };
+  const tabLabelActive: TextStyle = {
+    color: theme.colors.foreground,
+    fontSize: 13,
+    fontWeight: "700",
+  };
+  const tabCount: TextStyle = { color: theme.colors.foregroundMuted, fontSize: 11 };
+  const tabCountActive: TextStyle = { color: theme.colors.accent, fontSize: 11 };
+  // A tab with one card does not want to stretch across a wide window.
+  const narrow: ViewStyle = { width: "100%", maxWidth: 860, alignSelf: "center" };
+
   const card: ViewStyle = {
     backgroundColor: theme.colors.surface1,
     borderColor: theme.colors.border,
@@ -243,6 +287,14 @@ export function createStyles(theme: PluginTheme) {
     statLabel,
     grid,
     cell,
+    narrow,
+    tabBar,
+    tabItem,
+    tabItemActive,
+    tabLabel,
+    tabLabelActive,
+    tabCount,
+    tabCountActive,
     card,
     cardHeader,
     cardTitle,
