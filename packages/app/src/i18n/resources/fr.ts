@@ -1265,6 +1265,8 @@ export const fr: TranslationResources = {
       sessions: "Historique",
       search: "Recherche",
       schedules: "Planifications",
+      workspaces: "Espaces de travail",
+      projects: "Projets",
     },
     worktreeSetup: {
       title: "Configurer les scripts de worktree",

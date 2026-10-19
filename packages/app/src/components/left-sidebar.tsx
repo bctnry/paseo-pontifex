@@ -16,6 +16,7 @@ import {
   Text,
   useWindowDimensions,
   View,
+  type PressableStateCallbackType,
 } from "react-native";
 import { Gesture } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
@@ -568,6 +569,11 @@ function MobileSidebar({
     [insetsTop, insetsBottom, theme.colors.surfaceSidebar],
   );
 
+  const workspacesSectionHeaderElement = useMemo(
+    () => <WorkspacesSectionHeader groupMode={groupMode} onAddProject={handleOpenProject} />,
+    [groupMode, handleOpenProject],
+  );
+
   return (
     <MobilePanelOverlay
       panel="agent-list"
@@ -684,6 +690,11 @@ function DesktopSidebar({
     requestedWidth: sidebarWidth,
     viewportWidth,
   });
+
+  const workspacesSectionHeaderElement = useMemo(
+    () => <WorkspacesSectionHeader groupMode={groupMode} onAddProject={handleOpenProject} />,
+    [groupMode, handleOpenProject],
+  );
 
   const startWidthRef = useRef(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
@@ -831,9 +842,27 @@ function DesktopSidebar({
   );
 }
 
-function WorkspacesSectionHeader() {
+function WorkspacesSectionHeader({
+  groupMode,
+  onAddProject,
+}: {
+  groupMode: SidebarGroupMode;
+  onAddProject: () => void;
+}) {
+  const { t } = useTranslation();
+  const isProjectGrouping = groupMode === "project";
+
   return (
-    <SidebarSectionHeader title="Workspaces">
+    <SidebarSectionHeader
+      title={t(isProjectGrouping ? "sidebar.sections.projects" : "sidebar.sections.workspaces")}
+    >
+      {isProjectGrouping ? (
+        <SectionHeaderIconButton
+          label={t("sidebar.actions.addProject")}
+          onPress={onAddProject}
+          testID="sidebar-add-project-header"
+        />
+      ) : null}
       <Tooltip delayDuration={300}>
         <TooltipTrigger asChild>
           <View>
@@ -841,16 +870,55 @@ function WorkspacesSectionHeader() {
           </View>
         </TooltipTrigger>
         <TooltipContent side="bottom" align="center" offset={8}>
-          <IconTooltipContent label="Display preferences" />
+          <IconTooltipContent label={t("sidebar.display.trigger")} />
         </TooltipContent>
       </Tooltip>
     </SidebarSectionHeader>
   );
 }
 
-// Stable element so the sidebar list's listHeaderComponent prop keeps identity across
-// renders (WorkspacesSectionHeader takes no props).
-const workspacesSectionHeaderElement = <WorkspacesSectionHeader />;
+function SectionHeaderIconButton({
+  label,
+  onPress,
+  testID,
+}: {
+  label: string;
+  onPress: () => void;
+  testID: string;
+}) {
+  const actionStyle = useCallback(
+    ({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.sectionHeaderAction,
+      hovered && styles.sectionHeaderActionHovered,
+    ],
+    [],
+  );
+
+  return (
+    <Tooltip delayDuration={300}>
+      <TooltipTrigger asChild>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={label}
+          onPress={onPress}
+          style={actionStyle}
+          testID={testID}
+        >
+          {({ hovered }) => (
+            <DensityIcon
+              icon={FolderPlus}
+              size="sm"
+              color={hovered ? "foreground" : "foregroundMuted"}
+            />
+          )}
+        </Pressable>
+      </TooltipTrigger>
+      <TooltipContent side="bottom" align="center" offset={8} testID={`${testID}-tooltip`}>
+        <IconTooltipContent label={label} />
+      </TooltipContent>
+    </Tooltip>
+  );
+}
 
 // Static styles for Animated.Views — must NOT use Unistyles dynamic theme to
 // avoid the "Unable to find node on an unmounted component" crash when Unistyles
@@ -945,6 +1013,16 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     paddingVertical: theme.spacing[1],
     paddingHorizontal: theme.spacing[1],
+  },
+  sectionHeaderAction: {
+    width: density.iconButton,
+    height: density.iconButton,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: theme.borderRadius.md,
+  },
+  sectionHeaderActionHovered: {
+    backgroundColor: theme.colors.surfaceSidebarHover,
   },
   tooltipRow: {
     flexDirection: "row",

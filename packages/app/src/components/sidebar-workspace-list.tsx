@@ -233,7 +233,7 @@ interface SidebarWorkspaceListProps {
   onImportSession?: () => void;
   listFooterComponent?: ReactElement | null;
   // Rendered inside the scroll area, below the Pinned section and above the workspace
-  // list. Holds the "Workspaces" section header so pinned items sit above it.
+  // list. Holds the list's section header so pinned items sit above it.
   listHeaderComponent?: ReactElement | null;
   /** Gesture ref for coordinating with parent gestures (e.g., sidebar close) */
   parentGestureRef?: MutableRefObject<GestureType | undefined>;
@@ -2508,7 +2508,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   listContent: {
     paddingHorizontal: theme.spacing[2],
-    // Optical inset: aligns the visible Pinned/Workspaces glyph edge with the
+    // Optical inset: aligns the visible Pinned/list glyph edge with the
     // Schedules icon across the divider; their layout boxes have different insets.
     paddingTop: 2,
     paddingBottom: theme.spacing[4],

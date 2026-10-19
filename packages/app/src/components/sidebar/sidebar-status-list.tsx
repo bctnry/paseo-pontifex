@@ -1051,7 +1051,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   listContent: {
     paddingHorizontal: theme.spacing[2],
-    // Keep status mode's Pinned/Workspaces boundary identical to project mode.
+    // Keep status mode's Pinned/list boundary identical to project mode.
     paddingTop: 2,
     paddingBottom: theme.spacing[4],
   },

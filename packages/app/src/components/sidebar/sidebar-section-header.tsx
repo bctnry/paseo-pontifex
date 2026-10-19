@@ -7,8 +7,8 @@ import { useIsCompactFormFactor } from "@/constants/layout";
 import { isNative } from "@/constants/platform";
 import { density } from "@/styles/density";
 
-/** A sidebar section label such as "Pinned" or "Workspaces". A section with `onToggle`
- * collapses from its title; children sit at the trailing edge as its actions. */
+/** A sidebar section label such as "Pinned", "Workspaces", or "Projects". A section with
+ * `onToggle` collapses from its title; children sit at the trailing edge as its actions. */
 export function SidebarSectionHeader({
   title,
   collapsed,
