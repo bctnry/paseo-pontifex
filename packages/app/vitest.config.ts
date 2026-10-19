@@ -31,7 +31,10 @@ export default defineConfig({
             "app.config.test.ts",
             "vitest-environment.test.ts",
           ],
-          setupFiles: [path.resolve(__dirname, "vitest.setup.ts")],
+          setupFiles: [
+            path.resolve(__dirname, "vitest.setup.ts"),
+            path.resolve(__dirname, "vitest.i18n-setup.ts"),
+          ],
           exclude: [...configDefaults.exclude, "e2e/**", "src/**/*.browser.{test,spec}.{ts,tsx}"],
         },
       },
@@ -41,6 +44,7 @@ export default defineConfig({
           name: "browser",
           fileParallelism: false,
           include: ["src/**/*.browser.{test,spec}.{ts,tsx}"],
+          setupFiles: [path.resolve(__dirname, "vitest.i18n-setup.ts")],
           browser: {
             enabled: true,
             provider: playwright(),

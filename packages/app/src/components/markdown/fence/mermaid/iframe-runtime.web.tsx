@@ -1,8 +1,18 @@
-import { useCallback, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import type { DiagramColorScheme, MermaidRenderRequest } from "./render-model";
-import { mermaidRuntimeHtml } from "./runtime/html.gen";
 import { parseMermaidRuntimeMessage, type MermaidRuntimeRenderMessage } from "./runtime/messages";
 import { MermaidRuntimeRequestDriver } from "./runtime/request-driver";
+
+// The runtime HTML is a multi-megabyte string (bundled Mermaid, DOMPurify,
+// cytoscape). Load it only when a diagram actually mounts, so the initial web
+// bundle does not pay to parse it. Requests wait in MermaidRuntimeRequestDriver
+// until the iframe reports `bridgeReady`.
+let runtimeHtmlPromise: Promise<string> | null = null;
+
+function loadMermaidRuntimeHtml(): Promise<string> {
+  runtimeHtmlPromise ??= import("./runtime/html.gen").then((module) => module.mermaidRuntimeHtml);
+  return runtimeHtmlPromise;
+}
 
 export interface MermaidRenderedMessage {
   revision: number;
@@ -27,6 +37,21 @@ export function MermaidIframeRuntime({
   const iframeRef = useRef<HTMLIFrameElement | null>(null);
   const driverRef = useRef<MermaidRuntimeRequestDriver | null>(null);
   driverRef.current ??= new MermaidRuntimeRequestDriver();
+  const [runtimeHtml, setRuntimeHtml] = useState<string | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadMermaidRuntimeHtml()
+      .then((html) => {
+        if (!cancelled) setRuntimeHtml(html);
+      })
+      .catch((error: unknown) => {
+        console.error("[Mermaid] Failed to load diagram runtime", error);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const sendRequest = useCallback((current: MermaidRenderRequest | null) => {
     const target = iframeRef.current?.contentWindow;
@@ -66,6 +91,10 @@ export function MermaidIframeRuntime({
     return () => window.removeEventListener("message", receiveMessage);
   }, [onRenderFailed, onRendered, sendRequest]);
 
+  if (runtimeHtml === null) {
+    return null;
+  }
+
   // `inert` (not just tabIndex) because the Modal focus trap focuses descendants
   // programmatically; a focused iframe swallows every keystroke, including Escape.
   return (
@@ -75,7 +104,7 @@ export function MermaidIframeRuntime({
       aria-hidden
       inert
       sandbox="allow-scripts"
-      srcDoc={mermaidRuntimeHtml}
+      srcDoc={runtimeHtml}
       tabIndex={-1}
       style={iframeStyle}
     />
