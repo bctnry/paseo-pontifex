@@ -10,4 +10,3 @@ else please refer to other documents in this directory.
   merge commit" option on github. don't rebase or squash, because
   github's "X commits ahead Y commits behind" calculator can't
   properly calculate them if we rebase/squash.
-  
