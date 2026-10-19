@@ -20,3 +20,16 @@ export interface BootPluginThemeSource {
   serverId: string;
   contribution: PluginThemeContribution;
 }
+
+export interface BootCustomTheme {
+  id: string;
+  name: string;
+  swatch: string;
+  theme: Theme;
+  contribution: PluginThemeContribution;
+}
+
+export interface BootCustomThemeSource {
+  id: string;
+  contribution: PluginThemeContribution;
+}

@@ -39,6 +39,7 @@ import {
   DEFAULT_THEME_PREFERENCE,
 } from "@/hooks/use-settings";
 import {
+  CUSTOM_THEME_PREFERENCE,
   DEFAULT_MONO_FONT_STACK,
   DEFAULT_UI_FONT_STACK,
   ICON_SIZE,
@@ -47,10 +48,13 @@ import {
   THEME_SWATCHES,
   type Theme,
 } from "@/styles/theme";
-import { isNative } from "@/constants/platform";
+import { getIsElectron, isNative } from "@/constants/platform";
 import type { PluginThemeOption } from "@/plugins/themes";
+import type { CustomThemeOption } from "@/styles/custom-theme";
+import { useCustomThemeCatalog } from "@/appearance/custom-themes";
 import { settingsStyles } from "@/styles/settings";
 import { AppearancePreview } from "./appearance-preview";
+import { CustomThemesSection } from "./custom-themes-section";
 
 // ---------------------------------------------------------------------------
 // Theme-reactive leaf icons (withUnistyles + uniProps color mapping — no
@@ -64,7 +68,10 @@ const ThemedMonitor = withUnistyles(Monitor);
 
 const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 
-type BuiltInThemePreference = Exclude<AppSettings["theme"], typeof PLUGIN_THEME_PREFERENCE>;
+type BuiltInThemePreference = Exclude<
+  AppSettings["theme"],
+  typeof PLUGIN_THEME_PREFERENCE | typeof CUSTOM_THEME_PREFERENCE
+>;
 
 function getThemeLabel(t: TFunction, value: BuiltInThemePreference): string {
   return t(`settings.appearance.theme.options.${value}`);
@@ -153,36 +160,56 @@ function PluginThemeMenuItem({ option, selected, onSelect }: PluginThemeMenuItem
   );
 }
 
+interface CustomThemeMenuItemProps {
+  option: CustomThemeOption;
+  selected: boolean;
+  onSelect: (option: CustomThemeOption) => void;
+}
+
+function CustomThemeMenuItem({ option, selected, onSelect }: CustomThemeMenuItemProps) {
+  const handleSelect = useCallback(() => {
+    onSelect(option);
+  }, [onSelect, option]);
+  const leading = useMemo(() => <ThemeSwatch color={option.swatch} />, [option.swatch]);
+  return (
+    <DropdownMenuItem selected={selected} onSelect={handleSelect} leading={leading}>
+      {option.name}
+    </DropdownMenuItem>
+  );
+}
+
 interface ThemeRowProps {
   value: AppSettings["theme"];
   pluginThemes: PluginThemeOption[];
+  customThemes: CustomThemeOption[];
   selectedPluginTheme: PluginThemeOption | null;
+  selectedCustomTheme: CustomThemeOption | null;
   onChange: (theme: BuiltInThemePreference) => void;
   onSelectPluginTheme: (option: PluginThemeOption) => void;
+  onSelectCustomTheme: (option: CustomThemeOption) => void;
 }
 
 function ThemeRow({
   value,
   pluginThemes,
+  customThemes,
   selectedPluginTheme,
+  selectedCustomTheme,
   onChange,
   onSelectPluginTheme,
+  onSelectCustomTheme,
 }: ThemeRowProps) {
   const { t } = useTranslation();
   // A selected contribution that is no longer installed shows the fallback the app renders.
-  const builtInValue = value === PLUGIN_THEME_PREFERENCE ? DEFAULT_THEME_PREFERENCE : value;
-  const selectedLabel = selectedPluginTheme
-    ? selectedPluginTheme.name
-    : getThemeLabel(t, builtInValue);
-  const leading = useMemo(
-    () =>
-      selectedPluginTheme ? (
-        <ThemeSwatch color={selectedPluginTheme.swatch} />
-      ) : (
-        <ThemeLeading themeValue={builtInValue} />
-      ),
-    [builtInValue, selectedPluginTheme],
-  );
+  const isContributed = value === PLUGIN_THEME_PREFERENCE || value === CUSTOM_THEME_PREFERENCE;
+  const builtInValue = isContributed ? DEFAULT_THEME_PREFERENCE : value;
+  const selectedLabel =
+    selectedPluginTheme?.name ?? selectedCustomTheme?.name ?? getThemeLabel(t, builtInValue);
+  const leading = useMemo(() => {
+    if (selectedPluginTheme) return <ThemeSwatch color={selectedPluginTheme.swatch} />;
+    if (selectedCustomTheme) return <ThemeSwatch color={selectedCustomTheme.swatch} />;
+    return <ThemeLeading themeValue={builtInValue} />;
+  }, [builtInValue, selectedCustomTheme, selectedPluginTheme]);
   return (
     <View style={settingsStyles.row}>
       <View style={settingsStyles.rowContent}>
@@ -207,7 +234,11 @@ function ThemeRow({
                 ) : null}
                 <ThemeMenuItem
                   themeValue={option.name}
-                  selected={selectedPluginTheme === null && builtInValue === option.name}
+                  selected={
+                    selectedPluginTheme === null &&
+                    selectedCustomTheme === null &&
+                    builtInValue === option.name
+                  }
                   onChange={onChange}
                 />
               </Fragment>
@@ -220,6 +251,15 @@ function ThemeRow({
               option={option}
               selected={selectedPluginTheme?.id === option.id}
               onSelect={onSelectPluginTheme}
+            />
+          ))}
+          {customThemes.length > 0 ? <DropdownMenuSeparator /> : null}
+          {customThemes.map((option) => (
+            <CustomThemeMenuItem
+              key={option.id}
+              option={option}
+              selected={selectedCustomTheme?.id === option.id}
+              onSelect={onSelectCustomTheme}
             />
           ))}
         </DropdownMenuContent>
@@ -483,6 +523,12 @@ export function AppearanceSection() {
     selected: selectedPluginTheme,
     select: selectPluginTheme,
   } = useContributedThemes();
+  const customThemes = useCustomThemeCatalog();
+  const selectedCustomTheme = useMemo(() => {
+    if (settings.theme !== CUSTOM_THEME_PREFERENCE) return null;
+    return customThemes.options.find((option) => option.id === settings.customThemeId) ?? null;
+  }, [customThemes.options, settings.customThemeId, settings.theme]);
+  const showCustomThemes = getIsElectron();
   const showInterfaceFontFamilyRow = !isNative;
   const uiFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_UI_FONT_STACK);
   const monoFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_MONO_FONT_STACK);
@@ -516,6 +562,16 @@ export function AppearanceSection() {
       selectPluginTheme(option);
     },
     [selectPluginTheme],
+  );
+
+  const handleCustomThemeChange = useCallback(
+    (option: CustomThemeOption) => {
+      void updateSettings({
+        theme: CUSTOM_THEME_PREFERENCE,
+        customThemeId: option.id,
+      });
+    },
+    [updateSettings],
   );
 
   const handleContentMaxWidthChange = useCallback(
@@ -631,12 +687,18 @@ export function AppearanceSection() {
           <ThemeRow
             value={settings.theme}
             pluginThemes={pluginThemes}
+            customThemes={customThemes.options}
             selectedPluginTheme={selectedPluginTheme}
+            selectedCustomTheme={selectedCustomTheme}
             onChange={handleThemeChange}
             onSelectPluginTheme={handlePluginThemeChange}
+            onSelectCustomTheme={handleCustomThemeChange}
           />
         </View>
       </SettingsSection>
+      {showCustomThemes ? (
+        <CustomThemesSection catalog={customThemes} pluginThemes={pluginThemes} />
+      ) : null}
       <SettingsSection title={t("settings.appearance.fonts.title")}>
         <View style={settingsStyles.card}>
           {showInterfaceFontFamilyRow ? (

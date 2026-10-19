@@ -22,4 +22,18 @@ describe("plugin install form", () => {
     model.setSource("  /plugins/review  ");
     expect(model.getSubmission()).toEqual({ source: "/plugins/review" });
   });
+
+  it("replaces the source and resets the input", () => {
+    const model = openPluginInstallForm();
+    model.setSource("owner/review");
+
+    model.replaceSource("/plugins/review");
+
+    expect(model.getState()).toEqual({
+      source: "/plugins/review",
+      canSubmit: true,
+      resetKey: 1,
+    });
+    expect(model.getSubmission()).toEqual({ source: "/plugins/review" });
+  });
 });

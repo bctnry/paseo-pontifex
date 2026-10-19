@@ -9,6 +9,7 @@ import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { pickDirectory } from "@/desktop/pick-directory";
 import { HostPluginsPage } from "./plugins-page";
 
 void testI18n;
@@ -17,6 +18,8 @@ const runtime = vi.hoisted(() => ({
   connected: true,
   supported: true,
   logsSupported: true,
+  isElectron: false,
+  isLocalDaemon: false,
   client: null as DaemonClient | null,
 }));
 
@@ -30,6 +33,23 @@ vi.mock("@/runtime/host-features", () => ({
     if (feature === "pluginLogs") return runtime.logsSupported;
     return runtime.supported;
   },
+}));
+
+vi.mock("@/constants/platform", async () => {
+  const actual =
+    await vi.importActual<typeof import("@/constants/platform")>("@/constants/platform");
+  return {
+    ...actual,
+    getIsElectron: () => runtime.isElectron,
+  };
+});
+
+vi.mock("@/hooks/use-is-local-daemon", () => ({
+  useIsLocalDaemon: () => runtime.isLocalDaemon,
+}));
+
+vi.mock("@/desktop/pick-directory", () => ({
+  pickDirectory: vi.fn(),
 }));
 
 vi.mock("@/components/adaptive-modal-sheet", async () => {
@@ -150,7 +170,10 @@ describe("HostPluginsPage", () => {
     runtime.connected = true;
     runtime.supported = true;
     runtime.logsSupported = true;
+    runtime.isElectron = false;
+    runtime.isLocalDaemon = false;
     runtime.client = null;
+    vi.mocked(pickDirectory).mockReset();
     vi.stubGlobal(
       "confirm",
       vi.fn(() => true),
@@ -252,5 +275,35 @@ describe("HostPluginsPage", () => {
     fireEvent.click(screen.getAllByRole("button", { name: "Refresh" }).at(-1)!);
     await waitFor(() => expect(client.getPluginLogs).toHaveBeenCalledTimes(2));
     expect(await screen.findByText("No plugin output yet")).toBeDefined();
+  });
+
+  it("fills the plugin source from a local folder picker", async () => {
+    runtime.isElectron = true;
+    runtime.isLocalDaemon = true;
+    vi.mocked(pickDirectory).mockResolvedValue("/plugins/from-folder");
+    const client = createClient();
+    renderPage(client);
+
+    fireEvent.click(await screen.findByRole("button", { name: "Select folder…" }));
+    await waitFor(() => expect(pickDirectory).toHaveBeenCalledTimes(1));
+
+    const input = () => screen.getByLabelText("Plugin source") as HTMLInputElement;
+    await waitFor(() => expect(input().value).toBe("/plugins/from-folder"));
+
+    fireEvent.click(screen.getByRole("button", { name: "Install plugin" }));
+    await waitFor(() =>
+      expect(client.installPluginSource).toHaveBeenCalledWith({
+        source: "/plugins/from-folder",
+      }),
+    );
+  });
+
+  it("hides the folder picker when the host is not the local Electron daemon", async () => {
+    runtime.isElectron = true;
+    runtime.isLocalDaemon = false;
+    renderPage(createClient());
+
+    await screen.findByText("Plugin source");
+    expect(screen.queryByRole("button", { name: "Select folder…" })).toBeNull();
   });
 });

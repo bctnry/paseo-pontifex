@@ -20,12 +20,21 @@ import {
   type PluginThemeOption,
 } from "@/plugins/themes";
 import {
+  clearBootCustomTheme,
   clearBootPluginTheme,
+  readBootCustomTheme,
   readBootPluginTheme,
+  rememberBootCustomTheme,
   rememberBootPluginTheme,
 } from "@/styles/boot-plugin-theme";
-import { PLUGIN_THEME_NAMES, PLUGIN_THEME_PREFERENCE, THEME_TO_UNISTYLES } from "@/styles/theme";
+import {
+  CUSTOM_THEME_PREFERENCE,
+  PLUGIN_THEME_NAMES,
+  PLUGIN_THEME_PREFERENCE,
+  THEME_TO_UNISTYLES,
+} from "@/styles/theme";
 import { applyAppearance } from "./apply";
+import { useCustomThemeCatalog } from "./custom-themes";
 import { AppearanceSystemBars } from "./system-bars";
 
 interface ContributedThemes {
@@ -34,9 +43,11 @@ interface ContributedThemes {
   select: (option: PluginThemeOption) => void;
 }
 
+type AppliedTheme = Pick<PluginThemeOption, "theme">;
+
 interface ApplyThemeInput {
   preference: AppSettings["theme"];
-  contributedTheme: PluginThemeOption | null;
+  contributedTheme: AppliedTheme | null;
 }
 
 const ContributedThemesContext = createContext<ContributedThemes | null>(null);
@@ -51,7 +62,9 @@ function applyTheme({ preference, contributedTheme }: ApplyThemeInput): void {
   }
 
   const builtInPreference =
-    preference === PLUGIN_THEME_PREFERENCE ? DEFAULT_THEME_PREFERENCE : preference;
+    preference === PLUGIN_THEME_PREFERENCE || preference === CUSTOM_THEME_PREFERENCE
+      ? DEFAULT_THEME_PREFERENCE
+      : preference;
   if (builtInPreference === "auto") {
     UnistylesRuntime.setAdaptiveThemes(true);
     return;
@@ -64,23 +77,39 @@ function applyTheme({ preference, contributedTheme }: ApplyThemeInput): void {
 export function AppearanceProvider({ children }: { children: ReactNode }) {
   const { settings, updateSettings, isLoading } = useAppSettings();
   const [hasAppliedAppearance, setHasAppliedAppearance] = useState(false);
-  const bootTheme = useMemo(() => {
+  const bootPluginTheme = useMemo(() => {
     if (settings.theme !== PLUGIN_THEME_PREFERENCE) return null;
     const stored = readBootPluginTheme();
     return stored && stored.id === settings.pluginThemeId ? stored : null;
   }, [settings.pluginThemeId, settings.theme]);
-  const { options, ready: catalogReady } = usePluginThemeCatalog(bootTheme?.serverId);
-  const selected = useMemo(() => {
+  const bootCustomTheme = useMemo(() => {
+    if (settings.theme !== CUSTOM_THEME_PREFERENCE) return null;
+    const stored = readBootCustomTheme();
+    return stored && stored.id === settings.customThemeId ? stored : null;
+  }, [settings.customThemeId, settings.theme]);
+  const { options: pluginOptions, ready: pluginCatalogReady } = usePluginThemeCatalog(
+    bootPluginTheme?.serverId,
+  );
+  const { options: customOptions, ready: customCatalogReady } = useCustomThemeCatalog();
+  const selectedPluginTheme = useMemo(() => {
     if (settings.theme !== PLUGIN_THEME_PREFERENCE) return null;
     return (
-      options.find((option) => option.id === settings.pluginThemeId) ??
-      (catalogReady ? null : bootTheme)
+      pluginOptions.find((option) => option.id === settings.pluginThemeId) ??
+      (pluginCatalogReady ? null : bootPluginTheme)
     );
-  }, [bootTheme, catalogReady, options, settings.pluginThemeId, settings.theme]);
+  }, [bootPluginTheme, pluginCatalogReady, pluginOptions, settings.pluginThemeId, settings.theme]);
+  const selectedCustomTheme = useMemo(() => {
+    if (settings.theme !== CUSTOM_THEME_PREFERENCE) return null;
+    return (
+      customOptions.find((option) => option.id === settings.customThemeId) ??
+      (customCatalogReady ? null : bootCustomTheme)
+    );
+  }, [bootCustomTheme, customCatalogReady, customOptions, settings.customThemeId, settings.theme]);
+  const selectedTheme = selectedPluginTheme ?? selectedCustomTheme;
 
   useEffect(() => {
     if (isLoading) return;
-    applyTheme({ preference: settings.theme, contributedTheme: selected });
+    applyTheme({ preference: settings.theme, contributedTheme: selectedTheme });
     applyAppearance({
       uiFontFamily: settings.uiFontFamily,
       monoFontFamily: settings.monoFontFamily,
@@ -90,23 +119,42 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
       contentMaxWidth: resolveContentMaxWidth({ contentMaxWidth: settings.contentMaxWidth }),
       syntaxTheme: settings.syntaxTheme,
     });
-    const liveTheme = options.find((option) => option.id === settings.pluginThemeId);
-    const pluginThemeSelected = settings.theme === PLUGIN_THEME_PREFERENCE;
-    if (pluginThemeSelected && liveTheme) {
-      rememberBootPluginTheme({
-        id: liveTheme.id,
-        serverId: liveTheme.serverId,
-        contribution: liveTheme.contribution,
-      });
-    } else if (!pluginThemeSelected || catalogReady) {
+    const livePluginTheme = pluginOptions.find((option) => option.id === settings.pluginThemeId);
+    if (settings.theme === PLUGIN_THEME_PREFERENCE) {
+      if (livePluginTheme) {
+        rememberBootPluginTheme({
+          id: livePluginTheme.id,
+          serverId: livePluginTheme.serverId,
+          contribution: livePluginTheme.contribution,
+        });
+      } else if (pluginCatalogReady) {
+        clearBootPluginTheme();
+      }
+    } else {
       clearBootPluginTheme();
+    }
+    const liveCustomTheme = customOptions.find((option) => option.id === settings.customThemeId);
+    if (settings.theme === CUSTOM_THEME_PREFERENCE) {
+      if (liveCustomTheme) {
+        rememberBootCustomTheme({
+          id: liveCustomTheme.id,
+          contribution: liveCustomTheme.contribution,
+        });
+      } else if (customCatalogReady) {
+        clearBootCustomTheme();
+      }
+    } else {
+      clearBootCustomTheme();
     }
     setHasAppliedAppearance(true);
   }, [
-    catalogReady,
+    customCatalogReady,
+    customOptions,
     isLoading,
-    options,
-    selected,
+    pluginCatalogReady,
+    pluginOptions,
+    selectedTheme,
+    settings.customThemeId,
     settings.theme,
     settings.uiFontFamily,
     settings.monoFontFamily,
@@ -128,7 +176,10 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     },
     [updateSettings],
   );
-  const value = useMemo(() => ({ options, selected, select }), [options, selected, select]);
+  const value = useMemo(
+    () => ({ options: pluginOptions, selected: selectedPluginTheme, select }),
+    [pluginOptions, selectedPluginTheme, select],
+  );
 
   // The first settings load changes appearance keys. Mount screens only after applying it
   // so startup does not destroy and recreate an already-visible workspace.

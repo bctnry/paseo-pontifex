@@ -13,6 +13,7 @@ export interface PluginInstallFormModel {
   subscribe(listener: () => void): () => void;
   close(): void;
   setSource(value: string): void;
+  replaceSource(value: string): void;
   getSubmission(): PluginInstallSubmission;
   reset(): void;
 }
@@ -41,6 +42,9 @@ export function openPluginInstallForm(): PluginInstallFormModel {
     },
     setSource(source) {
       publish({ ...state, source });
+    },
+    replaceSource(source) {
+      publish({ source, resetKey: state.resetKey + 1 });
     },
     getSubmission() {
       const source = state.source.trim();

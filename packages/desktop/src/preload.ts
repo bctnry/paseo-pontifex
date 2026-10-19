@@ -86,6 +86,21 @@ contextBridge.exposeInMainWorld("paseoDesktop", {
       ipcRenderer.invoke("paseo:dialog:askWithCheckbox", message, options),
     open: (options?: Record<string, unknown>) => ipcRenderer.invoke("paseo:dialog:open", options),
   },
+  themes: {
+    list: () => ipcRenderer.invoke("paseo:themes:list"),
+    read: (fileName: string) => ipcRenderer.invoke("paseo:themes:read", fileName),
+    save: (fileName: string, content: string) =>
+      ipcRenderer.invoke("paseo:themes:save", fileName, content),
+    remove: (fileName: string) => ipcRenderer.invoke("paseo:themes:remove", fileName),
+    openFolder: () => ipcRenderer.invoke("paseo:themes:openFolder"),
+    onChanged: (handler: EventHandler): (() => void) => {
+      const listener = () => handler(undefined);
+      ipcRenderer.on("paseo:event:themes-changed", listener);
+      return () => {
+        ipcRenderer.removeListener("paseo:event:themes-changed", listener);
+      };
+    },
+  },
   notification: {
     isSupported: () => ipcRenderer.invoke("paseo:notification:isSupported"),
     sendNotification: (payload: { title: string; body?: string; data?: Record<string, unknown> }) =>

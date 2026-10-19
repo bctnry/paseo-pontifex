@@ -67,6 +67,19 @@ export function parseHexColor(hex: string): [number, number, number] | null {
   ];
 }
 
+/**
+ * Mixes two hex colors in sRGB. `amount` is the fraction of `to` to keep: `0` returns `from`,
+ * `1` returns `to`. Input that is not a color we own comes back untouched.
+ */
+export function mixHexColors(from: string, to: string, amount: number): string {
+  const source = parseHexColor(from);
+  const target = parseHexColor(to);
+  if (!source || !target) return from;
+  const fraction = Math.min(1, Math.max(0, amount));
+  const channels = source.map((channel, index) => channel + (target[index] - channel) * fraction);
+  return `#${channels.map(toHexChannel).join("")}`;
+}
+
 /** Adds alpha to a theme-owned hex color in a format accepted by Canvas and Skia. */
 export function hexColorWithAlpha(hex: string, alpha: number): string {
   const rgb = parseHexColor(hex);

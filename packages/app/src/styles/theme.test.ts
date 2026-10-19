@@ -1,9 +1,11 @@
 import { describe, expect, it } from "vitest";
 import {
+  darkPontifexTheme,
   darkPureBlackTheme,
   darkTheme,
   FONT_SIZE,
   getNextThemePreference,
+  lightPontifexTheme,
   lightTheme,
   THEME_OPTIONS,
 } from "./theme";
@@ -30,6 +32,8 @@ describe("Theme catalog", () => {
       "light",
       "dark",
       "auto",
+      "pontifexLight",
+      "pontifexDark",
       "zinc",
       "midnight",
       "claude",
@@ -38,6 +42,42 @@ describe("Theme catalog", () => {
     ]);
     expect(getNextThemePreference("dark")).toBe("auto");
     expect(getNextThemePreference("pureBlack")).toBe("light");
+  });
+});
+
+describe("Pontifex themes", () => {
+  it("builds Pontifex Dark from the custom theme template palette", () => {
+    expect(darkPontifexTheme.colorScheme).toBe("dark");
+    expect(darkPontifexTheme.colors).toMatchObject({
+      surface0: "#111111",
+      surface1: "#18181b",
+      surface2: "#27272a",
+      surface3: "#444446",
+      foreground: "#f4f4f5",
+      foregroundMuted: "#a1a1aa",
+      accent: "#f97316",
+      ring: "#fafafa",
+      surface4: "#59595b",
+      foregroundExtraMuted: "#76767c",
+      terminal: expect.objectContaining({ brightBlack: "#555555" }),
+    });
+  });
+
+  it("builds Pontifex Light as the light counterpart", () => {
+    expect(lightPontifexTheme.colorScheme).toBe("light");
+    expect(lightPontifexTheme.colors).toMatchObject({
+      surface0: "#ffffff",
+      surface1: "#fafafa",
+      surface2: "#f4f4f5",
+      surface3: "#e2e2e4",
+      foreground: "#18181b",
+      foregroundMuted: "#71717a",
+      accent: "#c2410c",
+      ring: "#18181b",
+      surface4: "#d2d2d4",
+      foregroundExtraMuted: "#9c9ca2",
+      terminal: expect.objectContaining({ brightBlack: "#5d5d5f" }),
+    });
   });
 });
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { desaturateHexColor, hexColorWithAlpha, parseHexColor } from "./color";
+import { desaturateHexColor, hexColorWithAlpha, mixHexColors, parseHexColor } from "./color";
 
 describe("parseHexColor", () => {
   it("parses six-digit hex", () => {
@@ -14,6 +14,20 @@ describe("parseHexColor", () => {
     expect(parseHexColor("none")).toBeNull();
     expect(parseHexColor("url(#a)")).toBeNull();
     expect(parseHexColor("#ff800")).toBeNull();
+  });
+});
+
+describe("mixHexColors", () => {
+  it("mixes two colors by fraction", () => {
+    expect(mixHexColors("#000000", "#ffffff", 0)).toBe("#000000");
+    expect(mixHexColors("#000000", "#ffffff", 0.5)).toBe("#808080");
+    expect(mixHexColors("#000000", "#ffffff", 1)).toBe("#ffffff");
+    expect(mixHexColors("#3f3f46", "#f4f4f5", 0.18)).toBe("#606066");
+  });
+
+  it("passes unsupported colors through untouched", () => {
+    expect(mixHexColors("currentColor", "#ffffff", 0.5)).toBe("currentColor");
+    expect(mixHexColors("#000000", "none", 0.5)).toBe("#000000");
   });
 });
 

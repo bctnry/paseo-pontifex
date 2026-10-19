@@ -20,6 +20,7 @@ import {
 } from "@/components/sidebar/display-preferences/row-items";
 import { isNative } from "@/constants/platform";
 import {
+  CUSTOM_THEME_PREFERENCE,
   DEFAULT_CONTENT_MAX_WIDTH,
   FONT_SIZE,
   PLUGIN_THEME_PREFERENCE,
@@ -48,6 +49,7 @@ export type EditorKeybindings = "default" | "vim" | "emacs";
 const ThemePreferenceSchema = z.enum([
   ...THEME_OPTIONS.map((option) => option.name),
   PLUGIN_THEME_PREFERENCE,
+  CUSTOM_THEME_PREFERENCE,
 ]);
 /** Where the theme picker lands when the persisted preference cannot be honoured. */
 export const DEFAULT_THEME_PREFERENCE = "auto" satisfies ThemePreference;
@@ -83,6 +85,8 @@ export interface AppSettings {
   theme: ThemePreference;
   /** Which contributed theme `theme: "plugin"` selects. */
   pluginThemeId: string | null;
+  /** Which desktop theme file `theme: "custom"` selects. */
+  customThemeId: string | null;
   language: AppLanguage;
   sendBehavior: SendBehavior;
   serviceUrlBehavior: ServiceUrlBehavior;
@@ -146,6 +150,7 @@ export interface Settings extends AppSettings {
 export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   theme: DEFAULT_THEME_PREFERENCE,
   pluginThemeId: null,
+  customThemeId: null,
   language: "system",
   sendBehavior: "steer",
   serviceUrlBehavior: "ask",
@@ -227,6 +232,7 @@ const StoredAppSettingsSchema = z
   .looseObject({
     theme: ThemePreferenceSchema.catch(DEFAULT_THEME_PREFERENCE),
     pluginThemeId: z.string().nullable().catch(null),
+    customThemeId: z.string().nullable().catch(null),
     language: z
       .enum(["system", "ar", "en", "es", "fr", "ja", "ko", "pt-BR", "ru", "zh-CN"])
       .catch("system"),

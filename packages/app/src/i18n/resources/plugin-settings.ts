@@ -31,6 +31,9 @@ export const pluginSettings = {
     docs: "الوثائق",
     install: "تثبيت الإضافة",
     installing: "جارٍ التثبيت…",
+    selectFolder: "اختيار مجلد…",
+    selectingFolder: "جارٍ الفتح…",
+    selectFolderError: "تعذّر اختيار مجلد",
     status: { running: "قيد التشغيل", disabled: "معطّلة", failed: "فشلت" },
     actions: {
       menu: "إجراءات {{id}}",
@@ -86,6 +89,9 @@ export const pluginSettings = {
     docs: "Documentación",
     install: "Instalar plugin",
     installing: "Instalando…",
+    selectFolder: "Seleccionar carpeta…",
+    selectingFolder: "Abriendo…",
+    selectFolderError: "No se pudo seleccionar una carpeta",
     status: { running: "en ejecución", disabled: "desactivado", failed: "fallido" },
     actions: {
       menu: "Acciones para {{id}}",
@@ -141,6 +147,9 @@ export const pluginSettings = {
     docs: "Documentation",
     install: "Installer le plugin",
     installing: "Installation…",
+    selectFolder: "Choisir un dossier…",
+    selectingFolder: "Ouverture…",
+    selectFolderError: "Impossible de sélectionner un dossier",
     status: { running: "actif", disabled: "désactivé", failed: "échec" },
     actions: {
       menu: "Actions pour {{id}}",
@@ -196,6 +205,9 @@ export const pluginSettings = {
     docs: "ドキュメント",
     install: "プラグインをインストール",
     installing: "インストール中…",
+    selectFolder: "フォルダーを選択…",
+    selectingFolder: "開いています…",
+    selectFolderError: "フォルダーを選択できません",
     status: { running: "実行中", disabled: "無効", failed: "失敗" },
     actions: {
       menu: "{{id}} のアクション",
@@ -250,6 +262,9 @@ export const pluginSettings = {
     docs: "문서",
     install: "플러그인 설치",
     installing: "설치 중…",
+    selectFolder: "폴더 선택…",
+    selectingFolder: "여는 중…",
+    selectFolderError: "폴더를 선택할 수 없습니다",
     status: { running: "실행 중", disabled: "비활성화", failed: "실패" },
     actions: {
       menu: "{{id}} 작업",
@@ -305,6 +320,9 @@ export const pluginSettings = {
     docs: "Documentação",
     install: "Instalar plugin",
     installing: "Instalando…",
+    selectFolder: "Selecionar pasta…",
+    selectingFolder: "Abrindo…",
+    selectFolderError: "Não foi possível selecionar uma pasta",
     status: { running: "em execução", disabled: "desativado", failed: "falhou" },
     actions: {
       menu: "Ações para {{id}}",
@@ -360,6 +378,9 @@ export const pluginSettings = {
     docs: "Документация",
     install: "Установить плагин",
     installing: "Установка…",
+    selectFolder: "Выбрать папку…",
+    selectingFolder: "Открытие…",
+    selectFolderError: "Не удалось выбрать папку",
     status: { running: "работает", disabled: "отключён", failed: "ошибка" },
     actions: {
       menu: "Действия для {{id}}",
@@ -414,6 +435,9 @@ export const pluginSettings = {
     docs: "文档",
     install: "安装插件",
     installing: "正在安装…",
+    selectFolder: "选择文件夹…",
+    selectingFolder: "正在打开…",
+    selectFolderError: "无法选择文件夹",
     status: { running: "运行中", disabled: "已禁用", failed: "失败" },
     actions: {
       menu: "{{id}} 的操作",

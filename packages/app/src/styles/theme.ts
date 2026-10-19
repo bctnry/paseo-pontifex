@@ -1,5 +1,7 @@
 import { Platform } from "react-native";
 import { darkHighlightColors, lightHighlightColors } from "@getpaseo/highlight";
+import { mixHexColors } from "@/utils/color";
+import { PONTIFEX_DARK_PALETTE, PONTIFEX_LIGHT_PALETTE, type ThemePalette } from "./theme-palettes";
 
 export const baseColors = {
   // Base colors
@@ -777,7 +779,99 @@ export function buildLightTheme(semanticColors: ReturnType<typeof buildLightSema
   } as const;
 }
 
+export type Theme = ReturnType<typeof buildLightTheme> | ReturnType<typeof buildDarkTheme>;
+
 export const lightTheme = buildLightTheme(lightSemanticColors);
+
+/**
+ * Builds a theme from the eight-slot palette shared by plugin themes, desktop custom themes, and
+ * the built-in Pontifex themes. Keep the slot semantics here; changing this changes all three.
+ */
+export function buildThemeFromPalette(input: {
+  appearance: "light" | "dark";
+  colors: ThemePalette;
+}): Theme {
+  const { appearance, colors } = input;
+  const accent = colors.accent ?? colors.foreground;
+  const surface3 = mixHexColors(
+    colors.control,
+    colors.foreground,
+    appearance === "dark" ? 0.14 : 0.08,
+  );
+  const surface4 = mixHexColors(surface3, colors.foreground, appearance === "dark" ? 0.12 : 0.08);
+  const borderAccent = mixHexColors(
+    colors.border,
+    colors.foreground,
+    appearance === "dark" ? 0.12 : 0.06,
+  );
+  const foregroundExtraMuted = mixHexColors(colors.mutedForeground, colors.background, 0.3);
+  const terminalBrightBlack =
+    appearance === "dark"
+      ? mixHexColors(colors.background, colors.foreground, 0.3)
+      : mixHexColors(colors.foreground, colors.background, 0.3);
+
+  if (appearance === "dark") {
+    return buildDarkTheme(
+      buildDarkSemanticColors({
+        surface0: colors.background,
+        surface1: colors.raised,
+        surface2: colors.control,
+        surface3,
+        surface4,
+        surfaceDiffEmpty: colors.raised,
+        surfaceSidebar: colors.background,
+        foreground: colors.foreground,
+        foregroundMuted: colors.mutedForeground,
+        foregroundExtraMuted,
+        border: colors.border,
+        borderAccent,
+        accent,
+        accentBright: accent,
+        accentForeground: colors.background,
+        destructive: darkTheme.colors.destructive,
+        terminalBlack: colors.control,
+        terminalBrightBlack,
+        ring: colors.ring,
+      }),
+    );
+  }
+
+  return buildLightTheme(
+    buildLightSemanticColors({
+      surface0: colors.background,
+      surface1: colors.raised,
+      surface2: colors.control,
+      surface3,
+      surface4,
+      surfaceDiffEmpty: colors.raised,
+      surfaceSidebar: colors.control,
+      foreground: colors.foreground,
+      foregroundMuted: colors.mutedForeground,
+      foregroundExtraMuted,
+      border: colors.border,
+      borderAccent,
+      accent,
+      accentBright: accent,
+      accentForeground: colors.background,
+      primary: colors.foreground,
+      primaryForeground: colors.background,
+      destructive: lightTheme.colors.destructive,
+      terminalBlack: colors.foreground,
+      terminalBrightBlack,
+      ring: colors.ring,
+    }),
+  );
+}
+
+export const darkPontifexTheme = buildThemeFromPalette({
+  appearance: "dark",
+  colors: PONTIFEX_DARK_PALETTE,
+});
+
+export const lightPontifexTheme = buildThemeFromPalette({
+  appearance: "light",
+  colors: PONTIFEX_LIGHT_PALETTE,
+});
 
 // Keep compatibility with existing code
 export const theme = darkTheme;
@@ -798,6 +892,20 @@ export const THEME_OPTIONS = [
     swatch: "#2D8B62",
   },
   { name: "auto", group: "primary" },
+  {
+    name: "pontifexLight",
+    group: "pontifex",
+    unistylesName: "lightPontifex",
+    theme: lightPontifexTheme,
+    swatch: PONTIFEX_LIGHT_PALETTE.accent,
+  },
+  {
+    name: "pontifexDark",
+    group: "pontifex",
+    unistylesName: "darkPontifex",
+    theme: darkPontifexTheme,
+    swatch: PONTIFEX_DARK_PALETTE.accent,
+  },
   {
     name: "zinc",
     group: "variant",
@@ -836,6 +944,7 @@ export const THEME_OPTIONS = [
 ] as const;
 
 export const PLUGIN_THEME_PREFERENCE = "plugin";
+export const CUSTOM_THEME_PREFERENCE = "custom";
 export const PLUGIN_THEME_NAMES = {
   light: "pluginLight",
   dark: "pluginDark",
@@ -843,10 +952,13 @@ export const PLUGIN_THEME_NAMES = {
 
 export type ThemePreference =
   | (typeof THEME_OPTIONS)[number]["name"]
-  | typeof PLUGIN_THEME_PREFERENCE;
-export type ThemeName = Exclude<ThemePreference, "auto" | typeof PLUGIN_THEME_PREFERENCE>;
+  | typeof PLUGIN_THEME_PREFERENCE
+  | typeof CUSTOM_THEME_PREFERENCE;
+export type ThemeName = Exclude<
+  ThemePreference,
+  "auto" | typeof PLUGIN_THEME_PREFERENCE | typeof CUSTOM_THEME_PREFERENCE
+>;
 type ConcreteThemeOption = Exclude<(typeof THEME_OPTIONS)[number], { name: "auto" }>;
-export type Theme = ConcreteThemeOption["theme"];
 
 const CONCRETE_THEME_OPTIONS = THEME_OPTIONS.filter(
   (option): option is ConcreteThemeOption => option.name !== "auto",

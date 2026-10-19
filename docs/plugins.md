@@ -706,6 +706,9 @@ contract. Unistyles needs every theme name at `StyleSheet.configure` time, so
 provider rewrites the matching slot when the selection changes. See [unistyles.md](unistyles.md)
 for the runtime-patching rules the appearance settings share.
 
+Desktop users who only need a personal palette can skip plugins and use a JSON file. See
+[custom-themes.md](custom-themes.md).
+
 `addTheme` is a client registration and belongs in `index.client.tsx`. A client that predates it
 cannot evaluate that entry. Daemons advertise
 `features.pluginThemes` in `server_info`; the plugin theme catalog is the one place the app reads it, and

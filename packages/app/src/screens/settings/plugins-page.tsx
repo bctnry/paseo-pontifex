@@ -6,7 +6,7 @@ import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useMutation } from "@tanstack/react-query";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
-import { MoreHorizontal, Trash2 } from "lucide-react-native";
+import { FolderOpen, MoreHorizontal, Trash2 } from "lucide-react-native";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsCard, SettingsRow } from "@/components/settings";
 import { Alert } from "@/components/ui/alert";
@@ -22,12 +22,18 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useFetchQuery } from "@/data/query";
+import { getIsElectron } from "@/constants/platform";
+import { pickDirectory } from "@/desktop/pick-directory";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
+import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { resolvePluginPageState } from "@/screens/settings/plugins-page-state";
-import { openPluginInstallForm } from "@/screens/settings/plugin-install-form-model";
+import {
+  openPluginInstallForm,
+  type PluginInstallFormModel,
+} from "@/screens/settings/plugin-install-form-model";
 import { pluginRegistry, useInstalledPlugins } from "@/plugins/registry";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -264,25 +270,26 @@ function PluginLogsSheet({
   );
 }
 
-export function HostPluginsPage({ serverId }: { serverId: string }) {
+function PluginInstallCard({
+  installForm,
+  resetKey,
+  canSubmit,
+  canBrowseForSource,
+  busy,
+  installing,
+  onInstall,
+}: {
+  installForm: PluginInstallFormModel;
+  resetKey: number;
+  canSubmit: boolean;
+  canBrowseForSource: boolean;
+  busy: boolean;
+  installing: boolean;
+  onInstall(): void;
+}) {
   const { t } = useTranslation();
-  const client = useHostRuntimeClient(serverId);
-  const connected = useHostRuntimeIsConnected(serverId);
-  const supported = useHostFeature(serverId, "pluginManagement");
-  // COMPAT(pluginSourceInstallation): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports source identifiers.
-  const sourceInstallSupported = useHostFeature(serverId, "pluginSourceInstallation");
-  // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
-  const logsSupported = useHostFeature(serverId, "pluginLogs");
-  const { config, patchConfig } = useDaemonConfig(serverId);
-  const refreshQueue = useRef(Promise.resolve());
-  useInstalledPlugins();
-  const queryKey = useMemo(() => pluginQueryKey(serverId), [serverId]);
-  const [installForm] = useState(openPluginInstallForm);
-  const installState = useSyncExternalStore(
-    installForm.subscribe,
-    installForm.getState,
-    installForm.getState,
-  );
+  const [selectingFolder, setSelectingFolder] = useState(false);
+  const [folderError, setFolderError] = useState<string | null>(null);
   const sourceDocsLink = useMemo(
     () => (
       <ExternalLink
@@ -292,6 +299,84 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
       />
     ),
     [t],
+  );
+  const selectFolder = useCallback(async () => {
+    if (!canBrowseForSource || selectingFolder) return;
+    setSelectingFolder(true);
+    setFolderError(null);
+    try {
+      const path = await pickDirectory();
+      if (path) installForm.replaceSource(path);
+    } catch {
+      setFolderError(t("settings.plugins.selectFolderError"));
+    } finally {
+      setSelectingFolder(false);
+    }
+  }, [canBrowseForSource, installForm, selectingFolder, t]);
+  const submit = useCallback(() => {
+    setFolderError(null);
+    onInstall();
+  }, [onInstall]);
+
+  return (
+    <View style={[settingsStyles.card, styles.install]}>
+      <Field label={t("settings.plugins.sourceLabel")} trailing={sourceDocsLink}>
+        <FormTextInput
+          key={resetKey}
+          initialValue={installForm.getState().source}
+          resetKey={resetKey}
+          onChangeText={installForm.setSource}
+          placeholder={t("settings.plugins.sourcePlaceholder")}
+          autoCapitalize="none"
+          autoCorrect={false}
+          editable={!busy}
+          accessibilityLabel={t("settings.plugins.sourceLabel")}
+        />
+      </Field>
+      {canBrowseForSource ? (
+        <Button
+          variant="outline"
+          size="sm"
+          leftIcon={FolderOpen}
+          onPress={selectFolder}
+          disabled={selectingFolder || busy}
+          accessibilityLabel={t("settings.plugins.selectFolder")}
+          testID="plugin-source-select-folder"
+          style={styles.selectFolder}
+        >
+          {selectingFolder
+            ? t("settings.plugins.selectingFolder")
+            : t("settings.plugins.selectFolder")}
+        </Button>
+      ) : null}
+      {folderError ? <Alert size="sm" variant="error" title={folderError} /> : null}
+      <Button onPress={submit} disabled={!canSubmit || busy}>
+        {installing ? t("settings.plugins.installing") : t("settings.plugins.install")}
+      </Button>
+    </View>
+  );
+}
+
+export function HostPluginsPage({ serverId }: { serverId: string }) {
+  const { t } = useTranslation();
+  const client = useHostRuntimeClient(serverId);
+  const connected = useHostRuntimeIsConnected(serverId);
+  const supported = useHostFeature(serverId, "pluginManagement");
+  // COMPAT(pluginSourceInstallation): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports source identifiers.
+  const sourceInstallSupported = useHostFeature(serverId, "pluginSourceInstallation");
+  // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
+  const logsSupported = useHostFeature(serverId, "pluginLogs");
+  const isLocalDaemon = useIsLocalDaemon(serverId);
+  const canBrowseForSource = getIsElectron() && isLocalDaemon;
+  const { config, patchConfig } = useDaemonConfig(serverId);
+  const refreshQueue = useRef(Promise.resolve());
+  useInstalledPlugins();
+  const queryKey = useMemo(() => pluginQueryKey(serverId), [serverId]);
+  const [installForm] = useState(openPluginInstallForm);
+  const installState = useSyncExternalStore(
+    installForm.subscribe,
+    installForm.getState,
+    installForm.getState,
   );
   const [logsPluginId, setLogsPluginId] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(
@@ -492,25 +577,15 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
           </View>
         </View>
         {sourceInstallSupported ? (
-          <View style={[settingsStyles.card, styles.install]}>
-            <Field label={t("settings.plugins.sourceLabel")} trailing={sourceDocsLink}>
-              <FormTextInput
-                initialValue=""
-                resetKey={installState.resetKey}
-                onChangeText={installForm.setSource}
-                placeholder={t("settings.plugins.sourcePlaceholder")}
-                autoCapitalize="none"
-                autoCorrect={false}
-                editable={!mutation.isPending}
-                accessibilityLabel={t("settings.plugins.sourceLabel")}
-              />
-            </Field>
-            <Button onPress={install} disabled={!installState.canSubmit || mutation.isPending}>
-              {mutation.isPending && mutation.variables?.action === "install"
-                ? t("settings.plugins.installing")
-                : t("settings.plugins.install")}
-            </Button>
-          </View>
+          <PluginInstallCard
+            installForm={installForm}
+            resetKey={installState.resetKey}
+            canSubmit={installState.canSubmit}
+            canBrowseForSource={canBrowseForSource}
+            busy={mutation.isPending}
+            installing={mutation.isPending && mutation.variables?.action === "install"}
+            onInstall={install}
+          />
         ) : (
           <Alert
             size="sm"
@@ -552,6 +627,7 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: theme.spacing[1],
   },
   install: { padding: theme.spacing[4], gap: theme.spacing[3] },
+  selectFolder: { alignSelf: "flex-start" },
   pluginControls: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
   menuButton: { padding: theme.spacing[1], borderRadius: theme.borderRadius.sm },
   menuIcon: { color: theme.colors.foregroundMuted },

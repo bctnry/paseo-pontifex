@@ -2,12 +2,15 @@ import type { PluginThemeContribution } from "@getpaseo/plugin";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { APP_SETTINGS_KEY } from "@/hooks/use-settings/keys";
 import {
+  clearBootCustomTheme,
   clearBootPluginTheme,
+  readBootCustomTheme,
   readBootPluginTheme,
   readBootThemeSettings,
+  rememberBootCustomTheme,
   rememberBootPluginTheme,
 } from "./boot-plugin-theme";
-import { PLUGIN_THEME_NAMES, REGISTERED_THEMES } from "./theme";
+import { CUSTOM_THEME_PREFERENCE, PLUGIN_THEME_NAMES, REGISTERED_THEMES } from "./theme";
 
 const CONTRIBUTION: PluginThemeContribution = {
   id: "high-contrast-dark",
@@ -22,6 +25,17 @@ const CONTRIBUTION: PluginThemeContribution = {
     accent: "#ffcc00",
     mutedForeground: "#b0b0b0",
     ring: "#ffffff",
+  },
+};
+
+const CUSTOM_CONTRIBUTION: PluginThemeContribution = {
+  ...CONTRIBUTION,
+  id: "ocean",
+  name: "Ocean",
+  colors: {
+    ...CONTRIBUTION.colors,
+    background: "#081018",
+    accent: "#38bdf8",
   },
 };
 
@@ -107,6 +121,50 @@ describe("boot plugin theme", () => {
     clearBootPluginTheme();
 
     expect(readBootPluginTheme()).toBeNull();
+    expect(readBootThemeSettings()).toEqual({ adaptiveThemes: true });
+  });
+
+  it("restores the selected desktop custom theme before the settings query resolves", () => {
+    rememberBootCustomTheme({ id: "ocean", contribution: CUSTOM_CONTRIBUTION });
+    values.set(
+      APP_SETTINGS_KEY,
+      JSON.stringify({
+        theme: CUSTOM_THEME_PREFERENCE,
+        customThemeId: "ocean",
+      }),
+    );
+
+    expect(readBootThemeSettings()).toEqual({
+      initialTheme: PLUGIN_THEME_NAMES.dark,
+    });
+    expect(REGISTERED_THEMES[PLUGIN_THEME_NAMES.dark].colors.surface0).toBe(
+      CUSTOM_CONTRIBUTION.colors.background,
+    );
+    expect(readBootCustomTheme()).toMatchObject({
+      id: "ocean",
+      name: "Ocean",
+      contribution: CUSTOM_CONTRIBUTION,
+    });
+  });
+
+  it("ignores a cached desktop custom theme for a different id", () => {
+    rememberBootCustomTheme({ id: "ocean", contribution: CUSTOM_CONTRIBUTION });
+    values.set(
+      APP_SETTINGS_KEY,
+      JSON.stringify({
+        theme: CUSTOM_THEME_PREFERENCE,
+        customThemeId: "forest",
+      }),
+    );
+
+    expect(readBootThemeSettings()).toEqual({ adaptiveThemes: true });
+  });
+
+  it("clears a stale desktop custom theme", () => {
+    rememberBootCustomTheme({ id: "ocean", contribution: CUSTOM_CONTRIBUTION });
+    clearBootCustomTheme();
+
+    expect(readBootCustomTheme()).toBeNull();
     expect(readBootThemeSettings()).toEqual({ adaptiveThemes: true });
   });
 });

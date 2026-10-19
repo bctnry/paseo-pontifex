@@ -53,6 +53,17 @@ export interface DesktopDialogBridge {
   open?: (options?: DesktopDialogOpenOptions) => Promise<string | string[] | null>;
 }
 
+export interface DesktopThemesBridge {
+  list?: () => Promise<string[]>;
+  read?: (fileName: string) => Promise<string>;
+  save?: (fileName: string, content: string) => Promise<void>;
+  remove?: (fileName: string) => Promise<void>;
+  openFolder?: () => Promise<void>;
+  onChanged?: <TEvent = unknown>(
+    handler: (event: TEvent) => void,
+  ) => Promise<() => void> | (() => void);
+}
+
 export interface DesktopNotificationBridge {
   isSupported?: () => Promise<boolean>;
   sendNotification?: (
@@ -181,6 +192,7 @@ export interface DesktopHostBridge {
   events?: DesktopEventsBridge;
   window?: DesktopWindowModuleBridge;
   dialog?: DesktopDialogBridge;
+  themes?: DesktopThemesBridge;
   notification?: DesktopNotificationBridge;
   opener?: DesktopOpenerBridge;
   editor?: DesktopEditorBridge;
