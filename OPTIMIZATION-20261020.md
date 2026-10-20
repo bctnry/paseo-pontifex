@@ -46,6 +46,20 @@ Verification: app and server typechecks, repo lint, repo format, relevant unit
 tests, and the web export passed. Browser tests were not run because Playwright
 Chromium is not installed in this checkout.
 
+### Web streaming Markdown head/tail
+
+Done in this pass.
+
+- `MarkdownRenderer` now applies the mdast head/tail split on web as well
+  (`packages/app/src/components/markdown/renderer.tsx`). Closed blocks render in
+  a memoized head; only the unfinished tail re-parses per reveal frame.
+- Completion reunites the parts, so native selection still sees one text view.
+- Regression test: `packages/app/src/components/markdown/renderer.streaming.test.tsx`
+  asserts the head does not re-render while the tail grows and that completion
+  produces one renderer.
+- Boundary discovery still runs once per completed line, not per frame. A single
+  long block still carries its full parse cost.
+
 ## P0 — highest impact
 
 ### P0.1 Finish the bundle split: xterm, CodeMirror, route chunks
@@ -66,7 +80,7 @@ Chromium is not installed in this checkout.
 
 **Cost**
 
-The remaining entry chunk is still ~18.6 MB. The terminal, the file editor, and
+The remaining entry chunk is still ~19.9 MB. The terminal, the file editor, and
 every route screen are parsed on every cold start even when the user opens one
 chat.
 
@@ -92,45 +106,7 @@ profiles before adopting.
 **Measure:** `npx expo export --platform web` chunk table; time from navigation
 to first terminal paint and first editor paint.
 
-### P0.2 Web streaming Markdown still reparses the whole message every frame
-
-**Evidence**
-
-- `packages/app/src/components/markdown/renderer.tsx:41` disables the head/tail
-  split on web: `const streaming = !isWeb && !!props.streaming;`.
-- The library patch parses synchronously on every `markdown` change
-  (`parseMarkdownSync` + `JSON.parse` of the full AST).
-- `packages/app/src/components/markdown/images.ts:41` calls
-  `prepareMarkdownSource` on every text change.
-- `packages/app/src/components/markdown/source.ts:111-136` may run a second full
-  `fromMarkdown` parse when the text contains links; `:119` also scans the text
-  for inline-code paths.
-- `packages/app/src/utils/highlight-cache.ts:53` keys the highlight cache on the
-  full code string, so an open fence misses every reveal frame.
-
-**Cost**
-
-At 60 Hz reveal, a long message pays full md4c parse + AST JSON + React
-reconciliation + source adaptation + open-fence highlighting. This is likely the
-largest app-side CPU cost during streaming.
-
-**Fix**
-
-- Apply `splitStreamingMarkdown` on web as well. Browser selection and chat find
-  operate on the DOM and can cross sibling nodes, unlike native selection.
-- Adapt the stable head incrementally and only adapt the tail.
-- Render an unterminated fence as plain text until it closes, or tokenize only
-  through the last complete line.
-- Memoize `prepareMarkdownSource().render(...)` on the image URL map.
-
-**Impact/effort:** high / medium. **Risk:** chat find, selection copy, scroll
-geometry, list/table continuation across the split. Validate on web before
-shipping.
-
-**Measure:** `PASEO_AGENT_STREAM_PERF_E2E=1` smoothness spec and the
-`stream-tick.bench.ts` bench with a long message near the 32k cap.
-
-### P0.3 Replica cache scans and rewrites more than it needs
+### P0.2 Replica cache scans and rewrites more than it needs
 
 **Evidence**
 
@@ -168,7 +144,7 @@ happens during a deferred write, never before a cached row paints.
 **Impact/effort:** high / medium. **Measure:** time to first cached chat paint;
 long-task entries during boot; replica-cache write duration.
 
-### P0.4 Persistence validates and serializes whole stores on hot paths
+### P0.3 Persistence validates and serializes whole stores on hot paths
 
 **Evidence**
 
@@ -198,7 +174,7 @@ write is synchronous.
 (typing path), `profile-workspace-tabs.mjs` / `profile-workspace-switching.mjs`
 (layout path), long tasks during draft persistence.
 
-### P0.5 Desktop socket/pipe/SSH frames are base64-encoded as if binary
+### P0.4 Desktop socket/pipe/SSH frames are base64-encoded as if binary
 
 **Evidence**
 
@@ -509,11 +485,10 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 ## Suggested order
 
 1. Bundle follow-ups: CodeMirror, xterm, async routes; re-measure.
-2. Web Markdown head/tail + source adaptation (P0.2).
-3. Replica cache and persistence writes (P0.3, P0.4).
-4. Desktop transport and log tail (P0.5, P2.1).
-5. Composer height and Explorer retention (P1.1, P1.2).
-6. Shell interaction and history revision work (P1.3, P1.4).
-7. Directory/git/reconnect amplification (P1.5).
-8. Startup gates and agent-directory fanout (P1.6, P1.7).
-9. Remaining P2 items as touch-time cleanup.
+2. Replica cache and persistence writes (P0.2, P0.3).
+3. Desktop transport and log tail (P0.4, P2.1).
+4. Composer height and Explorer retention (P1.1, P1.2).
+5. Shell interaction and history revision work (P1.3, P1.4).
+6. Directory/git/reconnect amplification (P1.5).
+7. Startup gates and agent-directory fanout (P1.6, P1.7).
+8. Remaining P2 items as touch-time cleanup.

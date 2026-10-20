@@ -2,7 +2,7 @@ import { readFileSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { splitStreamingMarkdown } from "./streaming";
 
-describe("native streaming Markdown", () => {
+describe("streaming Markdown", () => {
   it("keeps completed messages together for selection", () => {
     const text = "First.\n\nSecond.\n\nThird.";
     expect(splitStreamingMarkdown(text, false)).toEqual({ head: text, tail: "" });
