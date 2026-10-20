@@ -24,9 +24,9 @@ import type { ITheme } from "@xterm/xterm";
 import type { TerminalState } from "@getpaseo/protocol/messages";
 import type { TerminalInputModeState } from "@getpaseo/protocol/terminal-input-mode";
 import type { PendingTerminalModifiers } from "../utils/terminal-keys";
-import {
+import type {
   TerminalEmulatorRuntime,
-  type TerminalOutputData,
+  TerminalOutputData,
 } from "../terminal/runtime/terminal-emulator-runtime";
 import { encodeTerminalPaste } from "../terminal/runtime/terminal-paste";
 import type {
@@ -465,27 +465,44 @@ export default function TerminalEmulator({
       return () => {};
     }
 
-    const runtime = new TerminalEmulatorRuntime();
-    runtimeRef.current = runtime;
-    runtime.setCallbacks({
-      callbacks: {
-        ...mountCallbacksRef.current,
-        onOpenExternalUrl: openExternalUrl,
-      },
-    });
-    runtime.setPendingModifiers({ pendingModifiers: pendingModifiersRef.current });
-    runtime.mount({
-      root,
-      host,
-      initialSnapshot: initialSnapshotRef.current,
-      scrollback: scrollbackLinesRef.current,
-      theme: mountedThemeRef.current,
-      fontFamily: fontFamilyRef.current,
-      fontSize: fontSizeRef.current,
-    });
-    onRendererReadyChangeRef.current?.({ streamKey, isReady: true });
+    let cancelled = false;
+    let runtime: TerminalEmulatorRuntime | null = null;
+
+    // xterm and its addons are several megabytes. Load them when a terminal
+    // actually mounts; the pane keeps its loading overlay until
+    // `onRendererReadyChange` fires, so no output is written before this lands.
+    void import("../terminal/runtime/terminal-emulator-runtime")
+      .then(({ TerminalEmulatorRuntime }) => {
+        if (cancelled) return;
+        runtime = new TerminalEmulatorRuntime();
+        runtimeRef.current = runtime;
+        runtime.setCallbacks({
+          callbacks: {
+            ...mountCallbacksRef.current,
+            onOpenExternalUrl: openExternalUrl,
+          },
+        });
+        runtime.setPendingModifiers({ pendingModifiers: pendingModifiersRef.current });
+        runtime.mount({
+          root,
+          host,
+          initialSnapshot: initialSnapshotRef.current,
+          scrollback: scrollbackLinesRef.current,
+          theme: mountedThemeRef.current,
+          fontFamily: fontFamilyRef.current,
+          fontSize: fontSizeRef.current,
+        });
+        onRendererReadyChangeRef.current?.({ streamKey, isReady: true });
+        return;
+      })
+      .catch((error: unknown) => {
+        console.error("[Terminal] Failed to load the terminal runtime", error);
+        if (!cancelled) onRendererReadyChangeRef.current?.({ streamKey, isReady: false });
+      });
 
     return () => {
+      cancelled = true;
+      if (!runtime) return;
       runtime.unmount();
       onRendererReadyChangeRef.current?.({ streamKey, isReady: false });
       if (runtimeRef.current === runtime) {

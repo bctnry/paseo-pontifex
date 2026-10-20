@@ -47,6 +47,14 @@ state.
 This split is deliberate. The host layout must mount first so native local
 dynamic params exist before any nested workspace leaf is selected.
 
+## Web/Desktop route chunks
+
+`app.config.js` sets `extra.router.asyncRoutes: { web: true }`. Expo Router wraps
+each web/Electron route in `React.lazy` with its own Suspense fallback, so route
+screens ship as chunks instead of the initial bundle. Native keeps synchronous
+route modules; the layout ownership and local-param rules above assume layouts
+mount synchronously.
+
 ## Error Recovery
 
 The root error boundary lives above `ExpoRoot` in `src/root-app.tsx`. Reload

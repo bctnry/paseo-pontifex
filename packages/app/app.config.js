@@ -195,7 +195,11 @@ export default {
     extra: {
       fdroidBuild: isFdroidBuild,
       profileBuild: isProfileBuild,
-      router: {},
+      router: {
+        // Load route screens as their own chunks on web/Electron. Native keeps
+        // synchronous route modules; mobile cold start is a separate budget.
+        asyncRoutes: { web: true },
+      },
       ...(easProjectId ? { eas: { projectId: easProjectId } } : {}),
     },
     ...(easOwner ? { owner: easOwner } : {}),

@@ -101,53 +101,34 @@ Done in this pass.
 Verification: validated-storage, workspace-layout, draft, panel, sidebar, review,
 and browser-store suites pass.
 
+### Bundle follow-ups: CodeMirror, xterm, route chunks
+
+Done in this pass.
+
+- CodeMirror moved to `file-pane/editor/view.web.impl.tsx`; `view.web.tsx` is a
+  `React.lazy` wrapper with a small Suspense fallback. The editor chunk is 124 KB.
+- The terminal emulator now imports `TerminalEmulatorRuntime` dynamically. The
+  pane already keeps its stream subscription gated on `onRendererReadyChange`, so
+  no output is written while the chunk loads. The xterm chunk is 899 KB.
+- `extra.router.asyncRoutes` is enabled for web/Electron. Route screens load as
+  their own chunks; native keeps synchronous route modules.
+
+Measured with `npx expo export --platform web`:
+
+|                      |       Before |        After |
+| -------------------- | -----------: | -----------: |
+| Initial JS raw       | 19,924,120 B | 18,375,264 B |
+| Initial JS gzip      |  4,227,737 B |  3,801,223 B |
+| On-demand xterm      |      in main |    899,167 B |
+| On-demand CodeMirror |      in main |    124,440 B |
+
+The static export was loaded in a browser: `/welcome` rendered, Settings and its
+sections loaded their route chunks, and neither xterm nor CodeMirror was
+requested until their surface opened.
+
 ## P0 — highest impact
 
-### P0.1 Finish the bundle split: xterm, CodeMirror, route chunks
-
-**Evidence**
-
-- `packages/app/src/components/terminal-emulator.tsx:28` imports
-  `TerminalEmulatorRuntime` (all of xterm plus webgl/image/ligatures addons)
-  statically.
-- `packages/app/src/file-pane/editor/view.web.tsx:3-4` imports CodeMirror
-  `state` and `view` statically. `file-pane/pane.tsx:28` imports that view
-  eagerly.
-- `packages/app/app.config.js:142` still uses `web.output: "single"`, and
-  `app.config.js:195-198` leaves `extra.router` empty. Expo Router supports
-  `extra.router.asyncRoutes: { web: true }`; with it,
-  `node_modules/expo-router/build/useScreens.js:171-179` wraps each route in
-  `React.lazy`.
-
-**Cost**
-
-The remaining entry chunk is still ~19.9 MB. The terminal, the file editor, and
-every route screen are parsed on every cold start even when the user opens one
-chat.
-
-**Fix**
-
-1. Lazy-load CodeMirror: keep a thin `view.web.tsx` wrapper using
-   `React.lazy(() => import("./view.web.impl"))` and move the current
-   implementation to `view.web.impl.tsx`. Add a minimal Suspense fallback. Only
-   the file editor pays for CodeMirror.
-2. Lazy-load xterm: resolve `TerminalEmulatorRuntime` inside the mount effect,
-   or wrap `TerminalEmulator` in `React.lazy`. Gate `writeOutput` /
-   `restoreOutput` / `renderSnapshot` until `onRendererReadyChange` reports
-   ready; the terminal pane already has a loading overlay keyed on
-   `rendererReadyStreamKey` (`packages/app/src/components/terminal-pane.tsx`).
-3. Enable async routes for web and verify the root layout still mounts the
-   sidebar, command center, startup restore, and error boundary correctly.
-   Consider preloading the initial workspace route instead of every route.
-
-**Impact/effort:** high / medium. **Risk:** terminal output ordering, route
-transition flash, deep-link startup. Run the browser workspace/tab/terminal
-profiles before adopting.
-
-**Measure:** `npx expo export --platform web` chunk table; time from navigation
-to first terminal paint and first editor paint.
-
-### P0.2 Desktop socket/pipe/SSH frames are base64-encoded as if binary
+### P0.1 Desktop socket/pipe/SSH frames are base64-encoded as if binary
 
 **Evidence**
 
@@ -457,10 +438,9 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 
 ## Suggested order
 
-1. Bundle follow-ups: CodeMirror, xterm, async routes; re-measure.
-2. Desktop transport and log tail (P0.2, P2.1).
-3. Composer height and Explorer retention (P1.1, P1.2).
-4. Shell interaction and history revision work (P1.3, P1.4).
-5. Directory/git/reconnect amplification (P1.5).
-6. Startup gates and agent-directory fanout (P1.6, P1.7).
-7. Remaining P2 items as touch-time cleanup.
+1. Desktop transport and log tail (P0.1, P2.1).
+2. Composer height and Explorer retention (P1.1, P1.2).
+3. Shell interaction and history revision work (P1.3, P1.4).
+4. Directory/git/reconnect amplification (P1.5).
+5. Startup gates and agent-directory fanout (P1.6, P1.7).
+6. Remaining P2 items as touch-time cleanup.
