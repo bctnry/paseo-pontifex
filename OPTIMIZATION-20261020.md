@@ -83,6 +83,24 @@ Verification: replica row-store contract tests cover summaries across apply,
 overwrite, delete, rename, and clear; the replica, timeline, directory-sync, and
 host-runtime suites pass.
 
+### Persistence hot paths
+
+Done in this pass.
+
+- Persisted stores validate on read and serialize the in-memory state on write.
+  Write validation is now opt-in (`validateOnWrite`); the state is schema-derived
+  by the time it reaches the store, so hot paths no longer run a full Zod parse.
+- Validated state carries a non-enumerable marker, and the workspace-layout
+  `merge` consumes it instead of parsing the same blob again during hydration.
+- The workspace-layout projection normalizes and strips each layout once per
+  layout identity; a tab switch in one workspace reuses every other workspace's
+  projection. Unchanged persisted slices still skip the write entirely.
+- Draft and layout writes keep their existing throttling/skip behavior but no
+  longer pay write-path validation.
+
+Verification: validated-storage, workspace-layout, draft, panel, sidebar, review,
+and browser-store suites pass.
+
 ## P0 — highest impact
 
 ### P0.1 Finish the bundle split: xterm, CodeMirror, route chunks
@@ -129,37 +147,7 @@ profiles before adopting.
 **Measure:** `npx expo export --platform web` chunk table; time from navigation
 to first terminal paint and first editor paint.
 
-### P0.2 Persistence validates and serializes whole stores on hot paths
-
-**Evidence**
-
-- `packages/app/src/storage/validated-persist-storage.ts:33-40` runs
-  `safeParse` on **writes**, then `JSON.stringify`.
-- `packages/app/src/stores/workspace-layout-store.ts:2123-2145` normalizes and
-  deep-copies every workspace layout inside `partialize`.
-- `:2147-2177` parses the persisted blob again during `merge`.
-- `packages/app/src/stores/draft-store/index.ts:432` persists every draft;
-  `packages/app/src/stores/draft-store/persistence.ts:81-90` flushes on a
-  200 ms throttle.
-
-**Cost**
-
-A tab switch, pane resize, or draft edit does O(workspaces × tabs) or O(drafts)
-Zod work plus full serialization. On web, `AsyncStorage` is localStorage, so the
-write is synchronous.
-
-**Fix**
-
-- Validate on read only; the in-memory value is already schema-derived.
-- Persist only dirty workspaces/drafts.
-- Debounce layout writes; pass the parsed value from `getItem` into `merge`
-  instead of parsing twice.
-
-**Impact/effort:** high / medium. **Measure:** `profile-composer-typing.mjs`
-(typing path), `profile-workspace-tabs.mjs` / `profile-workspace-switching.mjs`
-(layout path), long tasks during draft persistence.
-
-### P0.3 Desktop socket/pipe/SSH frames are base64-encoded as if binary
+### P0.2 Desktop socket/pipe/SSH frames are base64-encoded as if binary
 
 **Evidence**
 
@@ -470,10 +458,9 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 ## Suggested order
 
 1. Bundle follow-ups: CodeMirror, xterm, async routes; re-measure.
-2. Persistence writes (P0.2).
-3. Desktop transport and log tail (P0.3, P2.1).
-4. Composer height and Explorer retention (P1.1, P1.2).
-5. Shell interaction and history revision work (P1.3, P1.4).
-6. Directory/git/reconnect amplification (P1.5).
-7. Startup gates and agent-directory fanout (P1.6, P1.7).
-8. Remaining P2 items as touch-time cleanup.
+2. Desktop transport and log tail (P0.2, P2.1).
+3. Composer height and Explorer retention (P1.1, P1.2).
+4. Shell interaction and history revision work (P1.3, P1.4).
+5. Directory/git/reconnect amplification (P1.5).
+6. Startup gates and agent-directory fanout (P1.6, P1.7).
+7. Remaining P2 items as touch-time cleanup.

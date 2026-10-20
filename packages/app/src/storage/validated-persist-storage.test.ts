@@ -1,7 +1,10 @@
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import type { StateStorage } from "zustand/middleware";
-import { createValidatedPersistStorage } from "./validated-persist-storage";
+import {
+  createValidatedPersistStorage,
+  isValidatedPersistState,
+} from "./validated-persist-storage";
 
 class MemoryStorage implements StateStorage {
   readonly values = new Map<string, string>();
@@ -50,12 +53,24 @@ describe("createValidatedPersistStorage", () => {
     });
   });
 
+  it("marks schema-validated state for downstream merges", async () => {
+    const backing = new MemoryStorage();
+    backing.values.set("settings", JSON.stringify({ state: { enabled: true }, version: 1 }));
+    const storage = createValidatedPersistStorage(backing, StateSchema);
+
+    const value = await storage.getItem("settings");
+
+    expect(value).not.toBeNull();
+    expect(isValidatedPersistState(value?.state)).toBe(true);
+  });
+
   it("clears a value rejected by the schema before writing", async () => {
     const backing = new MemoryStorage();
     backing.values.set("settings", JSON.stringify({ state: { count: 1 } }));
     const storage = createValidatedPersistStorage(
       backing,
       z.strictObject({ count: z.number().finite() }),
+      { validateOnWrite: true },
     );
 
     await storage.setItem("settings", { state: { count: Number.NaN } });

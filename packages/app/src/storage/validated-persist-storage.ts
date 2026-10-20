@@ -1,11 +1,39 @@
 import { z } from "zod";
 import type { PersistStorage, StateStorage, StorageValue } from "zustand/middleware";
 
+const VALIDATED_STATE = Symbol.for("paseo.validated-persist-state");
+
+/** Mark state that already passed `stateSchema` so a merge does not parse it again. */
+export function markValidatedPersistState<State>(state: State): State {
+  if (typeof state === "object" && state !== null && !Object.isFrozen(state)) {
+    Object.defineProperty(state, VALIDATED_STATE, {
+      value: true,
+      enumerable: false,
+      configurable: false,
+    });
+  }
+  return state;
+}
+
+export function isValidatedPersistState<State>(state: unknown): state is State {
+  return (
+    typeof state === "object" &&
+    state !== null &&
+    (state as Record<symbol, unknown>)[VALIDATED_STATE] === true
+  );
+}
+
 export function createValidatedPersistStorage<State>(
   backingStorage: StateStorage,
   stateSchema: z.ZodType<State>,
-  // Opt in only when callers preserve state references until values change.
-  options: { skipUnchanged?: boolean } = {},
+  options: {
+    // Opt in only when callers preserve state references until values change.
+    skipUnchanged?: boolean;
+    // State is schema-derived by the time it reaches the store. Re-validating on
+    // every write costs a full Zod parse on hot paths; reads remain the safety
+    // boundary. Enable this only for callers that write untrusted shapes.
+    validateOnWrite?: boolean;
+  } = {},
 ): PersistStorage<State> {
   const envelopeSchema = z.strictObject({
     state: stateSchema,
@@ -33,6 +61,7 @@ export function createValidatedPersistStorage<State>(
         await backingStorage.removeItem(name);
         return null;
       }
+      markValidatedPersistState(result.data.state);
       return result.data;
     },
     setItem: async (name, value) => {
@@ -44,15 +73,19 @@ export function createValidatedPersistStorage<State>(
         previous.version === value.version
       )
         return;
-      const result = envelopeSchema.safeParse(value);
-      if (!result.success) {
-        accepted.delete(name);
-        await backingStorage.removeItem(name);
-        return;
+      let nextValue: StorageValue<State> = value;
+      if (options.validateOnWrite) {
+        const result = envelopeSchema.safeParse(value);
+        if (!result.success) {
+          accepted.delete(name);
+          await backingStorage.removeItem(name);
+          return;
+        }
+        nextValue = result.data;
       }
       if (options.skipUnchanged) accepted.set(name, value);
       try {
-        await backingStorage.setItem(name, JSON.stringify(result.data));
+        await backingStorage.setItem(name, JSON.stringify(nextValue));
       } catch (error) {
         if (accepted.get(name) === value) accepted.delete(name);
         throw error;

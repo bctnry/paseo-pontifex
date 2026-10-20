@@ -65,7 +65,11 @@ import {
 } from "@/workspace-tabs/identity";
 import { isSheetTabModified, resolveCompactSheetPolicy } from "@/workspace-tabs/compact-sheet";
 import { panelResourceKey, type CompactSheetPolicy } from "@/panels/panel-manifest";
-import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
+import {
+  createValidatedPersistStorage,
+  isValidatedPersistState,
+  markValidatedPersistState,
+} from "@/storage/validated-persist-storage";
 import { panelTargetSupportsHostForWorkspaceKey } from "@/plugins/workspace-panels/locations";
 
 export {
@@ -383,7 +387,7 @@ function migrateWorkspaceLayoutPersistedState(
 ): z.infer<typeof WorkspaceLayoutPersistedStateSchema> {
   const result = WorkspaceLayoutPersistedStateSchema.safeParse(persistedState);
   if (!result.success || version >= WORKSPACE_LAYOUT_PERSIST_VERSION) {
-    return result.success ? result.data : { layoutByWorkspace: {} };
+    return markValidatedPersistState(result.success ? result.data : { layoutByWorkspace: {} });
   }
 
   const layoutByWorkspace: Record<string, WorkspaceLayout> = {};
@@ -401,12 +405,12 @@ function migrateWorkspaceLayoutPersistedState(
     sidePaneIdByWorkspace[workspaceKey] = migrated.sidePaneId;
   }
 
-  return {
+  return markValidatedPersistState({
     ...result.data,
     layoutByWorkspace,
     explorerPaneIdByWorkspace,
     sidePaneIdByWorkspace,
-  };
+  });
 }
 
 function trimNonEmpty(value: string | null | undefined): string | null {
@@ -956,6 +960,9 @@ const PERSISTED_SLICES = [
 function createPersistedStateProjection() {
   let previous: { source: WorkspaceLayoutStore; state: WorkspaceLayoutPersistedState } | null =
     null;
+  // A tab switch replaces one workspace's layout. Keep the normalized, stripped
+  // projection for every other workspace instead of rebuilding all of them.
+  const projectedLayouts = new WeakMap<WorkspaceLayout, WorkspaceLayout>();
   return (source: WorkspaceLayoutStore): WorkspaceLayoutPersistedState => {
     const last = previous;
     if (last && PERSISTED_SLICES.every((slice) => last.source[slice] === source[slice])) {
@@ -963,11 +970,15 @@ function createPersistedStateProjection() {
     }
     const layoutByWorkspace: Record<string, WorkspaceLayout> = {};
     for (const key in source.layoutByWorkspace) {
-      // Strip ephemeral (commit diff) tabs before persisting so they are
-      // dropped on reload rather than restored pointing at a rebased SHA.
-      layoutByWorkspace[key] = stripEphemeralTabsFromLayout(
-        normalizeLayout(source.layoutByWorkspace[key]),
-      );
+      const layout = source.layoutByWorkspace[key];
+      let projected = projectedLayouts.get(layout);
+      if (!projected) {
+        // Strip ephemeral (commit diff) tabs before persisting so they are
+        // dropped on reload rather than restored pointing at a rebased SHA.
+        projected = stripEphemeralTabsFromLayout(normalizeLayout(layout));
+        projectedLayouts.set(layout, projected);
+      }
+      layoutByWorkspace[key] = projected;
     }
     const state: WorkspaceLayoutPersistedState = {
       layoutByWorkspace,
@@ -2174,18 +2185,20 @@ export function createWorkspaceLayoutStore(
           migrateWorkspaceLayoutPersistedState(persistedState, version, ids),
         partialize: createPersistedStateProjection(),
         merge: (persistedState, currentState) => {
-          const result = WorkspaceLayoutPersistedStateSchema.safeParse(persistedState);
-          if (!result.success) {
+          const data = isValidatedPersistState<WorkspaceLayoutPersistedState>(persistedState)
+            ? persistedState
+            : (() => {
+                const parsed = WorkspaceLayoutPersistedStateSchema.safeParse(persistedState);
+                return parsed.success ? parsed.data : null;
+              })();
+          if (!data) {
             return currentState;
           }
           const layoutByWorkspace: Record<string, WorkspaceLayout> = {};
           const explorerSidebarPaneIdByWorkspace: Record<string, string | null> = {
-            ...(result.data.explorerSidebarPaneIdByWorkspace ??
-              result.data.explorerPaneIdByWorkspace),
+            ...(data.explorerSidebarPaneIdByWorkspace ?? data.explorerPaneIdByWorkspace),
           };
-          for (const [workspaceKey, persistedLayout] of Object.entries(
-            result.data.layoutByWorkspace,
-          )) {
+          for (const [workspaceKey, persistedLayout] of Object.entries(data.layoutByWorkspace)) {
             const restoredLayout = restoreWorkspaceLayout(
               stripEphemeralTabsFromLayout(persistedLayout),
               resolveExplorerSidebarPaneId(
@@ -2208,23 +2221,20 @@ export function createWorkspaceLayoutStore(
             ...currentState,
             layoutByWorkspace,
             pinnedAgentIdsByWorkspace: Object.fromEntries(
-              Object.entries(result.data.pinnedAgentIdsByWorkspace ?? {}).map(([key, agentIds]) => [
+              Object.entries(data.pinnedAgentIdsByWorkspace ?? {}).map(([key, agentIds]) => [
                 key,
                 new Set(agentIds),
               ]),
             ),
-            splitSizesByWorkspace: result.data.splitSizesByWorkspace ?? {},
+            splitSizesByWorkspace: data.splitSizesByWorkspace ?? {},
             explorerSidebarWidthByWorkspace:
-              result.data.explorerSidebarWidthByWorkspace ??
+              data.explorerSidebarWidthByWorkspace ??
               convertLegacyExplorerSidebarRatios(
-                result.data.explorerSidebarRatioByWorkspace ??
-                  result.data.sidePanelRatioByWorkspace ??
-                  {},
+                data.explorerSidebarRatioByWorkspace ?? data.sidePanelRatioByWorkspace ?? {},
               ),
             explorerSidebarPaneIdByWorkspace,
-            sidePaneIdByWorkspace: result.data.sidePaneIdByWorkspace ?? {},
-            pullRequestTabAutoOpenedByWorkspace:
-              result.data.pullRequestTabAutoOpenedByWorkspace ?? {},
+            sidePaneIdByWorkspace: data.sidePaneIdByWorkspace ?? {},
+            pullRequestTabAutoOpenedByWorkspace: data.pullRequestTabAutoOpenedByWorkspace ?? {},
           };
         },
       },
