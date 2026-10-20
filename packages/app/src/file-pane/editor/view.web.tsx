@@ -4,7 +4,7 @@ import { Annotation, Compartment, EditorState, Transaction } from "@codemirror/s
 import { EditorView } from "@codemirror/view";
 import { getLanguageForFile } from "@getpaseo/highlight";
 import { getCM, vim } from "@replit/codemirror-vim";
-import { isRenderedMarkdownFile } from "@/components/file-pane-render-mode";
+import { isRenderedMarkdownFile } from "@/file-panels";
 import type { EditorKeybindings } from "@/hooks/use-settings";
 import type { WorkspaceFileLocation } from "@/workspace/file-open";
 import type { FileEditorModel } from "./model";

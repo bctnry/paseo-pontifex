@@ -6,7 +6,7 @@ import {
   PanelLeftClose,
   PanelRightClose,
 } from "lucide-react-native";
-import { Pressable, ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
+import { ScrollView, Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import {
@@ -14,6 +14,7 @@ import {
   useIconButtonChromeStyle,
 } from "@/components/ui/icon-button-chrome";
 import { mutedIconColorMapping } from "@/components/ui/icon-color";
+import { PressHighlight } from "@/components/ui/press-highlight";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import type { MarkdownOutlineItem } from "./outline";
 
@@ -62,7 +63,7 @@ export function MarkdownOutlineSidebar({
         style={[styles.rail, position === "left" ? styles.railLeft : styles.railRight]}
         testID="markdown-outline-collapsed"
       >
-        <Pressable
+        <PressHighlight
           accessibilityRole="button"
           accessibilityLabel={t("panels.file.outline.expand")}
           accessibilityState={COLLAPSED_ACCESSIBILITY_STATE}
@@ -73,7 +74,7 @@ export function MarkdownOutlineSidebar({
           testID="markdown-outline-toggle"
         >
           <ThemedListTree size={iconSize} uniProps={mutedIconColorMapping} />
-        </Pressable>
+        </PressHighlight>
       </View>
     );
   }
@@ -87,7 +88,7 @@ export function MarkdownOutlineSidebar({
         <Text numberOfLines={1} style={styles.title}>
           {t("panels.file.outline.title")}
         </Text>
-        <Pressable
+        <PressHighlight
           accessibilityRole="button"
           accessibilityLabel={t("panels.file.outline.collapse")}
           accessibilityState={EXPANDED_ACCESSIBILITY_STATE}
@@ -102,7 +103,7 @@ export function MarkdownOutlineSidebar({
           ) : (
             <ThemedPanelRightClose size={iconSize} uniProps={mutedIconColorMapping} />
           )}
-        </Pressable>
+        </PressHighlight>
       </View>
       <ScrollView
         style={styles.listScroll}
@@ -147,7 +148,7 @@ function OutlineRow({
   );
 
   return (
-    <Pressable
+    <PressHighlight
       accessible={false}
       onHoverIn={handleHoverIn}
       onHoverOut={handleHoverOut}
@@ -158,7 +159,7 @@ function OutlineRow({
       ) : (
         <View style={styles.disclosureSpacer} />
       )}
-      <Pressable
+      <PressHighlight
         accessibilityRole="button"
         accessibilityLabel={item.title}
         onPress={handlePress}
@@ -172,8 +173,8 @@ function OutlineRow({
             {item.title}
           </Text>
         )}
-      </Pressable>
-    </Pressable>
+      </PressHighlight>
+    </PressHighlight>
   );
 }
 
@@ -200,7 +201,7 @@ function OutlineDisclosure({
   );
 
   return (
-    <Pressable
+    <PressHighlight
       accessibilityRole="button"
       accessibilityLabel={t(
         expanded ? "panels.file.outline.collapseItem" : "panels.file.outline.expandItem",
@@ -218,7 +219,7 @@ function OutlineDisclosure({
       ) : (
         <ThemedChevronRight size={12} uniProps={mutedIconColorMapping} />
       )}
-    </Pressable>
+    </PressHighlight>
   );
 }
 

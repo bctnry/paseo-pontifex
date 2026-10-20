@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useTranslation } from "react-i18next";
-import { Pressable, Text, View, type GestureResponderEvent } from "react-native";
+import { Text, View, type GestureResponderEvent } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { EditingTextInput, type EditingTextInputHandle } from "@/components/ui/text-input";
+import { PressHighlight } from "@/components/ui/press-highlight";
 import { HEX_COLOR_PATTERN } from "@/styles/plugin-theme";
 
 export interface ThemeColorPickerAnchor {
@@ -87,7 +88,7 @@ export function ThemeColorPickerBase({
     <View style={styles.container}>
       <View style={styles.row}>
         <Text style={styles.label}>{label}</Text>
-        <Pressable
+        <PressHighlight
           accessibilityRole="button"
           accessibilityLabel={t("settings.appearance.customThemes.pickColor", { label })}
           disabled={!onPickColor}
@@ -95,7 +96,7 @@ export function ThemeColorPickerBase({
           style={styles.swatchButton}
         >
           <View style={[styles.swatch, { backgroundColor: value }]} />
-        </Pressable>
+        </PressHighlight>
         <EditingTextInput
           ref={inputRef}
           initialValue={value}

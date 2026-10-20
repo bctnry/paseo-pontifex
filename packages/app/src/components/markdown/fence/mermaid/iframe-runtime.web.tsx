@@ -44,6 +44,7 @@ export function MermaidIframeRuntime({
     void loadMermaidRuntimeHtml()
       .then((html) => {
         if (!cancelled) setRuntimeHtml(html);
+        return;
       })
       .catch((error: unknown) => {
         console.error("[Mermaid] Failed to load diagram runtime", error);
