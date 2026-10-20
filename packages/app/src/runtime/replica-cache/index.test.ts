@@ -77,6 +77,23 @@ class MemoryStorage implements ReplicaRowStore {
     return [...hosts].map(([serverId, rows]) => ({ serverId, rows }));
   }
 
+  async readHostSummaries() {
+    const summaries = new Map<string, { rowCount: number; bytes: number }>();
+    for (const row of this.rows.values()) {
+      const summary = summaries.get(row.serverId) ?? { rowCount: 0, bytes: 0 };
+      summary.rowCount += 1;
+      summary.bytes += Buffer.byteLength(row.payload);
+      summaries.set(row.serverId, summary);
+    }
+    return [...summaries]
+      .map(([serverId, summary]) => ({
+        serverId,
+        rowCount: summary.rowCount,
+        bytes: summary.bytes,
+      }))
+      .sort((left, right) => left.serverId.localeCompare(right.serverId));
+  }
+
   async apply(changes: ReplicaRowChanges): Promise<void> {
     this.writes += 1;
     if (this.persistentWriteFailure) throw this.persistentWriteFailure;
@@ -86,6 +103,13 @@ class MemoryStorage implements ReplicaRowStore {
       throw error;
     }
     this.changes.push(changes);
+    for (const replacement of changes.replaceKinds ?? []) {
+      for (const [key, row] of this.rows) {
+        if (row.serverId === replacement.serverId && replacement.kinds.includes(row.kind)) {
+          this.rows.delete(key);
+        }
+      }
+    }
     for (const key of changes.deletes) this.rows.delete(this.key(key));
     for (const row of changes.upserts) this.rows.set(this.key(row), row);
   }
@@ -535,6 +559,39 @@ describe("ReplicaCache", () => {
     expect(storage.changes[0]?.upserts.map(({ kind, id }) => ({ kind, id }))).toEqual([
       { kind: "timeline", id: "agent-1" },
     ]);
+  });
+
+  it("does not serialize timeline items outside the retained window", async () => {
+    const storage = new MemoryStorage();
+    const cache = createCache(storage);
+    const items = Array.from({ length: 60 }, (_, index) => ({
+      ...timelineItem(`item ${index}`),
+      id: `message-${index}`,
+      timelineCursor: { epoch: "epoch-1", seq: index + 1 },
+    }));
+    let discardedItemReads = 0;
+    Object.defineProperty(items[0]!, "text", {
+      configurable: true,
+      enumerable: true,
+      get: () => {
+        discardedItemReads += 1;
+        return "discarded";
+      },
+    });
+
+    cache.commitTimeline(SERVER_ID, "agent-1", {
+      agentId: "agent-1",
+      items,
+      range: { epoch: "epoch-1", startSeq: 1, endSeq: 60 },
+      hasOlder: false,
+    });
+    await cache.flush();
+
+    expect(discardedItemReads).toBe(0);
+    const payload = JSON.parse(requireTimelineRow(storage).payload) as {
+      items: unknown[];
+    };
+    expect(payload.items).toHaveLength(50);
   });
 
   it("never reads directory rows older than an accepted deferred deletion", async () => {
@@ -1057,7 +1114,9 @@ describe("ReplicaCache", () => {
         const { cache, expectReads } = await streamingCache();
 
         expect((await cache.readWorkspace(SERVER_ID, "workspace-1"))?.workspace.name).toBe("main");
-        expectReads(2, 1);
+        // The pending stream commit touches other rows, so the two reads answer
+        // from storage without forcing a write first.
+        expectReads(2, 0);
         await cache.flush();
       });
 

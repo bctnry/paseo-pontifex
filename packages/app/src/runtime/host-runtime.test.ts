@@ -606,7 +606,30 @@ function createMemoryReplicaRowStore(): ReplicaRowStore {
       }
       return [...hosts].map(([serverId, hostRows]) => ({ serverId, rows: hostRows }));
     },
+    readHostSummaries: async () => {
+      const summaries = new Map<string, { rowCount: number; bytes: number }>();
+      for (const row of rows.values()) {
+        const summary = summaries.get(row.serverId) ?? { rowCount: 0, bytes: 0 };
+        summary.rowCount += 1;
+        summary.bytes += Buffer.byteLength(row.payload);
+        summaries.set(row.serverId, summary);
+      }
+      return [...summaries]
+        .map(([serverId, summary]) => ({
+          serverId,
+          rowCount: summary.rowCount,
+          bytes: summary.bytes,
+        }))
+        .sort((left, right) => left.serverId.localeCompare(right.serverId));
+    },
     apply: async (changes) => {
+      for (const replacement of changes.replaceKinds ?? []) {
+        for (const [key, row] of rows) {
+          if (row.serverId === replacement.serverId && replacement.kinds.includes(row.kind)) {
+            rows.delete(key);
+          }
+        }
+      }
       for (const key of changes.deletes) rows.delete(keyOf(key));
       for (const row of changes.upserts) rows.set(keyOf(row), row);
     },

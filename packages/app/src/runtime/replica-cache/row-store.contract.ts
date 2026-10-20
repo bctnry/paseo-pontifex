@@ -55,6 +55,49 @@ export function runReplicaRowStoreContract(
       ]);
     });
 
+    it("reports per-host row counts and payload bytes", async () => {
+      await store.apply({
+        upserts: [
+          row("server-a", "agent", "agent-1", "abc"),
+          row("server-a", "project", "project-1", "é"),
+          row("server-b", "timeline", "singleton", "hello"),
+        ],
+        deletes: [],
+      });
+
+      expect(await store.readHostSummaries()).toEqual([
+        { serverId: "server-a", rowCount: 2, bytes: 5 },
+        { serverId: "server-b", rowCount: 1, bytes: 5 },
+      ]);
+    });
+
+    it("keeps summaries correct across overwrite, delete, rename and clear", async () => {
+      await store.apply({
+        upserts: [
+          row("server-a", "agent", "agent-1", "old"),
+          row("server-a", "workspace", "workspace-1", "keep"),
+          row("server-b", "agent", "agent-2", "b"),
+        ],
+        deletes: [],
+      });
+      await store.apply({
+        upserts: [row("server-a", "agent", "agent-1", "replacement")],
+        deletes: [{ serverId: "server-a", kind: "workspace", id: "workspace-1" }],
+      });
+      expect(await store.readHostSummaries()).toEqual([
+        { serverId: "server-a", rowCount: 1, bytes: 11 },
+        { serverId: "server-b", rowCount: 1, bytes: 1 },
+      ]);
+
+      await store.renameHost("server-a", "server-b");
+      expect(await store.readHostSummaries()).toEqual([
+        { serverId: "server-b", rowCount: 2, bytes: 12 },
+      ]);
+
+      await store.clear();
+      expect(await store.readHostSummaries()).toEqual([]);
+    });
+
     it("reads only requested kinds for one host", async () => {
       await store.apply({
         upserts: [

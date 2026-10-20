@@ -1950,7 +1950,9 @@ export function createSessionAgentStreamReducerQueue(
           return next;
         });
       }
-      onCommitted?.(agentId);
+      if (result.changedTail || result.changedHead || result.cursorChanged) {
+        onCommitted?.(agentId);
+      }
     },
     handleSideEffects: (agentId, sideEffects) => {
       for (const effect of sideEffects) {

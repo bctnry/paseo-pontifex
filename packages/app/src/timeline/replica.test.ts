@@ -678,6 +678,38 @@ function createSqliteCache() {
   };
 }
 
+describe("timeline commit deduplication", () => {
+  it("skips an unchanged timeline and commits when the head grows", () => {
+    useSessionStore.getState().initializeSession(SERVER_ID, null);
+    const commits: CachedTimeline[] = [];
+    const storage: TimelineReplicaStorage = {
+      readTimeline: async () => undefined,
+      commitTimeline: (_serverId, _agentId, timeline) => {
+        commits.push(timeline);
+      },
+    };
+    const replica = createTimelineReplica({
+      serverId: SERVER_ID,
+      storage,
+      prepareAgent: async () => undefined,
+    });
+
+    applySynced(AGENT_ID, 4);
+    replica.timelineUpdated(AGENT_ID);
+    replica.timelineUpdated(AGENT_ID);
+
+    expect(commits).toHaveLength(1);
+
+    useSessionStore.getState().setAgentStreamState(SERVER_ID, AGENT_ID, {
+      head: [item("live", "live", 5)],
+    });
+    replica.timelineUpdated(AGENT_ID);
+
+    expect(commits).toHaveLength(2);
+    expect(commits[1]?.items.map((entry) => entry.id)).toEqual([`network-${AGENT_ID}`, "live"]);
+  });
+});
+
 describe("SQLite baseline restoration", () => {
   it.each([false, true])(
     "keeps display-only cached history under a live event (synced=%s)",

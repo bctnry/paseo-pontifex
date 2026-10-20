@@ -60,6 +60,29 @@ Done in this pass.
 - Boundary discovery still runs once per completed line, not per frame. A single
   long block still carries its full parse cost.
 
+### Replica cache budget and read path
+
+Done in this pass.
+
+- Row stores keep per-host row counts and UTF-8 payload byte totals beside the
+  rows (`row-store.web.ts`, `row-store-sqlite.ts`). The cache hydrates from
+  `readHostSummaries()` instead of `readAll()`, so the first write no longer
+  loads every cached payload. Schema version 2 initializes the summaries.
+- Cached reads persist only when an accepted change touches the requested rows.
+  An unrelated stream or host write no longer forces a write before a cache hit;
+  in-flight writes are tracked so a read still waits for a change it needs.
+- Directory baseline replacement deletes the host's directory kinds in the
+  store transaction (`replaceKinds`) instead of reading them into JS first.
+- `serializeTimeline()` slices to the 50-item window before mapping.
+- `TimelineReplicaOwner.timelineUpdated()` skips unchanged items/head/range
+  commits, and the reducer only calls `onCommitted` when the tail, head, or
+  cursor actually changed.
+- Byte accounting uses `TextEncoder` with a code-unit fallback.
+
+Verification: replica row-store contract tests cover summaries across apply,
+overwrite, delete, rename, and clear; the replica, timeline, directory-sync, and
+host-runtime suites pass.
+
 ## P0 — highest impact
 
 ### P0.1 Finish the bundle split: xterm, CodeMirror, route chunks
@@ -106,45 +129,7 @@ profiles before adopting.
 **Measure:** `npx expo export --platform web` chunk table; time from navigation
 to first terminal paint and first editor paint.
 
-### P0.2 Replica cache scans and rewrites more than it needs
-
-**Evidence**
-
-- `packages/app/src/runtime/replica-cache/index.ts:1028`: every cached read
-  awaits `syncPending()`.
-- `:1239-1251`: `persist()` clears the global debounce timer and calls
-  `ensureStoredIndex()`.
-- `:1559-1580`: `ensureStoredIndex()` calls `rowStore.readAll()` — every cached
-  row of every host.
-- `:798-819`: byte size is computed with a hand-written per-character UTF-8
-  loop.
-- `:756-783`: `serializeTimeline()` maps every loaded item, then slices to the
-  last 50.
-- `packages/app/src/timeline/viewed-timeline-sync.ts:143-150` spreads the whole
-  loaded tail plus head on every committed batch.
-- `packages/app/src/timeline/session-stream-reducers.ts:1953` calls
-  `onCommitted` after every flush, even when only the cursor changed.
-
-**Cost**
-
-A one-time main-thread stall after boot, plus O(loaded history) work while
-streaming. This contradicts the documented invariant that budget bookkeeping
-happens during a deferred write, never before a cached row paints.
-
-**Fix**
-
-- Persist per-host row count and byte total in the `meta` store; hydrate from
-  that and reserve `readAll()` for recovery.
-- Make reads wait only for pending changes matching the requested
-  `(serverId, kind, id)`; `hasPendingReadChanges` already exists.
-- Slice timeline items before serializing and skip unchanged commits.
-- Compute byte length with `TextEncoder` or a chunked path instead of a
-  per-character loop.
-
-**Impact/effort:** high / medium. **Measure:** time to first cached chat paint;
-long-task entries during boot; replica-cache write duration.
-
-### P0.3 Persistence validates and serializes whole stores on hot paths
+### P0.2 Persistence validates and serializes whole stores on hot paths
 
 **Evidence**
 
@@ -174,7 +159,7 @@ write is synchronous.
 (typing path), `profile-workspace-tabs.mjs` / `profile-workspace-switching.mjs`
 (layout path), long tasks during draft persistence.
 
-### P0.4 Desktop socket/pipe/SSH frames are base64-encoded as if binary
+### P0.3 Desktop socket/pipe/SSH frames are base64-encoded as if binary
 
 **Evidence**
 
@@ -485,8 +470,8 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 ## Suggested order
 
 1. Bundle follow-ups: CodeMirror, xterm, async routes; re-measure.
-2. Replica cache and persistence writes (P0.2, P0.3).
-3. Desktop transport and log tail (P0.4, P2.1).
+2. Persistence writes (P0.2).
+3. Desktop transport and log tail (P0.3, P2.1).
 4. Composer height and Explorer retention (P1.1, P1.2).
 5. Shell interaction and history revision work (P1.3, P1.4).
 6. Directory/git/reconnect amplification (P1.5).

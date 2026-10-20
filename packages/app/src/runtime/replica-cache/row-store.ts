@@ -12,14 +12,31 @@ export interface ReplicaRow extends ReplicaRowKey {
   payload: string;
 }
 
+export interface ReplicaRowKindReplacement {
+  serverId: string;
+  kinds: readonly ReplicaRowKind[];
+}
+
 export interface ReplicaRowChanges {
   upserts: ReplicaRow[];
   deletes: ReplicaRowKey[];
+  /**
+   * Replace every stored row of these kinds for the host before applying the
+   * upserts. Directory baseline replacement uses this instead of reading the
+   * host's current rows into JS just to compute deletes.
+   */
+  replaceKinds?: readonly ReplicaRowKindReplacement[];
 }
 
 export interface ReplicaHostRows {
   serverId: string;
   rows: ReplicaRow[];
+}
+
+export interface ReplicaHostSummary {
+  serverId: string;
+  rowCount: number;
+  bytes: number;
 }
 
 export interface ReplicaRowStore {
@@ -30,6 +47,8 @@ export interface ReplicaRowStore {
     ids?: readonly string[],
   ): Promise<ReplicaRow[]>;
   readAll(): Promise<ReplicaHostRows[]>;
+  /** Per-host row count and UTF-8 payload bytes, without loading row payloads. */
+  readHostSummaries(): Promise<ReplicaHostSummary[]>;
   apply(changes: ReplicaRowChanges): Promise<void>;
   deleteHost(serverId: string): Promise<void>;
   renameHost(oldServerId: string, newServerId: string): Promise<void>;
