@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { useMemo, useRef } from "react";
 import { collectAllPanes, type WorkspaceLayout } from "@/stores/workspace-layout-store";
 import type { WorkspaceTab } from "@/workspace-tabs/model";
 import { deriveWorkspacePaneState } from "./workspace-pane-state";
@@ -36,7 +36,11 @@ export function useVisibleAgentIds(input: {
   routeFocused: boolean;
   focusedPaneOnly: boolean;
 }): string[] {
-  const nextAgentIds = selectVisibleAgentIds(input);
+  const { layout, tabs, sheetTab, routeFocused, focusedPaneOnly } = input;
+  const nextAgentIds = useMemo(
+    () => selectVisibleAgentIds({ layout, tabs, sheetTab, routeFocused, focusedPaneOnly }),
+    [focusedPaneOnly, layout, routeFocused, sheetTab, tabs],
+  );
   const stableAgentIds = useRef<string[]>([]);
   if (
     stableAgentIds.current.length !== nextAgentIds.length ||

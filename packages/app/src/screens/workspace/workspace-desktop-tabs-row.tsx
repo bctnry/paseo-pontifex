@@ -1,14 +1,5 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
-import React, {
-  useCallback,
-  useEffect,
-  useLayoutEffect,
-  useMemo,
-  useRef,
-  useState,
-  type Dispatch,
-  type SetStateAction,
-} from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Pressable, Text, View, type LayoutChangeEvent } from "react-native";
 import {
   CopyX,
@@ -460,7 +451,6 @@ function tabKeyExtractor(tab: WorkspaceDesktopTabRowItem) {
 export interface WorkspaceDesktopTabRowItem {
   tab: WorkspaceTabDescriptor;
   isActive: boolean;
-  isCloseHovered: boolean;
   isClosingTab: boolean;
 }
 
@@ -480,14 +470,22 @@ interface WorkspaceTabLabelMeasurement {
 }
 
 interface WorkspaceTabTrackSnapshot {
-  signature: string;
   tabs: ResolvedWorkspaceDesktopTabRowItem[];
   labels: WorkspaceTabLabel[];
   labelWidths: number[];
 }
 
-function workspaceTabLabelSignature(labels: WorkspaceTabLabel[]): string {
-  return JSON.stringify(labels);
+function sameWorkspaceTabLabels(left: WorkspaceTabLabel[], right: WorkspaceTabLabel[]): boolean {
+  return (
+    left === right ||
+    (left.length === right.length &&
+      left.every(
+        (label, index) =>
+          label.key === right[index]?.key &&
+          label.label === right[index]?.label &&
+          label.modified === right[index]?.modified,
+      ))
+  );
 }
 
 function completeWorkspaceTabLabelWidths(
@@ -521,7 +519,6 @@ export interface WorkspaceDesktopTabsRowProps {
   tabs: WorkspaceDesktopTabRowItem[];
   normalizedServerId: string;
   normalizedWorkspaceId: string;
-  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
@@ -727,13 +724,11 @@ function TabChip({
   resolvedTabWidth,
   showLabel,
   showCloseButton,
-  isCloseHovered,
   isClosingTab,
   presentation,
   tooltipLabel,
   accessibilityLabel,
   resolvedTab,
-  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   dragHandleProps,
@@ -746,13 +741,11 @@ function TabChip({
   resolvedTabWidth: number;
   showLabel: boolean;
   showCloseButton: boolean;
-  isCloseHovered: boolean;
   isClosingTab: boolean;
   presentation: WorkspaceTabPresentation;
   tooltipLabel: string;
   accessibilityLabel: string;
   resolvedTab: WorkspaceDesktopTabActions;
-  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   dragHandleProps: DraggableListDragHandleProps | undefined;
@@ -764,6 +757,7 @@ function TabChip({
   );
   const isCompact = useIsCompactFormFactor();
   const [hovered, setHovered] = useState(false);
+  const [isCloseHovered, setIsCloseHovered] = useState(false);
   // An active tab in a pane that does not have focus stays legible but quiet: it keeps the fill of
   // a hovered chip and the muted label, so only one chip in the window reads as the live one.
   const isActiveFocused = isActive && isFocused;
@@ -818,12 +812,12 @@ function TabChip({
   }, []);
 
   const handleCloseButtonHoverIn = useCallback(() => {
-    setHoveredCloseTabKey(tab.key);
-  }, [setHoveredCloseTabKey, tab.key]);
+    setIsCloseHovered(true);
+  }, []);
 
   const handleCloseButtonHoverOut = useCallback(() => {
-    setHoveredCloseTabKey((current) => (current === tab.key ? null : current));
-  }, [setHoveredCloseTabKey, tab.key]);
+    setIsCloseHovered(false);
+  }, []);
 
   const handleCloseButtonPress = useCallback(
     (event: { stopPropagation?: () => void }) => {
@@ -1019,7 +1013,6 @@ function ResolvedWorkspaceDesktopTabsRow({
   tabs,
   normalizedServerId,
   normalizedWorkspaceId,
-  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   onCopyResumeCommand,
@@ -1129,7 +1122,6 @@ function ResolvedWorkspaceDesktopTabsRow({
       }),
     [fallbackTabLabels, tabs],
   );
-  const tabLabelSignature = useMemo(() => workspaceTabLabelSignature(tabLabels), [tabLabels]);
   const currentTabLabelKeys = useMemo(() => new Set(tabLabels.map(({ key }) => key)), [tabLabels]);
   useEffect(() => {
     setLabelMeasurements((current) => {
@@ -1155,19 +1147,19 @@ function ResolvedWorkspaceDesktopTabsRow({
 
     setTrackSnapshot((current) => {
       if (
-        current?.signature === tabLabelSignature &&
+        current &&
+        sameWorkspaceTabLabels(current.labels, tabLabels) &&
         sameWidths(current.labelWidths, labelWidths)
       ) {
         return current;
       }
       return {
-        signature: tabLabelSignature,
         tabs,
         labels: tabLabels,
         labelWidths,
       };
     });
-  }, [labelMeasurements, tabLabelSignature, tabLabels, tabs, tabsContainerWidth]);
+  }, [labelMeasurements, tabLabels, tabs, tabsContainerWidth]);
 
   useLayoutEffect(() => {
     publishMeasuredTrack();
@@ -1293,7 +1285,6 @@ function ResolvedWorkspaceDesktopTabsRow({
           resolvedTabWidth={resolvedTabWidth}
           showLabel={showLabel}
           showCloseButton={shouldShowCloseButton}
-          setHoveredCloseTabKey={setHoveredCloseTabKey}
           onNavigateTab={onNavigateTab}
           onCloseTab={onCloseTab}
           labels={tabMenuLabels}
@@ -1320,7 +1311,6 @@ function ResolvedWorkspaceDesktopTabsRow({
       onNavigateTab,
       onReloadAgent,
       onRenameTab,
-      setHoveredCloseTabKey,
       tabMenuLabels,
       tabDropPreviewIndex,
       displayedTabs.length,
@@ -1446,7 +1436,6 @@ function ResolvedDesktopTabChip({
   resolvedTabWidth,
   showLabel,
   showCloseButton,
-  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   labels,
@@ -1472,7 +1461,6 @@ function ResolvedDesktopTabChip({
   resolvedTabWidth: number;
   showLabel: boolean;
   showCloseButton: boolean;
-  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   labels: WorkspaceTabMenuLabels;
@@ -1543,13 +1531,11 @@ function ResolvedDesktopTabChip({
         resolvedTabWidth={resolvedTabWidth}
         showLabel={showLabel}
         showCloseButton={showCloseButton}
-        isCloseHovered={item.isCloseHovered}
         isClosingTab={item.isClosingTab}
         presentation={presentation}
         tooltipLabel={tooltipLabel}
         accessibilityLabel={accessibilityLabel}
         resolvedTab={resolvedTab}
-        setHoveredCloseTabKey={setHoveredCloseTabKey}
         onNavigateTab={onNavigateTab}
         onCloseTab={onCloseTab}
         dragHandleProps={dragHandleProps}

@@ -126,6 +126,23 @@ The static export was loaded in a browser: `/welcome` rendered, Settings and its
 sections loaded their route chunks, and neither xterm nor CodeMirror was
 requested until their surface opened.
 
+### Workspace shell pointer work
+
+Done in this pass.
+
+- Close-button hover is local to `TabChip`; the screen-level
+  `hoveredCloseTabKey` state and its prop plumbing through the split tree and
+  Explorer dock are gone. Hovering ✕ re-renders one chip.
+- Drag previews keep the latest resolved values in refs for drop handling and
+  commit shell state at most once per animation frame. Equal tab/pane previews
+  do not produce a new commit.
+- The tab-label track compares label arrays by value instead of
+  `JSON.stringify`.
+- `useVisibleAgentIds` memoizes its pane × tab derivation.
+
+The per-tab offscreen measurement `Text` nodes remain; they now re-render only
+when the tab set or labels change, not while the pointer moves or hovers.
+
 ## P0 — highest impact
 
 ### P0.1 Desktop socket/pipe/SSH frames are base64-encoded as if binary
@@ -186,25 +203,7 @@ Fix: keep the dock mounted and hide it like other retained panels, or skip
 initialization when `directories` already has entries; move the scrollbar thumb
 to a ref + rAF. **Measure:** `scripts/profile-explorer-toggle.mjs`.
 
-### P1.3 Workspace shell renders too much per pointer/hover event
-
-- `packages/app/src/components/split-container.tsx:495-550` sets a new drop
-  preview on every `onDragMove`/`onDragOver`; `:641-642` wires it.
-- `packages/app/src/screens/workspace/workspace-screen.tsx:1787` stores
-  `hoveredCloseTabKey` at screen level; entering/leaving the ✕ re-renders the
-  whole shell.
-- `packages/app/src/screens/workspace/workspace-desktop-tabs-row.tsx:1346-1360`
-  renders one hidden measurement `Text` per tab; `:1121-1132` builds a JSON
-  signature on changes.
-- `packages/app/src/screens/workspace/visible-agent-ids.ts:32-48` re-derives
-  panes × tabs every render.
-
-Fix: compare the resolved preview before `setState`, coalesce to one update per
-frame, keep close-hover local to `TabChip`, use one reusable offscreen label
-measurement, and `useMemo` the visible agent ids. React Compiler is enabled, but
-these state-identity changes still cross its memo boundaries.
-
-### P1.4 Live tool groups and history rows still do O(history) work per delta
+### P1.3 Live tool groups and history rows still do O(history) work per delta
 
 - `packages/app/src/tool-calls/detail-level/grouping.ts:213-226` copies the
   whole historical group map and creates a fresh update map while a live group
@@ -223,7 +222,7 @@ revision applied, key measurement on history identity, skip virtual-row
 measurement for live-head growth, and cache content width from a resize effect.
 **Measure:** `agent-stream/stream-tick.bench.ts` with a tool-heavy turn.
 
-### P1.5 Directory sync, git status, and reconnect amplify RPCs and writes
+### P1.4 Directory sync, git status, and reconnect amplify RPCs and writes
 
 - `packages/app/src/runtime/directory-sync/index.ts:486-493` loads and
   validates the cached directory before issuing the network fetch.
@@ -242,7 +241,7 @@ changed; debounce reconnect repair by offline duration; keep route→query-key
 mappings instead of scanning. **Measure:** RPC counts during boot/reconnect and
 while saving files.
 
-### P1.6 Startup waits on non-critical storage and parsing
+### P1.5 Startup waits on non-critical storage and parsing
 
 - `packages/app/src/runtime/host-runtime.ts:1637` awaits
   `projectIconCache.restore()` before `hostRegistryStatus = "ready"`.
@@ -262,7 +261,7 @@ plugins in an idle callback; probe the preferred connection first and defer
 fallbacks. **Measure:** time to splash resolution and time to first interactive
 workspace.
 
-### P1.7 Agent directory fanout rebuilds global indexes per event
+### P1.6 Agent directory fanout rebuilds global indexes per event
 
 - `packages/app/src/stores/session-store.ts:1501` rebuilds
   `workspaceAgentActivity` by scanning all agents on every `setAgents`.
@@ -440,7 +439,7 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 
 1. Desktop transport and log tail (P0.1, P2.1).
 2. Composer height and Explorer retention (P1.1, P1.2).
-3. Shell interaction and history revision work (P1.3, P1.4).
-4. Directory/git/reconnect amplification (P1.5).
-5. Startup gates and agent-directory fanout (P1.6, P1.7).
+3. History revision work (P1.3).
+4. Directory/git/reconnect amplification (P1.4).
+5. Startup gates and agent-directory fanout (P1.5, P1.6).
 6. Remaining P2 items as touch-time cleanup.

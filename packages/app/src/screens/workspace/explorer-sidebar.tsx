@@ -19,7 +19,6 @@ import { WindowChromeRegion, WindowChromeSafeArea } from "@/utils/desktop-window
 
 interface ExplorerSidebarDockProps extends Pick<
   WorkspaceDesktopTabsRowProps,
-  | "setHoveredCloseTabKey"
   | "onCopyResumeCommand"
   | "onCopyAgentId"
   | "onCopyTerminalId"
@@ -29,7 +28,6 @@ interface ExplorerSidebarDockProps extends Pick<
   | "onCreateNewTab"
   | "onExitFocusMode"
 > {
-  hoveredCloseTabKey: string | null;
   onCloseTabsToLeft: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
@@ -64,8 +62,6 @@ export function ExplorerSidebarDock({
   onSelectTab,
   onCloseTab,
   onCreateNewTab,
-  hoveredCloseTabKey,
-  setHoveredCloseTabKey,
   onCopyResumeCommand,
   onCopyAgentId,
   onCopyTerminalId,
@@ -88,10 +84,9 @@ export function ExplorerSidebarDock({
       tabs.map((tab) => ({
         tab,
         isActive: tab.tabId === activeTabId,
-        isCloseHovered: hoveredCloseTabKey === tab.key,
         isClosingTab: closingTabIds.has(tab.tabId),
       })),
-    [activeTabId, closingTabIds, hoveredCloseTabKey, tabs],
+    [activeTabId, closingTabIds, tabs],
   );
   const handleSelectTab = useCallback(
     (tabId: string) => onSelectTab(pane.id, tabId),
@@ -132,7 +127,6 @@ export function ExplorerSidebarDock({
                 launchPurpose="supporting"
                 isFocused={isWorkspaceFocused}
                 ownsKeyboardShortcuts={false}
-                setHoveredCloseTabKey={setHoveredCloseTabKey}
                 onCopyResumeCommand={onCopyResumeCommand}
                 onCopyAgentId={onCopyAgentId}
                 onCopyTerminalId={onCopyTerminalId}
