@@ -12,39 +12,39 @@ waste worth scheduling, **P2** = opportunistic cleanup.
 
 ## Completed
 
-### Initial bundle: Mermaid runtime + non-English locales
+### Initial bundle: Mermaid runtime
 
 Done in this pass.
 
 - Mermaid's runtime HTML is now a dynamic import
   (`packages/app/src/components/markdown/fence/mermaid/iframe-runtime.web.tsx`).
   Requests queue until the iframe reports `bridgeReady`.
-- `en` stays in the initial bundle; every other locale is a dynamic import
-  (`packages/app/src/i18n/i18next.ts`). `ensureI18nLanguageForRender` waits for
-  the bundle and ignores stale loads (`packages/app/src/i18n/sync-language.ts`).
-- Tests preload all dictionaries through `packages/app/vitest.i18n-setup.ts`.
+- The Mermaid runtime is a separate 3.58 MB chunk, fetched when a diagram mounts.
+
+A parallel async locale loader was prototyped on this branch, but the upstream
+sync brought `fc775b6 Load translations when their language is selected`. That
+implementation uses a synchronous `BackendModule` plus
+`partialBundledLanguages`: only the selected locale module is evaluated, while
+all locale modules remain in the main bundle for offline use. It preserves the
+provider contract (translations are ready before children render), so the async
+loader and its test setup were dropped during the merge.
 
 Measured with `npx expo export --platform web`:
 
-|                       |       Before |        After |
-| --------------------- | -----------: | -----------: |
-| Main JS               | 23,486,330 B | 18,571,913 B |
-| Main JS gzip          |  5,190,143 B |  3,965,270 B |
-| Initial scripts total |    ~23.49 MB |    ~18.60 MB |
+|                       |       Before |           After merge |
+| --------------------- | -----------: | --------------------: |
+| Main JS               | 23,486,330 B |          19,924,120 B |
+| Main JS gzip          |  5,190,143 B |           4,227,737 B |
+| Mermaid runtime chunk |      in main | 3,579,024 B on demand |
 
-New on-demand chunks:
+An intermediate branch build reached 18,571,913 B raw / 3,965,270 B gzip with
+async locale chunks. The merged result is larger because upstream keeps the
+locale modules bundled, but the Mermaid saving remains: about 3.56 MB raw /
+0.96 MB gzip off the startup path.
 
-- Mermaid runtime: 3.58 MB, fetched when a diagram mounts.
-- Locales: 91–310 KB each, fetched when selected.
-
-Caveat: a non-English user sees English until the locale chunk lands. If that
-flash matters, gate the provider on the selected locale or prefetch it during
-settings hydration.
-
-Verification: app typecheck, lint on changed files, and
-`npx vitest run --project unit src/i18n src/components/markdown/fence/mermaid`
-(76 tests) passed. Browser tests were not run because Playwright Chromium is not
-installed in this checkout.
+Verification: app and server typechecks, repo lint, repo format, relevant unit
+tests, and the web export passed. Browser tests were not run because Playwright
+Chromium is not installed in this checkout.
 
 ## P0 — highest impact
 
