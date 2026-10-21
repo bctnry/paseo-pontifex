@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo 로고">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo Pontifex 로고">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Paseo Pontifex</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -10,6 +10,8 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="README.ko.md">한국어</a>
 </p>
+
+<p align="center"><strong>속도와 사용하기 쉬운 UI에 초점을 맞춘 Paseo의 포크입니다.</strong></p>
 
 <p align="center">
   <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
@@ -36,7 +38,7 @@
   <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
 </p>
 
-내 컴퓨터에서 에이전트를 병렬로 실행하세요. 데스크톱이나 휴대폰에서 배포하세요.
+Paseo Pontifex는 속도와 사용하기 쉬운 UI에 초점을 맞춘 Paseo의 포크입니다. 내 컴퓨터에서 에이전트를 병렬로 실행하고, 데스크톱이나 휴대폰에서 작업을 이어가세요.
 
 - **셀프 호스팅:** 에이전트는 완전한 개발 환경이 갖춰진 내 컴퓨터에서 실행됩니다. 평소 쓰던 도구, 설정, 스킬을 그대로 쓸 수 있습니다.
 - **여러 제공자 지원:** Claude Code, Codex, Copilot, OpenCode, Pi를 하나의 인터페이스에서 사용할 수 있습니다. 작업마다 알맞은 모델을 고를 수 있습니다.

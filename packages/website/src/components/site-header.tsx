@@ -8,7 +8,7 @@ export function SiteHeader() {
   return (
     <header className="flex flex-col items-center gap-4 md:flex-row md:justify-between">
       <a href="/" className="flex items-center gap-3">
-        <img src="/logo.svg" alt="Paseo" className="w-6 h-6" />
+        <img src="/logo.svg" alt="Paseo" className="w-6 h-6 invert" />
         <span className="text-lg font-medium">Paseo</span>
       </a>
       <div className="flex flex-wrap items-center justify-center gap-4">

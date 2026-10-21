@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo Pontifex logo">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Paseo Pontifex</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -10,6 +10,8 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="README.ko.md">한국어</a>
 </p>
+
+<p align="center"><strong>Paseo 的分支，专注于速度与易用的界面。</strong></p>
 
 <p align="center">
   <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
@@ -38,7 +40,7 @@
 
 ---
 
-在你自己的机器上并行运行 agents。无论在手机上还是桌前，都能推进交付。
+Paseo Pontifex 是 Paseo 的分支，专注于更快的速度和更易用的界面。它在你自己的机器上并行运行 agents，无论在手机上还是桌前，都能推进交付。
 
 - **自托管：** Agents 在你的机器上运行，使用完整的本地开发环境、工具、配置和技能。
 - **多提供商：** 通过同一个界面使用 Claude Code、Codex、Copilot、OpenCode 和 Pi。为每个任务选择合适的模型。

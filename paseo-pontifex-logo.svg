@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="291.45" height="312.27" aria-labelledby="title" role="img" version="1.1" viewBox="0 0 291.45 312.27" xmlns="http://www.w3.org/2000/svg" xmlns:cc="http://creativecommons.org/ns#" xmlns:dc="http://purl.org/dc/elements/1.1/" xmlns:rdf="http://www.w3.org/1999/02/22-rdf-syntax-ns#">
+ <title id="title">Paseo</title>
+ <metadata>
+  <rdf:RDF>
+   <cc:Work rdf:about="">
+    <dc:title>Paseo</dc:title>
+   </cc:Work>
+  </rdf:RDF>
+ </metadata>
+ <path d="m229 0a62.454 62.454 0 0 1 62.453 62.453v83.271h-41.635v-83.271a20.818 20.818 0 0 0-20.818-20.818 20.818 20.818 0 0 0-20.818 20.818h-41.635a62.454 62.454 0 0 1 62.453-62.453zm-20.818 62.455 2e-3 249.81h-83.271l-41.637-41.635v-83.271l-83.271-83.271v-41.635zm-41.635 41.635h-83.271v24.391l17.244 17.244h41.637v41.637h-17.244v66.025l17.244 17.246h24.391z"/>
+</svg>

@@ -356,7 +356,7 @@ function DemoMessage({
     <div className="flex gap-3">
       <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-full border border-white/10 bg-white/[0.06]">
         {bot ? (
-          <img src="/logo.svg" alt="" className="h-4 w-4" />
+          <img src="/logo.svg" alt="" className="h-4 w-4 invert" />
         ) : (
           <span className="text-xs font-medium text-white/60">M</span>
         )}

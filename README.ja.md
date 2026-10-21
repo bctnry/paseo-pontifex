@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo Pontifex logo">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Paseo Pontifex</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -10,6 +10,8 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="README.ko.md">한국어</a>
 </p>
+
+<p align="center"><strong>速度と使いやすい UI に焦点を当てた Paseo のフォークです。</strong></p>
 
 <p align="center">
   <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
@@ -38,7 +40,7 @@
 
 ---
 
-自分のマシンでエージェントを並列実行。スマートフォンからでもデスクからでも、開発を進めてリリースできます。
+Paseo Pontifex は、速度と使いやすい UI に焦点を当てた Paseo のフォークです。自分のマシンでエージェントを並列実行し、スマートフォンからでもデスクからでも開発を進めてリリースできます。
 
 - **セルフホスト:** エージェントはあなたのマシン上で動作し、完全な開発環境を使用します。自分のツール・設定・スキルをそのまま活用できます。
 - **マルチプロバイダー:** Claude Code、Codex、Copilot、OpenCode、Pi を同一のインターフェースで利用。タスクに合ったモデルを選べます。

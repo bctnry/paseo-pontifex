@@ -1,8 +1,8 @@
 <p align="center">
-  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo logo">
+  <img src="packages/website/public/logo.svg" width="64" height="64" alt="Paseo Pontifex logo">
 </p>
 
-<h1 align="center">Paseo</h1>
+<h1 align="center">Paseo Pontifex</h1>
 
 <p align="center">
   <a href="README.md">English</a> ·
@@ -10,6 +10,8 @@
   <a href="README.ja.md">日本語</a> ·
   <a href="README.ko.md">한국어</a>
 </p>
+
+<p align="center"><strong>A fork of <a href="https://github.com/getpaseo/paseo">Paseo</a> focused on speed and easy-to-use UI.</strong></p>
 
 <p align="center">
   <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
@@ -36,7 +38,7 @@
   <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo mobile app" width="100%">
 </p>
 
-Paseo is an open source agentic development environment for desktop, mobile, web, and CLI. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.
+Paseo Pontifex is a fork of Paseo, the open source agentic development environment for desktop, mobile, web, and CLI. This fork keeps the upstream feature set and focuses on a faster, calmer client: less rendering work while agents stream, faster Explorer and file-panel interactions, startup and cache work moved off the critical path, and UI refinements that keep common actions in reach. Open the desktop app and work: agents, editor, terminals, diffs, pull requests, and a browser in one window. Run many agents at once, each in its own worktree, on one machine or several. The mobile app is the full app, native on iOS and Android.
 
 - **Parallel agents:** Run many agents at once, each in its own worktree.
 - **Built-in orchestration:** Agents in Paseo can create worktrees, launch other agents, and talk to them, across providers.
@@ -48,6 +50,15 @@ Paseo is an open source agentic development environment for desktop, mobile, web
 - **Privacy-first:** Paseo doesn't have any telemetry, tracking, or forced log-ins.
 
 [Run parallel tasks in Paseo](https://paseo.sh/docs/parallel-development): start agents in separate worktrees, review their diffs, run each app, and check it in the built-in browser.
+
+## About this fork
+
+Paseo Pontifex tracks [upstream Paseo](https://github.com/getpaseo/paseo) and adds focused work on top. The goal is not a different product: it is the same self-hosted, multi-provider workflow with a faster client and fewer rough edges.
+
+- Web and desktop work is tuned for streaming, Explorer interactions, file panels, and startup.
+- UI refinements keep common actions close and reduce visual noise.
+- Builds, branding, and release artifacts come from this fork.
+- Upstream docs describe the shared feature set. Report fork-specific issues here; upstream bugs belong in [getpaseo/paseo](https://github.com/getpaseo/paseo/issues).
 
 ## Sponsors
 
@@ -93,7 +104,7 @@ You need at least one agent CLI installed and configured with your credentials:
 
 ### Desktop app (recommended)
 
-Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/bctnry/paseo-pontifex/releases). Open the app and the daemon starts automatically. Nothing else to install.
+Download the fork build from the [GitHub releases page](https://github.com/bctnry/paseo-pontifex/releases). Upstream documentation and marketing live at [paseo.sh](https://paseo.sh). Open the app and the daemon starts automatically. Nothing else to install.
 
 To connect from your phone, open **Settings → your host → Pair Device**.
 
@@ -217,7 +228,7 @@ npm run typecheck
 
 ## Support Paseo
 
-Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown at the top of this README and on the paseo.sh homepage and docs.
+Upstream Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the upstream work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown at the top of this README and on the paseo.sh homepage and docs.
 
 ## Related projects
 
