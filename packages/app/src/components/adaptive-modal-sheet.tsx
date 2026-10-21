@@ -120,6 +120,7 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 0,
   },
   title: {
+    fontFamily: theme.fontFamily.ui,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.medium,
   },
@@ -165,6 +166,7 @@ const styles = StyleSheet.create((theme) => ({
   },
   inlineTitle: {
     flex: 1,
+    fontFamily: theme.fontFamily.ui,
     fontSize: theme.fontSize.base,
     fontWeight: theme.fontWeight.medium,
     color: theme.colors.foreground,

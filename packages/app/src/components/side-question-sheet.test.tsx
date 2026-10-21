@@ -9,6 +9,7 @@ import { SideQuestionSheet, type SideQuestionState } from "@/components/side-que
 const { theme } = vi.hoisted(() => ({
   theme: {
     spacing: { 2: 8 },
+    fontFamily: { ui: "Test UI" },
     fontSize: { base: 15, sm: 13 },
     colors: {
       foregroundMuted: "#aaa",

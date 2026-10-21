@@ -72,14 +72,17 @@ const styles = StyleSheet.create((theme) => ({
   },
   mutedText: {
     color: theme.colors.foregroundMuted,
+    fontFamily: theme.fontFamily.ui,
     fontSize: theme.fontSize.base,
   },
   questionText: {
     color: theme.colors.foreground,
+    fontFamily: theme.fontFamily.ui,
     fontSize: theme.fontSize.sm,
   },
   errorText: {
     color: theme.colors.palette.red[300],
+    fontFamily: theme.fontFamily.ui,
     fontSize: theme.fontSize.base,
   },
 }));
