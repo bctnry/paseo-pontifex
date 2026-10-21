@@ -26,7 +26,17 @@ export function SideQuestionSheet({
   onClose: () => void;
 }) {
   const { t } = useTranslation();
-  const header = useMemo(() => ({ title: "/btw", subtitle: state?.question }), [state?.question]);
+  const header = useMemo(
+    () => ({
+      title: "/btw",
+      subtitle: state?.question ? (
+        <Text style={styles.questionText} numberOfLines={2}>
+          {state.question}
+        </Text>
+      ) : undefined,
+    }),
+    [state?.question],
+  );
 
   let content = null;
   if (state?.loading) {
@@ -63,6 +73,10 @@ const styles = StyleSheet.create((theme) => ({
   mutedText: {
     color: theme.colors.foregroundMuted,
     fontSize: theme.fontSize.base,
+  },
+  questionText: {
+    color: theme.colors.foreground,
+    fontSize: theme.fontSize.sm,
   },
   errorText: {
     color: theme.colors.palette.red[300],
