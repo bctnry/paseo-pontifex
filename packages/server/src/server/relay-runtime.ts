@@ -27,7 +27,22 @@ interface RelayRuntimeOptions {
 export interface RelayRuntime {
   getConfig(): RelayRuntimeConfig;
   setEnabled(enabled: boolean): void;
+  setConfig(config: RelayRuntimeConfig): void;
   stop(): Promise<void>;
+}
+
+function relayTransportChanged(previous: RelayRuntimeConfig, next: RelayRuntimeConfig): boolean {
+  return previous.endpoint !== next.endpoint || previous.useTls !== next.useTls;
+}
+
+function relayConfigsEqual(left: RelayRuntimeConfig, right: RelayRuntimeConfig): boolean {
+  return (
+    left.enabled === right.enabled &&
+    left.endpoint === right.endpoint &&
+    left.publicEndpoint === right.publicEndpoint &&
+    left.useTls === right.useTls &&
+    left.publicUseTls === right.publicUseTls
+  );
 }
 
 export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
@@ -47,24 +62,51 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
     });
   }
 
-  function setEnabled(enabled: boolean): void {
-    if (config.enabled === enabled) return;
-    if (enabled) {
-      start();
-      config = { ...config, enabled: true };
-      return;
-    }
-    config = { ...config, enabled: false };
+  function stopTransport(): RelayTransportController | null {
     const current = transport;
     transport = null;
+    return current;
+  }
+
+  function stopInBackground(current: RelayTransportController | null): void {
     void current?.stop().catch((error) => {
       options.logger.warn({ err: error }, "Failed to stop relay transport");
     });
   }
 
+  function setConfig(next: RelayRuntimeConfig): void {
+    if (relayConfigsEqual(config, next)) return;
+
+    if (!next.enabled) {
+      config = next;
+      stopInBackground(stopTransport());
+      return;
+    }
+
+    const needsNewTransport = !transport || relayTransportChanged(config, next);
+    if (needsNewTransport) {
+      const previous = stopTransport();
+      stopInBackground(previous);
+      const previousConfig = config;
+      config = next;
+      try {
+        start();
+      } catch (error) {
+        config = { ...previousConfig, enabled: false };
+        throw error;
+      }
+      return;
+    }
+
+    config = next;
+  }
+
+  function setEnabled(enabled: boolean): void {
+    setConfig({ ...config, enabled });
+  }
+
   async function stop(): Promise<void> {
-    const current = transport;
-    transport = null;
+    const current = stopTransport();
     await current?.stop();
   }
 
@@ -73,6 +115,7 @@ export function createRelayRuntime(options: RelayRuntimeOptions): RelayRuntime {
   return {
     getConfig: () => config,
     setEnabled,
+    setConfig,
     stop,
   };
 }

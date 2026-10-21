@@ -61,4 +61,41 @@ describe("RelayRuntime", () => {
     expect(() => runtime.setEnabled(true)).toThrow("Invalid relay endpoint");
     expect(runtime.getConfig().enabled).toBe(false);
   });
+
+  test("restarts the transport when the endpoint changes", async () => {
+    const stops: Array<ReturnType<typeof vi.fn>> = [];
+    const starts: string[] = [];
+    const startTransport: typeof startRelayTransport = (options) => {
+      starts.push(options.relayEndpoint);
+      const stop = vi.fn(async () => undefined);
+      stops.push(stop);
+      return { stop } satisfies RelayTransportController;
+    };
+    const runtime = createRelayRuntime({
+      config: {
+        enabled: true,
+        endpoint: "relay.one.test:443",
+        publicEndpoint: "relay.one.test:443",
+        useTls: true,
+        publicUseTls: true,
+      },
+      logger: pino({ level: "silent" }),
+      attachSocket: async () => undefined,
+      serverId: "relay-runtime-test",
+      daemonKeyPair: generateKeyPair(),
+      startTransport,
+    });
+
+    runtime.setConfig({
+      enabled: true,
+      endpoint: "relay.two.test:443",
+      publicEndpoint: "relay.two.test:443",
+      useTls: true,
+      publicUseTls: true,
+    });
+
+    await vi.waitFor(() => expect(stops[0]).toHaveBeenCalledOnce());
+    expect(starts).toEqual(["relay.one.test:443", "relay.two.test:443"]);
+    expect(runtime.getConfig().endpoint).toBe("relay.two.test:443");
+  });
 });

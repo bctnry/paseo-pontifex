@@ -71,6 +71,38 @@ paseo daemon pair
 
 Confirm when prompted. Paseo prints a QR code and pairing link. Scan the QR code with Paseo on your phone, or choose **Paste pairing link** in the phone app.
 
+### Use a self-hosted relay
+
+The relay is a transport, not a Paseo account service. You can point a host at your own relay instead of the official one.
+
+1. Open **Settings → your host → Pair devices → Relay → Configure**.
+2. Select **Custom relay**.
+3. Enter the relay's internal `host:port`, its public `host:port` if clients reach it through a different address, and whether TLS is used.
+4. Save, then pair the device as usual.
+
+The same settings live in `config.json`:
+
+```json
+{
+  "daemon": {
+    "relay": {
+      "enabled": true,
+      "endpoint": "relay.example.com:443",
+      "publicEndpoint": "relay.example.com:443",
+      "useTls": true,
+      "publicUseTls": true
+    }
+  },
+  "app": {
+    "baseUrl": "https://paseo.example.com"
+  }
+}
+```
+
+`endpoint` is the address the daemon connects to. `publicEndpoint` is the address written into the pairing offer. `app.baseUrl` is the web app a pairing link opens; point it at a self-hosted web UI if you do not want the hosted one. The relay still sees only encrypted traffic and metadata, as described in [Security](/docs/security).
+
+Switching back to **Paseo relay** restores `relay.paseo.sh:443` and TLS. The official relay remains available as a preset.
+
 ## Tailscale
 
 Install [Tailscale](https://tailscale.com/download) on the daemon machine and your phone. Sign in to the same tailnet on both devices.

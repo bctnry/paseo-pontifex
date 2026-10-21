@@ -168,6 +168,10 @@ const MutableBrowserToolsConfigSchema = z
 const MutableRelayConfigSchema = z
   .object({
     enabled: z.boolean(),
+    endpoint: z.string().min(1).optional(),
+    publicEndpoint: z.string().min(1).optional(),
+    useTls: z.boolean().optional(),
+    publicUseTls: z.boolean().optional(),
   })
   .passthrough();
 
@@ -214,6 +218,7 @@ export const MutableDaemonConfigSchema = z
 export const MutableDaemonConfigPatchSchema = z
   .object({
     relay: MutableRelayConfigSchema.partial().optional(),
+    app: z.object({ baseUrl: z.string().min(1).optional() }).optional(),
     mcp: z.object({ injectIntoAgents: z.boolean().optional() }).passthrough().optional(),
     browserTools: MutableBrowserToolsConfigSchema.partial().optional(),
     providers: z
@@ -3645,6 +3650,8 @@ export const ServerInfoStatusPayloadSchema = z
         daemonConfigReload: z.boolean().optional(),
         // COMPAT(relayConfig): added in v0.2.6, remove gate after 2027-01-31.
         relayConfig: z.boolean().optional(),
+        // Relay endpoint, TLS, and pairing web URL are editable from the client.
+        relayEndpointConfig: z.boolean().optional(),
         // COMPAT(pushTokenRevocation): added in v0.3.2, remove gate after 2027-02-10.
         pushTokenRevocation: z.boolean().optional(),
         // COMPAT(plugins): added in v0.3.0, remove gate after 2027-08-07.

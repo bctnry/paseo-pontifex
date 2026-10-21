@@ -8,18 +8,31 @@ import { loadPersistedConfig } from "./persisted-config.js";
 import type { PersistedConfig } from "./persisted-config.js";
 import type { MutableDaemonConfig } from "@getpaseo/protocol/messages";
 
+function reloadableRelayConfig(
+  persisted: PersistedConfig,
+  options: { relayEnabledFallback?: boolean },
+): NonNullable<MutableDaemonConfig["relay"]> {
+  const relay = persisted.daemon?.relay ?? {};
+  const endpoint = relay.endpoint ?? "relay.paseo.sh:443";
+  const useTls = relay.useTls ?? true;
+  return {
+    enabled: relay.enabled ?? options.relayEnabledFallback ?? true,
+    endpoint,
+    publicEndpoint: relay.publicEndpoint ?? endpoint,
+    useTls,
+    publicUseTls: relay.publicUseTls ?? useTls,
+  };
+}
+
 function reloadableConfig(
   persisted: PersistedConfig,
   options: { relayEnabledFallback?: boolean } = {},
 ): MutableDaemonConfig {
   const daemon = persisted.daemon ?? {};
-  const relay = daemon.relay ?? {};
   const git = daemon.git ?? {};
   const agents = persisted.agents ?? {};
   return {
-    relay: {
-      enabled: relay.enabled ?? options.relayEnabledFallback ?? true,
-    },
+    relay: reloadableRelayConfig(persisted, options),
     mcp: { enabled: true, injectIntoAgents: false },
     browserTools: { enabled: daemon.browserTools?.enabled ?? false },
     providers: (agents.providers ?? {}) as MutableDaemonConfig["providers"],
@@ -118,6 +131,44 @@ describe("DaemonConfigStore", () => {
 
     expect(changes).toEqual([true]);
     expect(loadPersistedConfig(paseoHome).daemon?.relay?.enabled).toBe(true);
+  });
+
+  test("patch persists relay endpoint and pairing app url", () => {
+    const paseoHome = mkdtempSync(path.join(tmpdir(), "paseo-daemon-config-store-"));
+    tempDirs.push(paseoHome);
+    const store = new DaemonConfigStore(paseoHome, {
+      relay: { enabled: false },
+      mcp: { injectIntoAgents: false },
+      browserTools: { enabled: false },
+      providers: {},
+      metadataGeneration: { providers: [] },
+      autoArchiveAfterMerge: false,
+      enableTerminalAgentHooks: false,
+      appendSystemPrompt: "",
+    });
+    const relayChanges: unknown[] = [];
+    const appChanges: unknown[] = [];
+    store.onFieldChange("relay.endpoint", (value) => relayChanges.push(value));
+    store.onFieldChange("app.baseUrl", (value) => appChanges.push(value));
+
+    store.patch({
+      relay: {
+        endpoint: "relay.example.test:8443",
+        publicEndpoint: "relay.example.test:8443",
+        useTls: true,
+        publicUseTls: false,
+      },
+      app: { baseUrl: "https://paseo.example.test" },
+    });
+
+    expect(relayChanges).toEqual(["relay.example.test:8443"]);
+    expect(appChanges).toEqual(["https://paseo.example.test"]);
+    expect(store.get().relay?.endpoint).toBe("relay.example.test:8443");
+    expect(store.get().relay?.publicUseTls).toBe(false);
+    const persisted = loadPersistedConfig(paseoHome);
+    expect(persisted.daemon?.relay?.endpoint).toBe("relay.example.test:8443");
+    expect(persisted.daemon?.relay?.publicUseTls).toBe(false);
+    expect(persisted.app?.baseUrl).toBe("https://paseo.example.test");
   });
 
   test("patch round-trips agent profiles through the strictly-parsed persisted config", () => {
@@ -943,7 +994,14 @@ describe("DaemonConfigStore reload", () => {
         resolve: (nextPersisted) => {
           const mutable = reloadableConfig(nextPersisted, { relayEnabledFallback });
           if (options.overrideControlledPaths?.includes("daemon.relay.enabled")) {
-            mutable.relay = initialMutable.relay;
+            mutable.relay = { ...mutable.relay, enabled: initialMutable.relay?.enabled ?? false };
+          }
+          if (options.overrideControlledPaths?.includes("daemon.relay.endpoint")) {
+            mutable.relay = {
+              ...mutable.relay,
+              endpoint: initialMutable.relay?.endpoint,
+              publicEndpoint: initialMutable.relay?.publicEndpoint,
+            };
           }
           return {
             mutable,
@@ -1025,8 +1083,12 @@ describe("DaemonConfigStore reload", () => {
     });
 
     expect(store.reload()).toEqual({
-      appliedPaths: ["daemon.relay.enabled"],
-      restartRequiredPaths: ["daemon.relay.endpoint", "daemon.relay.useTls"],
+      appliedPaths: [
+        "daemon.relay.enabled",
+        "daemon.relay.endpoint",
+        "daemon.relay.publicEndpoint",
+      ],
+      restartRequiredPaths: [],
       overrideControlledPaths: [],
     });
   });
@@ -1053,11 +1115,13 @@ describe("DaemonConfigStore reload", () => {
     writeConfig(paseoHome, { version: 1 });
 
     expect(store.reload()).toEqual({
-      appliedPaths: ["daemon.browserTools.enabled"],
+      appliedPaths: [
+        "daemon.browserTools.enabled",
+        "daemon.relay.endpoint",
+        "daemon.relay.publicEndpoint",
+      ],
       restartRequiredPaths: [
         "daemon.listen",
-        "daemon.relay.endpoint",
-        "daemon.relay.useTls",
         "daemon.serviceProxy.listen",
         "daemon.serviceProxy.publicBaseUrl",
       ],
@@ -1066,7 +1130,7 @@ describe("DaemonConfigStore reload", () => {
     expect(store.get().relay?.enabled).toBe(false);
   });
 
-  test("keeps overridden leaves separate from restart-required siblings", () => {
+  test("keeps overridden leaves separate from applied siblings", () => {
     const { paseoHome, store } = createReloadableStore({
       initialPersisted: { version: 1 },
       overrideControlledPaths: ["daemon.relay.enabled"],
@@ -1079,8 +1143,8 @@ describe("DaemonConfigStore reload", () => {
     });
 
     expect(store.reload()).toEqual({
-      appliedPaths: [],
-      restartRequiredPaths: ["daemon.relay.endpoint"],
+      appliedPaths: ["daemon.relay.endpoint", "daemon.relay.publicEndpoint"],
+      restartRequiredPaths: [],
       overrideControlledPaths: ["daemon.relay.enabled"],
     });
   });

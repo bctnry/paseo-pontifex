@@ -17,7 +17,14 @@ type MutableDaemonConfigPatch = import("@getpaseo/protocol/messages").MutableDae
 type ProviderOverride = import("./agent/provider-launch-config.js").ProviderOverride;
 
 interface SupportedMutableConfigPatch {
-  relay?: { enabled?: boolean };
+  relay?: {
+    enabled?: boolean;
+    endpoint?: string;
+    publicEndpoint?: string;
+    useTls?: boolean;
+    publicUseTls?: boolean;
+  };
+  app?: { baseUrl?: string };
   mcp?: { injectIntoAgents?: boolean };
   browserTools?: { enabled?: boolean };
   providers?: MutableDaemonConfig["providers"];
@@ -170,6 +177,10 @@ function isEqualValue(a: unknown, b: unknown): boolean {
 
 const RELOADABLE_PATHS = [
   "daemon.relay.enabled",
+  "daemon.relay.endpoint",
+  "daemon.relay.publicEndpoint",
+  "daemon.relay.useTls",
+  "daemon.relay.publicUseTls",
   "daemon.mcp.enabled",
   "daemon.mcp.injectIntoAgents",
   "daemon.browserTools.enabled",
@@ -193,6 +204,10 @@ const RELOADABLE_PATHS = [
 
 const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["daemon.relay.enabled", "relay.enabled"],
+  ["daemon.relay.endpoint", "relay.endpoint"],
+  ["daemon.relay.publicEndpoint", "relay.publicEndpoint"],
+  ["daemon.relay.useTls", "relay.useTls"],
+  ["daemon.relay.publicUseTls", "relay.publicUseTls"],
   ["daemon.mcp.enabled", "mcp.enabled"],
   ["daemon.mcp.injectIntoAgents", "mcp.injectIntoAgents"],
   ["daemon.browserTools.enabled", "browserTools.enabled"],
@@ -249,34 +264,52 @@ function compactOwnedPaths(paths: readonly string[], owners: readonly string[]):
   return Array.from(compacted).sort();
 }
 
+function pickRelayAndAppPatch(
+  patch: MutableDaemonConfigPatch,
+): Pick<SupportedMutableConfigPatch, "relay" | "app"> {
+  const next: Pick<SupportedMutableConfigPatch, "relay" | "app"> = {};
+  if (patch.relay) {
+    const relay: NonNullable<SupportedMutableConfigPatch["relay"]> = {};
+    if (patch.relay.enabled !== undefined) relay.enabled = patch.relay.enabled;
+    if (patch.relay.endpoint !== undefined) relay.endpoint = patch.relay.endpoint;
+    if (patch.relay.publicEndpoint !== undefined) {
+      relay.publicEndpoint = patch.relay.publicEndpoint;
+    }
+    if (patch.relay.useTls !== undefined) relay.useTls = patch.relay.useTls;
+    if (patch.relay.publicUseTls !== undefined) {
+      relay.publicUseTls = patch.relay.publicUseTls;
+    }
+    if (Object.keys(relay).length > 0) next.relay = relay;
+  }
+  if (patch.app?.baseUrl !== undefined) next.app = { baseUrl: patch.app.baseUrl };
+  return next;
+}
+
 function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMutableConfigPatch {
-  return {
-    ...(patch.relay?.enabled !== undefined ? { relay: { enabled: patch.relay.enabled } } : {}),
-    ...(patch.mcp?.injectIntoAgents !== undefined
-      ? { mcp: { injectIntoAgents: patch.mcp.injectIntoAgents } }
-      : {}),
-    ...(patch.browserTools?.enabled !== undefined
-      ? { browserTools: { enabled: patch.browserTools.enabled } }
-      : {}),
-    ...(patch.providers !== undefined ? { providers: patch.providers } : {}),
-    ...(patch.removeProviders !== undefined ? { removeProviders: patch.removeProviders } : {}),
-    ...(patch.metadataGeneration?.providers !== undefined
-      ? { metadataGeneration: { providers: patch.metadataGeneration.providers } }
-      : {}),
-    ...(patch.autoArchiveAfterMerge !== undefined
-      ? { autoArchiveAfterMerge: patch.autoArchiveAfterMerge }
-      : {}),
-    ...(patch.enableTerminalAgentHooks !== undefined
-      ? { enableTerminalAgentHooks: patch.enableTerminalAgentHooks }
-      : {}),
-    ...(patch.appendSystemPrompt !== undefined
-      ? { appendSystemPrompt: patch.appendSystemPrompt }
-      : {}),
-    ...(patch.terminalProfiles !== undefined ? { terminalProfiles: patch.terminalProfiles } : {}),
-    ...(patch.agentProfiles !== undefined ? { agentProfiles: patch.agentProfiles } : {}),
-    ...(patch.pluginsEnabled !== undefined ? { pluginsEnabled: patch.pluginsEnabled } : {}),
-    ...(patch.plugins !== undefined ? { plugins: patch.plugins } : {}),
-  };
+  const next: SupportedMutableConfigPatch = pickRelayAndAppPatch(patch);
+  if (patch.mcp?.injectIntoAgents !== undefined) {
+    next.mcp = { injectIntoAgents: patch.mcp.injectIntoAgents };
+  }
+  if (patch.browserTools?.enabled !== undefined) {
+    next.browserTools = { enabled: patch.browserTools.enabled };
+  }
+  if (patch.providers !== undefined) next.providers = patch.providers;
+  if (patch.removeProviders !== undefined) next.removeProviders = patch.removeProviders;
+  if (patch.metadataGeneration?.providers !== undefined) {
+    next.metadataGeneration = { providers: patch.metadataGeneration.providers };
+  }
+  if (patch.autoArchiveAfterMerge !== undefined) {
+    next.autoArchiveAfterMerge = patch.autoArchiveAfterMerge;
+  }
+  if (patch.enableTerminalAgentHooks !== undefined) {
+    next.enableTerminalAgentHooks = patch.enableTerminalAgentHooks;
+  }
+  if (patch.appendSystemPrompt !== undefined) next.appendSystemPrompt = patch.appendSystemPrompt;
+  if (patch.terminalProfiles !== undefined) next.terminalProfiles = patch.terminalProfiles;
+  if (patch.agentProfiles !== undefined) next.agentProfiles = patch.agentProfiles;
+  if (patch.pluginsEnabled !== undefined) next.pluginsEnabled = patch.pluginsEnabled;
+  if (patch.plugins !== undefined) next.plugins = patch.plugins;
+  return next;
 }
 
 export function applyMutableProviderConfigToOverrides(
@@ -586,6 +619,9 @@ function mergeMutablePatchIntoPersistedConfig(params: {
   const agents = mergeMutableAgentPatch(persisted.agents, patch, removeProviders);
   return {
     ...persisted,
+    ...(patch.app?.baseUrl !== undefined
+      ? { app: { ...persisted.app, baseUrl: patch.app.baseUrl } }
+      : {}),
     ...(patch.pluginsEnabled !== undefined ? { pluginsEnabled: patch.pluginsEnabled } : {}),
     ...(patch.plugins !== undefined ? { plugins: patch.plugins } : {}),
     ...(daemon ? { daemon } : { daemon: undefined }),
@@ -637,15 +673,32 @@ function mergeMutableAgentPatch(
   return Object.keys(next).length > 0 ? (next as PersistedConfig["agents"]) : undefined;
 }
 
+function mergeRelayPatch(
+  relay: NonNullable<PersistedConfig["daemon"]>["relay"],
+  patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
+  persistRelayEnabled: boolean,
+): NonNullable<PersistedConfig["daemon"]>["relay"] {
+  const relayPatch = {
+    ...(persistRelayEnabled && patch.relay?.enabled !== undefined
+      ? { enabled: patch.relay.enabled }
+      : {}),
+    ...(patch.relay?.endpoint !== undefined ? { endpoint: patch.relay.endpoint } : {}),
+    ...(patch.relay?.publicEndpoint !== undefined
+      ? { publicEndpoint: patch.relay.publicEndpoint }
+      : {}),
+    ...(patch.relay?.useTls !== undefined ? { useTls: patch.relay.useTls } : {}),
+    ...(patch.relay?.publicUseTls !== undefined ? { publicUseTls: patch.relay.publicUseTls } : {}),
+  };
+  return Object.keys(relayPatch).length > 0 ? { ...relay, ...relayPatch } : relay;
+}
+
 function mergeMutableDaemonPatch(
   persistedDaemon: PersistedConfig["daemon"],
   patch: Omit<SupportedMutableConfigPatch, "removeProviders">,
   persistRelayEnabled: boolean,
 ): PersistedConfig["daemon"] {
   const next = { ...persistedDaemon } as NonNullable<PersistedConfig["daemon"]>;
-  if (persistRelayEnabled && patch.relay?.enabled !== undefined) {
-    next.relay = { ...next.relay, enabled: patch.relay.enabled };
-  }
+  next.relay = mergeRelayPatch(next.relay, patch, persistRelayEnabled);
   if (patch.mcp?.injectIntoAgents !== undefined) {
     next.mcp = { ...next.mcp, injectIntoAgents: patch.mcp.injectIntoAgents };
   }

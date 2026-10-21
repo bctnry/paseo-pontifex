@@ -235,6 +235,8 @@ Set the persisted value in `config.json`:
 
 `PASEO_RELAY_ENABLED=true|false` overrides the file for a foreground deployment. Managed `start` uses the file. End and relaunch a deployment to remove its override before changing relay from the app or `paseo daemon pair --relay`.
 
+The relay target is configurable too. `daemon.relay.endpoint` is the daemon-facing `host:port`, `daemon.relay.publicEndpoint` is what clients receive in the pairing offer, and `daemon.relay.useTls` / `publicUseTls` select TLS on each side. Edit them from **Settings → your host → Pair devices → Relay**, or in `config.json`. The official `relay.paseo.sh:443` remains the default preset.
+
 ## Common env vars
 
 - `PASEO_HOME`, set Paseo home directory

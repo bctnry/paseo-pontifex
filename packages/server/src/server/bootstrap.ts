@@ -171,7 +171,7 @@ import type { TerminalManager } from "../terminal/terminal-manager.js";
 import { createConfiguredTerminalManager } from "../terminal/terminal-manager-factory.js";
 import { applyTerminalAgentHookSetting } from "../terminal/agent-hooks/terminal-agent-hook-setting.js";
 import { loadOrCreateDaemonKeyPair } from "./daemon-keypair.js";
-import { createRelayRuntime, type RelayRuntime } from "./relay-runtime.js";
+import { createRelayRuntime, type RelayRuntime, type RelayRuntimeConfig } from "./relay-runtime.js";
 import type { PushNotificationSender } from "./push/index.js";
 import { getOrCreateServerId } from "./server-id.js";
 import { resolveDaemonVersion } from "./daemon-version.js";
@@ -538,11 +538,23 @@ function resolveExpressTrustProxySetting(config: PaseoDaemonConfig): true | stri
   return config.trustedProxies ?? ["loopback"];
 }
 
+function resolveInitialRelayConfig(config: PaseoDaemonConfig): MutableDaemonConfig["relay"] {
+  const endpoint = config.relayEndpoint ?? "relay.paseo.sh:443";
+  const useTls = config.relayUseTls ?? endpoint === "relay.paseo.sh:443";
+  return {
+    enabled: config.relayEnabled ?? true,
+    endpoint,
+    publicEndpoint: config.relayPublicEndpoint ?? endpoint,
+    useTls,
+    publicUseTls: config.relayPublicUseTls ?? useTls,
+  };
+}
+
 function createInitialMutableDaemonConfig(config: PaseoDaemonConfig): MutableDaemonConfig {
   const providers = config.providerOverrides ?? {};
 
   const initialConfig: MutableDaemonConfig = {
-    relay: { enabled: config.relayEnabled ?? true },
+    relay: resolveInitialRelayConfig(config),
     mcp: {
       enabled: config.mcpEnabled ?? true,
       injectIntoAgents: config.mcpInjectIntoAgents ?? true,
@@ -646,6 +658,19 @@ export async function createPaseoDaemon(
     logger.warn({ err: error }, "Failed to reconcile managed helper process ledger");
   });
   let relayRuntime: RelayRuntime | null = null;
+
+  const readRelayRuntimeConfig = (): RelayRuntimeConfig => {
+    const relay = daemonConfigStore.get().relay;
+    const endpoint = relay?.endpoint ?? "relay.paseo.sh:443";
+    const useTls = relay?.useTls ?? endpoint === "relay.paseo.sh:443";
+    return {
+      enabled: relay?.enabled ?? false,
+      endpoint,
+      publicEndpoint: relay?.publicEndpoint ?? endpoint,
+      useTls,
+      publicUseTls: relay?.publicUseTls ?? useTls,
+    };
+  };
 
   const staticDir = config.staticDir;
   const downloadTokenTtlMs = config.downloadTokenTtlMs ?? 60000;
@@ -1656,11 +1681,6 @@ export async function createPaseoDaemon(
             daemonConfigStore.onFieldChange("appendSystemPrompt", (value) => {
               agentManager.setAppendSystemPrompt(typeof value === "string" ? value : "");
             });
-            const relayEnabled = config.relayEnabled ?? true;
-            const relayEndpoint = config.relayEndpoint ?? "relay.paseo.sh:443";
-            const relayPublicEndpoint = config.relayPublicEndpoint ?? relayEndpoint;
-            const relayUseTls = config.relayUseTls ?? relayEndpoint === "relay.paseo.sh:443";
-            const relayPublicUseTls = config.relayPublicUseTls ?? relayUseTls;
             if (boundListenTarget.type === "tcp") {
               logger.info(
                 {
@@ -1738,14 +1758,7 @@ export async function createPaseoDaemon(
                   return appBaseUrl;
                 },
                 desktopManaged: config.desktopManaged === true,
-                getRelayConfig: () =>
-                  relayRuntime?.getConfig() ?? {
-                    enabled: daemonConfigStore.get().relay?.enabled ?? relayEnabled,
-                    endpoint: relayEndpoint,
-                    publicEndpoint: relayPublicEndpoint,
-                    useTls: relayUseTls,
-                    publicUseTls: relayPublicUseTls,
-                  },
+                getRelayConfig: () => relayRuntime?.getConfig() ?? readRelayRuntimeConfig(),
               },
               serviceProxyPublicBaseUrl,
               browserToolsBroker,
@@ -1760,13 +1773,7 @@ export async function createPaseoDaemon(
             providerSnapshotManager.settlePluginProviders();
             wsServer.beginAcceptingConnections();
             relayRuntime = createRelayRuntime({
-              config: {
-                enabled: relayEnabled,
-                endpoint: relayEndpoint,
-                publicEndpoint: relayPublicEndpoint,
-                useTls: relayUseTls,
-                publicUseTls: relayPublicUseTls,
-              },
+              config: readRelayRuntimeConfig(),
               logger,
               attachSocket: async (ws, metadata) => {
                 if (!wsServer) throw new Error("WebSocket server is not ready");
@@ -1775,9 +1782,17 @@ export async function createPaseoDaemon(
               serverId,
               daemonKeyPair: daemonKeyPair.keyPair,
             });
-            daemonConfigStore.onFieldChange("relay.enabled", (value) => {
-              relayRuntime?.setEnabled(value === true);
-            });
+            for (const field of [
+              "relay.enabled",
+              "relay.endpoint",
+              "relay.publicEndpoint",
+              "relay.useTls",
+              "relay.publicUseTls",
+            ]) {
+              daemonConfigStore.onFieldChange(field, () => {
+                relayRuntime?.setConfig(readRelayRuntimeConfig());
+              });
+            }
             await hubRelationships.start();
           };
 
