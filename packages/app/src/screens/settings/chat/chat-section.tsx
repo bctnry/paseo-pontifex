@@ -42,6 +42,10 @@ export function ChatSection() {
     (chatOutlineEnabled: boolean) => void updateSettings({ chatOutlineEnabled }),
     [updateSettings],
   );
+  const changeComposerEmacsKeybindings = useCallback(
+    (composerEmacsKeybindings: boolean) => void updateSettings({ composerEmacsKeybindings }),
+    [updateSettings],
+  );
   const markdownOutlinePositionOptions = useMemo(
     () =>
       (["left", "right"] as const).map((value) => ({
@@ -95,6 +99,15 @@ export function ChatSection() {
               hint={t("settings.appearance.chatOutline.description")}
               value={settings.chatOutlineEnabled}
               onValueChange={changeChatOutline}
+            />
+          )}
+          {isNative ? null : (
+            <SettingsSwitch
+              label={t("settings.general.composerEmacsKeybindings.label")}
+              hint={t("settings.general.composerEmacsKeybindings.description")}
+              value={settings.composerEmacsKeybindings}
+              onValueChange={changeComposerEmacsKeybindings}
+              testID="composer-emacs-keybindings"
             />
           )}
         </SettingsCard>

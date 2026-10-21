@@ -2278,6 +2278,11 @@ export const zhCN: TranslationResources = {
           detailed: "完整详情",
         },
       },
+      composerEmacsKeybindings: {
+        label: "输入框 Emacs 快捷键",
+        description:
+          "在消息输入框中使用 readline 快捷键：Ctrl+A 行首，Ctrl+E 行尾，Ctrl+K 删除到行尾，Ctrl+Y 粘贴。",
+      },
       language: {
         label: "语言",
         description: "应用语言",

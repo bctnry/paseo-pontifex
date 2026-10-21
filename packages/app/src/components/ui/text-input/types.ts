@@ -23,4 +23,6 @@ export interface EditingTextInputProps extends Omit<
   onPasteImages?: (files: readonly NativePastedFile[]) => void;
   onPasteError?: (message: string) => void;
   variant?: "default" | "bottom-sheet";
+  /** Web only: apply readline/Emacs bindings while this input is focused. */
+  emacsKeybindings?: boolean;
 }

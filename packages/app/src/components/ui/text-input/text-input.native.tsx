@@ -35,6 +35,7 @@ export const EditingTextInput = forwardRef<EditingTextInputHandle, EditingTextIn
       onPasteImages,
       onPasteError,
       variant = isInsideBottomSheet ? "bottom-sheet" : "default",
+      emacsKeybindings: _emacsKeybindings,
       value: _,
       defaultValue: __,
       ...props

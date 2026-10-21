@@ -2353,6 +2353,11 @@ export const fr: TranslationResources = {
           detailed: "Détails complets",
         },
       },
+      composerEmacsKeybindings: {
+        label: "Raccourcis Emacs dans le composeur",
+        description:
+          "Utilisez les raccourcis readline dans la zone de message : Ctrl+A début de ligne, Ctrl+E fin de ligne, Ctrl+K supprimer la ligne, Ctrl+Y coller.",
+      },
       language: {
         label: "Langue",
         description: "Langue de l’application",

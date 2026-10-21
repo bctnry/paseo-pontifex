@@ -2430,6 +2430,11 @@ export const en = {
           detailed: "Full detail",
         },
       },
+      composerEmacsKeybindings: {
+        label: "Emacs keybindings in composer",
+        description:
+          "Use readline shortcuts in the message box: Ctrl+A line start, Ctrl+E line end, Ctrl+K kill line, Ctrl+Y yank.",
+      },
       language: {
         label: "Language",
         description: "App language",

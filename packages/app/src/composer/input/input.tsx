@@ -60,6 +60,7 @@ import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
+import { useAppSettings } from "@/hooks/use-settings";
 import { RenderProfile } from "@/utils/render-profiler";
 import { useComposerHeight } from "./height";
 import { ComposerInputPresentation } from "./presentation";
@@ -643,6 +644,7 @@ interface ComposerTextSurfaceProps {
   focusHintVisible: boolean;
   focusInputKeys: ShortcutChord | null | undefined;
   focusHintLabel: string;
+  emacsKeybindings: boolean;
 }
 
 /**
@@ -707,6 +709,7 @@ function ComposerTextSurface(props: ComposerTextSurfaceProps): React.ReactElemen
         onPasteImages={props.onPasteImages}
         onPasteError={props.onPasteError}
         autoFocus={props.autoFocus}
+        emacsKeybindings={props.emacsKeybindings}
       />
       <FocusHint
         visible={props.focusHintVisible}
@@ -1244,6 +1247,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const { isPaneFocused } = useComposerKeyboardScope();
     const mode = resolveComposerInputMode(inputMode);
     const { t } = useTranslation();
+    const { settings } = useAppSettings();
     const isCompact = useIsCompactFormFactor();
     const { height: windowHeight } = useWindowDimensions();
     const editingSession = useComposerEditingSession(inputMode, props.editingSession);
@@ -2016,6 +2020,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             focusHintLabel={t("composer.input.focusHint", {
               shortcut: focusInputKeys ? formatShortcut(focusInputKeys[0], getShortcutOs()) : "",
             })}
+            emacsKeybindings={isWeb && settings.composerEmacsKeybindings}
           />
         </RenderProfile>
       ),
@@ -2045,6 +2050,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         isInputFocused,
         value,
         focusInputKeys,
+        settings.composerEmacsKeybindings,
       ],
     );
     const toolbar = useMemo(

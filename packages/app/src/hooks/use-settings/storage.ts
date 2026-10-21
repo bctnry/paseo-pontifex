@@ -117,6 +117,8 @@ export interface AppSettings {
   markdownOutlinePosition: MarkdownOutlinePosition;
   markdownOutlineDepth: number;
   editorKeybindings: EditorKeybindings;
+  /** Readline/Emacs navigation and editing keys in the chat composer (web/desktop). */
+  composerEmacsKeybindings: boolean;
   filePanelAssociations: Record<string, string>;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
@@ -178,6 +180,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   markdownOutlinePosition: "left",
   markdownOutlineDepth: DEFAULT_MARKDOWN_OUTLINE_DEPTH,
   editorKeybindings: "default",
+  composerEmacsKeybindings: false,
   filePanelAssociations: {},
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
@@ -289,6 +292,7 @@ const StoredAppSettingsSchema = z
       MAX_MARKDOWN_OUTLINE_DEPTH,
     ).catch(DEFAULT_MARKDOWN_OUTLINE_DEPTH),
     editorKeybindings: z.enum(["default", "vim", "emacs"]).optional().catch(undefined),
+    composerEmacsKeybindings: z.boolean().catch(false),
     // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
     vimKeybindings: z.boolean().optional().catch(undefined),
     filePanelAssociations: z.record(z.string(), z.string()).catch({}),

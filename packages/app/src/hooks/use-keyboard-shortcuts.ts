@@ -32,6 +32,7 @@ import { useKeyboardShortcutOverrides } from "@/hooks/use-keyboard-shortcut-over
 import { isNative } from "@/constants/platform";
 import { keyboardShortcutsAvailable } from "@/keyboard/availability";
 import { getDesktopHost, isElectronRuntime } from "@/desktop/host";
+import { isEmacsComposerKey } from "@/composer/emacs-keybindings";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import { buildOpenProjectRoute } from "@/utils/host-routes";
 import { hasActiveWebOverlay } from "@/lib/overlay-root";
@@ -328,6 +329,16 @@ export function useKeyboardShortcuts({
     // During IME composition, Enter confirms the candidate selection and must
     // not route through global shortcuts like message send.
     if (isImeComposingKeyboardEvent(event)) {
+      return;
+    }
+
+    // The composer's Emacs layer owns Ctrl/Alt navigation keys while it has
+    // focus. Otherwise Ctrl+K would kill a line and open the command center.
+    if (
+      isEmacsComposerKey(event) &&
+      event.target instanceof Element &&
+      event.target.closest("[data-emacs-keybindings='true']")
+    ) {
       return;
     }
 

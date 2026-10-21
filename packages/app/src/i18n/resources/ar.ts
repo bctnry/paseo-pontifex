@@ -2339,6 +2339,11 @@ export const ar: TranslationResources = {
           detailed: "التفاصيل الكاملة",
         },
       },
+      composerEmacsKeybindings: {
+        label: "اختصارات Emacs في مربع الرسالة",
+        description:
+          "استخدم اختصارات readline في مربع الرسالة: Ctrl+A لبداية السطر، Ctrl+E لنهاية السطر، Ctrl+K لحذف السطر، Ctrl+Y للصق.",
+      },
       language: {
         label: "لغة",
         description: "لغة التطبيق",

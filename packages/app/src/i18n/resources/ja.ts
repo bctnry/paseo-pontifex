@@ -2323,6 +2323,11 @@ export const ja: TranslationResources = {
           detailed: "すべての詳細",
         },
       },
+      composerEmacsKeybindings: {
+        label: "コンポーザーの Emacs キーバインド",
+        description:
+          "メッセージ欄で readline ショートカットを使います: Ctrl+A 行頭、Ctrl+E 行末、Ctrl+K 行削除、Ctrl+Y 貼り付け。",
+      },
       language: {
         label: "言語",
         description: "アプリの言語",

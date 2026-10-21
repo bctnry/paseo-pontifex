@@ -2356,6 +2356,11 @@ export const es: TranslationResources = {
           detailed: "Detalle completo",
         },
       },
+      composerEmacsKeybindings: {
+        label: "Atajos de Emacs en el compositor",
+        description:
+          "Usa atajos de readline en el cuadro de mensaje: Ctrl+A inicio de línea, Ctrl+E fin de línea, Ctrl+K borrar línea, Ctrl+Y pegar.",
+      },
       language: {
         label: "Idioma",
         description: "Idioma de la aplicación",

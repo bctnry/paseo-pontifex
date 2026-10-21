@@ -2314,6 +2314,11 @@ export const ko: TranslationResources = {
           detailed: "전체 세부정보",
         },
       },
+      composerEmacsKeybindings: {
+        label: "작성기에서 Emacs 키 바인딩",
+        description:
+          "메시지 상자에서 readline 단축키를 사용합니다: Ctrl+A 줄 시작, Ctrl+E 줄 끝, Ctrl+K 줄 삭제, Ctrl+Y 붙여넣기.",
+      },
       language: {
         label: "언어",
         description: "앱 언어",

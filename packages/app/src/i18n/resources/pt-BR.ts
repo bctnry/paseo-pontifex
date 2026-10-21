@@ -2338,6 +2338,11 @@ export const ptBR: TranslationResources = {
           detailed: "Detalhes completos",
         },
       },
+      composerEmacsKeybindings: {
+        label: "Atalhos do Emacs no compositor",
+        description:
+          "Use atalhos readline na caixa de mensagem: Ctrl+A início da linha, Ctrl+E fim da linha, Ctrl+K apagar linha, Ctrl+Y colar.",
+      },
       language: {
         label: "Idioma",
         description: "Idioma do app",

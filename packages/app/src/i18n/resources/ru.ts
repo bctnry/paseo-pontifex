@@ -2339,6 +2339,11 @@ export const ru: TranslationResources = {
           detailed: "Все подробности",
         },
       },
+      composerEmacsKeybindings: {
+        label: "Сочетания клавиш Emacs в композере",
+        description:
+          "Используйте сочетания readline в поле сообщения: Ctrl+A — начало строки, Ctrl+E — конец строки, Ctrl+K — удалить строку, Ctrl+Y — вставить.",
+      },
       language: {
         label: "Язык",
         description: "Язык приложения",
