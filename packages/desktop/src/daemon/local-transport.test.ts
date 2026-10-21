@@ -40,6 +40,34 @@ function createEndpoint(): TransportEndpoint & { close: ReturnType<typeof vi.fn>
   };
 }
 
+function createMessageSocket() {
+  let openListener: (() => void) | null = null;
+  let messageListener: ((data: unknown, isBinary: boolean) => void) | null = null;
+  const socket: TransportWebSocket = {
+    readyState: 1,
+    once(event, listener) {
+      if (event === "open") openListener = listener;
+    },
+    on(event, listener) {
+      if (event === "message") {
+        messageListener = listener as (data: unknown, isBinary: boolean) => void;
+      }
+    },
+    send: vi.fn(),
+    close: vi.fn(),
+    terminate: vi.fn(),
+  };
+  return {
+    socket,
+    open() {
+      openListener?.();
+    },
+    message(data: Buffer, isBinary: boolean) {
+      messageListener?.(data, isBinary);
+    },
+  };
+}
+
 interface ScheduledTimeout {
   callback: () => void;
   delayMs: number;
@@ -200,5 +228,46 @@ describe("local transport session lifecycle", () => {
     expect(endpoint.close).toHaveBeenCalledTimes(1);
     expect(createWebSocket).not.toHaveBeenCalled();
     expect(events).toEqual([]);
+  });
+
+  it("keeps Buffer text frames on the text path", async () => {
+    const harness = createMessageSocket();
+    const { events, manager } = createManagerHarness(
+      async () => createEndpoint(),
+      [harness.socket],
+    );
+
+    manager.open(SESSION_INPUT);
+    await Promise.resolve();
+    harness.open();
+    harness.message(Buffer.from('{"type":"ping"}'), false);
+
+    expect(events).toEqual([
+      { sessionId: SESSION_INPUT.sessionId, kind: "open" },
+      {
+        sessionId: SESSION_INPUT.sessionId,
+        kind: "message",
+        text: '{"type":"ping"}',
+      },
+    ]);
+  });
+
+  it("forwards binary frames as typed arrays instead of base64", async () => {
+    const harness = createMessageSocket();
+    const { events, manager } = createManagerHarness(
+      async () => createEndpoint(),
+      [harness.socket],
+    );
+
+    manager.open(SESSION_INPUT);
+    await Promise.resolve();
+    harness.open();
+    harness.message(Buffer.from([0, 255, 1]), true);
+
+    const message = events[1];
+    expect(message?.kind).toBe("message");
+    expect(message?.binary).toBeInstanceOf(Uint8Array);
+    expect([...(message?.binary ?? [])]).toEqual([0, 255, 1]);
+    expect(message?.text).toBeUndefined();
   });
 });

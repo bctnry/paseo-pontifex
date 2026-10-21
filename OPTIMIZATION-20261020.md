@@ -196,37 +196,19 @@ Done in this pass.
 The per-tab offscreen measurement `Text` nodes remain; they now re-render only
 when the tab set or labels change, not while the pointer moves or hovers.
 
-## P0 — highest impact
+### Desktop local transport frames
 
-### P0.1 Desktop socket/pipe/SSH frames are base64-encoded as if binary
+Done in this pass.
 
-**Evidence**
-
-- `packages/desktop/src/daemon/local-transport.ts:414` checks
-  `isBinary || data instanceof Buffer`. `ws` delivers text frames as a `Buffer`
-  with `isBinary === false`, so every text message on socket/pipe/SSH transports
-  takes the binary path.
-- `packages/app/src/desktop/daemon/desktop-daemon-transport.ts:15-31` builds
-  base64 with a per-byte character loop and decodes it per byte.
-- `packages/app/src/desktop/daemon/desktop-daemon-transport.ts:175-183` encodes
-  outbound binary frames the same way.
-
-**Cost**
-
-Every daemon message on those transports pays base64 encode + ~33% larger IPC
-payload + decode. Terminal output is the hot path. The default `directTcp`
-transport uses the renderer WebSocket and is unaffected.
-
-**Fix**
-
-- Branch on `isBinary` only; use `data.toString()` for text frames.
-- Pass `Uint8Array`/`ArrayBuffer` through IPC structured clone instead of
-  base64.
-- If base64 must stay, use `Uint8Array.prototype.toBase64` or chunked
-  `btoa` rather than a per-byte string loop.
-
-**Impact/effort:** high for affected transports / low. **Measure:** terminal echo
-latency over socket and SSH; IPC payload sizes.
+- The desktop transport branches on `isBinary` alone. `ws` text frames, which
+  arrive as `Buffer` with `isBinary === false`, take `data.toString()` instead
+  of base64 encoding.
+- Binary frames cross Electron IPC as `Uint8Array` in both directions. The
+  renderer sends the typed array through `invoke` and receives the same shape
+  from the event bridge; base64 encoding/decoding and its per-byte loops are
+  gone.
+- Tests cover both a text `Buffer` frame and a binary frame, plus text/binary
+  sends through the renderer transport.
 
 ## P1 — significant waste
 

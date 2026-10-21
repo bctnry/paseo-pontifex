@@ -70,6 +70,42 @@ describe("desktop-daemon-transport", () => {
     expect(rpc.closedSessions).toEqual([sessionId]);
   });
 
+  it("emits text and binary frames without a base64 round trip", async () => {
+    const rpc = createFakeLocalDaemonTransportRpc();
+    const transportFactory = createDesktopDaemonTransportFactory(rpc);
+    const transport = transportFactory!({ url: LOCAL_URL });
+    const onMessage = vi.fn();
+    transport.onMessage(onMessage);
+    rpc.resolveListen(vi.fn());
+    await Promise.resolve();
+
+    const sessionId = rpc.openCalls[0]?.sessionId ?? "";
+    rpc.emitEvent({ sessionId, kind: "open" });
+    rpc.emitEvent({ sessionId, kind: "message", text: '{"type":"ping"}' });
+    rpc.emitEvent({ sessionId, kind: "message", binary: new Uint8Array([0, 255, 1]) });
+
+    expect(onMessage).toHaveBeenNthCalledWith(1, '{"type":"ping"}', false);
+    expect(onMessage).toHaveBeenNthCalledWith(2, new Uint8Array([0, 255, 1]), true);
+  });
+
+  it("sends text and binary frames through the RPC as native values", async () => {
+    const rpc = createFakeLocalDaemonTransportRpc();
+    const transportFactory = createDesktopDaemonTransportFactory(rpc);
+    const transport = transportFactory!({ url: LOCAL_URL });
+    rpc.resolveListen(vi.fn());
+    await Promise.resolve();
+
+    const sessionId = rpc.openCalls[0]?.sessionId ?? "";
+    rpc.emitEvent({ sessionId, kind: "open" });
+    transport.send('{"type":"ping"}');
+    transport.send(new Uint8Array([0, 255, 1]));
+
+    expect(rpc.recordedSends).toEqual([
+      { sessionId, text: '{"type":"ping"}' },
+      { sessionId, binary: new Uint8Array([0, 255, 1]) },
+    ]);
+  });
+
   it("passes Remote SSH parameters to the desktop transport bridge", async () => {
     const rpc = createFakeLocalDaemonTransportRpc();
     const transportFactory = createDesktopDaemonTransportFactory(rpc);

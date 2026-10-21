@@ -439,7 +439,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
     open_local_daemon_transport: async (args) => await openLocalTransportSession(args),
     send_local_daemon_transport_message: async (args) => {
       await sendLocalTransportMessage(
-        args as { sessionId: string; text?: string; binaryBase64?: string },
+        args as { sessionId: string; text?: string; binary?: Uint8Array | ArrayBuffer },
       );
     },
     close_local_daemon_transport: (args) => {

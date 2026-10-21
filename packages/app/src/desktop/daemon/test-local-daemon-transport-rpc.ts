@@ -7,7 +7,7 @@ import type {
 export interface RecordedSend {
   sessionId: string;
   text?: string;
-  binaryBase64?: string;
+  binary?: Uint8Array | ArrayBuffer;
 }
 
 export interface FakeLocalDaemonTransportRpc extends LocalDaemonTransportRpc {

@@ -27,7 +27,7 @@ export interface TransportEventPayload {
   sessionId: string;
   kind: "open" | "message" | "close" | "error";
   text?: string | null;
-  binaryBase64?: string | null;
+  binary?: Uint8Array | null;
   code?: number | null;
   reason?: string | null;
   error?: string | null;
@@ -73,7 +73,11 @@ export interface LocalTransportManagerDependencies {
 
 export interface LocalTransportManager {
   open(rawInput: unknown): void;
-  send(input: { sessionId: string; text?: string; binaryBase64?: string }): Promise<void>;
+  send(input: {
+    sessionId: string;
+    text?: string;
+    binary?: Uint8Array | ArrayBuffer;
+  }): Promise<void>;
   close(sessionId: string): void;
   closeAll(): void;
 }
@@ -275,13 +279,20 @@ async function resolveTransportEndpoint(target: TransportTarget): Promise<Transp
   };
 }
 
-function decodeTransportMessage(input: { text?: string; binaryBase64?: string }): string | Buffer {
+function decodeTransportMessage(input: {
+  text?: string;
+  binary?: Uint8Array | ArrayBuffer;
+}): string | Buffer {
   if (typeof input.text === "string") {
     return input.text;
   }
 
-  if (typeof input.binaryBase64 === "string") {
-    return Buffer.from(input.binaryBase64, "base64");
+  if (input.binary instanceof ArrayBuffer) {
+    return Buffer.from(input.binary);
+  }
+
+  if (input.binary) {
+    return Buffer.from(input.binary.buffer, input.binary.byteOffset, input.binary.byteLength);
   }
 
   throw new Error("Local transport send requires text or binary payload.");
@@ -411,12 +422,14 @@ export function createLocalTransportManager(
       if (!isCurrent(session) || session.state !== "open") {
         return;
       }
-      if (isBinary || data instanceof Buffer) {
+      if (isBinary) {
         const buf = Buffer.isBuffer(data) ? data : Buffer.from(data as ArrayBuffer);
         emitEvent({
           sessionId: session.id,
           kind: "message",
-          binaryBase64: buf.toString("base64"),
+          // Electron's structured clone keeps typed arrays as bytes, avoiding a
+          // base64 expansion and a per-byte string loop in the renderer.
+          binary: new Uint8Array(buf.buffer, buf.byteOffset, buf.byteLength),
         });
         return;
       }
@@ -496,7 +509,7 @@ export function createLocalTransportManager(
   async function send(input: {
     sessionId: string;
     text?: string;
-    binaryBase64?: string;
+    binary?: Uint8Array | ArrayBuffer;
   }): Promise<void> {
     const session = sessions.get(input.sessionId);
     if (!session) {
@@ -558,7 +571,7 @@ export function openLocalTransportSession(rawInput: unknown): void {
 export async function sendLocalTransportMessage(input: {
   sessionId: string;
   text?: string;
-  binaryBase64?: string;
+  binary?: Uint8Array | ArrayBuffer;
 }): Promise<void> {
   await localTransportManager.send(input);
 }

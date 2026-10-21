@@ -10,7 +10,7 @@ export interface LocalDaemonTransportEvent {
   sessionId: string;
   kind: "open" | "message" | "close" | "error";
   text?: string | null;
-  binaryBase64?: string | null;
+  binary?: Uint8Array | null;
   code?: number | null;
   reason?: string | null;
   error?: string | null;
@@ -19,7 +19,11 @@ export interface LocalDaemonTransportEvent {
 export interface LocalDaemonTransportRpc {
   openSession(input: OpenLocalTransportSessionInput): Promise<void>;
   listenToEvents(handler: (event: LocalDaemonTransportEvent) => void): Promise<() => void>;
-  sendMessage(input: { sessionId: string; text?: string; binaryBase64?: string }): Promise<void>;
+  sendMessage(input: {
+    sessionId: string;
+    text?: string;
+    binary?: Uint8Array | ArrayBuffer;
+  }): Promise<void>;
   closeSession(sessionId: string): Promise<void>;
 }
 
