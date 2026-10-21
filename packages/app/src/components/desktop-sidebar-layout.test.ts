@@ -5,9 +5,17 @@ import {
   resolveDesktopAppContentMinimum,
   resolveDesktopSidebarVisibility,
   resolveDesktopSidebarWidth,
+  shouldShowSidebarTopStrip,
 } from "@/components/desktop-sidebar-layout";
 
 describe("desktop sidebar layout", () => {
+  it("shows the brand strip only for the frameless desktop shells", () => {
+    expect(shouldShowSidebarTopStrip("custom-linux")).toBe(true);
+    expect(shouldShowSidebarTopStrip("custom-windows")).toBe(true);
+    expect(shouldShowSidebarTopStrip("native-mac")).toBe(false);
+    expect(shouldShowSidebarTopStrip(null)).toBe(false);
+  });
+
   it("keeps a retained sidebar hidden while app chrome is suppressed", () => {
     expect(
       resolveDesktopSidebarVisibility({

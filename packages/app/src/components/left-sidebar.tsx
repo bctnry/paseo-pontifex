@@ -25,12 +25,16 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
+import { SidebarTopTextMark } from "@/components/icons/sidebar-top-text-mark";
 import {
   IconButtonChromeProvider,
   iconButtonChromeGlyphSize,
   mutedIconColorMapping,
 } from "@/components/ui/icon-button-chrome";
-import { resolveDesktopSidebarWidth } from "@/components/desktop-sidebar-layout";
+import {
+  resolveDesktopSidebarWidth,
+  shouldShowSidebarTopStrip,
+} from "@/components/desktop-sidebar-layout";
 import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
   SIDEBAR_RESIZE_FAIL_OFFSET,
@@ -47,6 +51,7 @@ import { SidebarSectionHeader } from "@/components/sidebar/sidebar-section-heade
 import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HEADER_INNER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
+import { getDesktopWindowChromeMode } from "@/desktop/host";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -682,6 +687,7 @@ function DesktopSidebar({
   active,
 }: DesktopSidebarProps) {
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
+  const showTopStrip = shouldShowSidebarTopStrip(getDesktopWindowChromeMode());
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const sidebarWidth = usePanelStore((state) => state.sidebarWidth);
   const setSidebarWidth = usePanelStore((state) => state.setSidebarWidth);
@@ -765,8 +771,46 @@ function DesktopSidebar({
     [insetsTop],
   );
   const sidebarHeaderGroupStyle = useMemo(
-    () => [styles.sidebarHeaderGroup, ownsTopLeft && styles.sidebarHeaderGroupBelowChrome],
-    [ownsTopLeft],
+    () => [
+      styles.sidebarHeaderGroup,
+      (ownsTopLeft || showTopStrip) && styles.sidebarHeaderGroupBelowChrome,
+    ],
+    [ownsTopLeft, showTopStrip],
+  );
+  const sidebarChromeRow = useMemo(() => {
+    if (showTopStrip) {
+      return (
+        <View style={styles.sidebarTopStrip} testID="sidebar-top-strip">
+          <SidebarTopTextMark />
+          <TitlebarDragRegion />
+        </View>
+      );
+    }
+    if (ownsTopLeft) {
+      return (
+        <View style={styles.desktopChromeRow}>
+          <TitlebarDragRegion />
+        </View>
+      );
+    }
+    return <TitlebarDragRegion />;
+  }, [ownsTopLeft, showTopStrip]);
+  const devBuildBadge = useMemo(
+    () =>
+      DEV_BUILD_LABEL ? (
+        <View
+          pointerEvents="none"
+          style={styles.devBuildBadge}
+          testID="dev-build-label"
+          accessibilityLabel={`Development build: ${DEV_BUILD_LABEL}`}
+        >
+          <GitBranch size={12} color={theme.colors.accentForeground} />
+          <Text numberOfLines={1} ellipsizeMode="tail" style={styles.devBuildBadgeText}>
+            {DEV_BUILD_LABEL}
+          </Text>
+        </View>
+      ) : undefined,
+    [theme.colors.accentForeground],
   );
   return (
     <Animated.View
@@ -777,27 +821,8 @@ function DesktopSidebar({
     >
       <View style={desktopSidebarBorderStyle}>
         <View style={styles.sidebarDragArea}>
-          {ownsTopLeft || DEV_BUILD_LABEL ? (
-            <View style={styles.desktopChromeRow}>
-              <TitlebarDragRegion />
-              {DEV_BUILD_LABEL ? (
-                <View
-                  pointerEvents="none"
-                  style={styles.devBuildBadge}
-                  testID="dev-build-label"
-                  accessibilityLabel={`Development build: ${DEV_BUILD_LABEL}`}
-                >
-                  <GitBranch size={12} color={theme.colors.accentForeground} />
-                  <Text numberOfLines={1} ellipsizeMode="tail" style={styles.devBuildBadgeText}>
-                    {DEV_BUILD_LABEL}
-                  </Text>
-                </View>
-              ) : null}
-            </View>
-          ) : (
-            <TitlebarDragRegion />
-          )}
-          <SidebarNavRows style={sidebarHeaderGroupStyle} />
+          {sidebarChromeRow}
+          <SidebarNavRows style={sidebarHeaderGroupStyle} firstRowTrailing={devBuildBadge} />
         </View>
 
         {isInitialLoad && !hasActiveHostFilter ? (
@@ -960,6 +985,15 @@ const styles = StyleSheet.create((theme) => ({
   sidebarDragArea: {
     position: "relative",
   },
+  sidebarTopStrip: {
+    height: HEADER_INNER_HEIGHT,
+    alignItems: "center",
+    justifyContent: "center",
+    paddingHorizontal: theme.spacing[3],
+    paddingVertical: theme.spacing[1],
+    backgroundColor: "#ff7f00",
+    userSelect: "none",
+  },
   desktopChromeRow: {
     position: "relative",
     height: HEADER_INNER_HEIGHT,
@@ -975,6 +1009,7 @@ const styles = StyleSheet.create((theme) => ({
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[1],
+    marginLeft: theme.spacing[2],
     paddingHorizontal: theme.spacing[2],
     paddingVertical: 2,
     borderRadius: theme.borderRadius.none,

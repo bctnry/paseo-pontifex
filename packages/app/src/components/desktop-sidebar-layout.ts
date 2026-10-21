@@ -1,5 +1,6 @@
 import { EXPLORER_WORKSPACE_MIN_WIDTH } from "@/components/explorer-sidebar-layout";
 import { SETTINGS_DESKTOP_SPLIT_MIN_WIDTH } from "@/constants/layout";
+import type { DesktopWindowChromeMode } from "@/desktop/host";
 import { MAX_SIDEBAR_WIDTH, MIN_SIDEBAR_WIDTH } from "@/stores/panel-store";
 
 const MIN_DESKTOP_CENTER_WIDTH = 400;
@@ -18,6 +19,11 @@ export function resolveDesktopSidebarVisibility(input: {
     input.isOpen &&
     input.canShare
   );
+}
+
+/** Only the frameless desktop shells need the sidebar strip to stand in for the title bar. */
+export function shouldShowSidebarTopStrip(mode: DesktopWindowChromeMode | null): boolean {
+  return mode === "custom-windows" || mode === "custom-linux";
 }
 
 export function resolveDesktopAppChromeLayout(input: {
