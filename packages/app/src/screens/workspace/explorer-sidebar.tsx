@@ -1,9 +1,9 @@
 import { useCallback, useMemo, type ReactNode } from "react";
 import { View } from "react-native";
+import { useWorkspaceTabDrag } from "@/components/workspace-tab-drag-context";
 import { StyleSheet } from "react-native-unistyles";
 import { RetainedPanel } from "@/components/retained-panel";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
-import type { TabDropPreview } from "@/components/split-container-tab-drop-preview";
 import { WorkspacePanelHost } from "@/screens/workspace/workspace-panel-host";
 import { deriveWorkspacePaneState } from "@/screens/workspace/workspace-pane-state";
 import {
@@ -31,15 +31,12 @@ interface ExplorerSidebarDockProps extends Pick<
   onCloseTabsToLeft: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
-  active: boolean;
   pane: SplitPane;
   uiTabs: WorkspaceTab[];
   normalizedServerId: string;
   normalizedWorkspaceId: string;
   isWorkspaceFocused: boolean;
   closingTabIds: Set<string>;
-  activeDragTabId: string | null;
-  tabDropPreview: TabDropPreview | null;
   onSelectTab: (paneId: string, tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onReorderTabsInPane: (paneId: string, tabIds: string[]) => void;
@@ -52,15 +49,12 @@ interface ExplorerSidebarDockProps extends Pick<
 
 /** A dock shell over the shared panel host. It owns no workspace-pane capabilities. */
 export function ExplorerSidebarDock({
-  active,
   pane,
   uiTabs,
   normalizedServerId,
   normalizedWorkspaceId,
   isWorkspaceFocused,
   closingTabIds,
-  activeDragTabId,
-  tabDropPreview,
   onSelectTab,
   onCloseTab,
   onCreateNewTab,
@@ -78,6 +72,7 @@ export function ExplorerSidebarDock({
   buildPaneContentModel,
   headerAction,
 }: ExplorerSidebarDockProps) {
+  const { activeDragTabId, tabDropPreview, externalDndContext } = useWorkspaceTabDrag();
   const paneState = useMemo(() => deriveWorkspacePaneState({ pane, tabs: uiTabs }), [pane, uiTabs]);
   const tabs = useMemo(() => paneState.tabs.map((tab) => tab.descriptor), [paneState.tabs]);
   const activeTabId = paneState.activeTabId;
@@ -118,7 +113,7 @@ export function ExplorerSidebarDock({
   );
 
   return (
-    <RetainedPanel active={active}>
+    <RetainedPanel active>
       <WindowChromeRegion corners="top-right">
         <View style={styles.dock} testID="workspace-explorer-sidebar">
           <WindowChromeSafeArea placement="inline" style={styles.tabRail}>
@@ -127,7 +122,7 @@ export function ExplorerSidebarDock({
               <WorkspaceDesktopTabsRow
                 host="explorer"
                 launchPurpose="supporting"
-                isFocused={isWorkspaceFocused && active}
+                isFocused={isWorkspaceFocused}
                 ownsKeyboardShortcuts={false}
                 onCopyResumeCommand={onCopyResumeCommand}
                 onCopyAgentId={onCopyAgentId}
@@ -140,7 +135,7 @@ export function ExplorerSidebarDock({
                 onCloseOtherTabs={handleCloseOtherTabs}
                 focusModeEnabled={false}
                 onExitFocusMode={onExitFocusMode}
-                externalDndContext
+                externalDndContext={externalDndContext}
                 paneId={pane.id}
                 tabs={tabItems}
                 normalizedServerId={normalizedServerId}
@@ -165,8 +160,8 @@ export function ExplorerSidebarDock({
               activeTabId={activeTabId}
               normalizedServerId={normalizedServerId}
               normalizedWorkspaceId={normalizedWorkspaceId}
-              isWorkspaceFocused={isWorkspaceFocused && active}
-              isPaneFocused={active}
+              isWorkspaceFocused={isWorkspaceFocused}
+              isPaneFocused
               buildPaneContentModel={buildPaneContentModel}
             />
           </View>

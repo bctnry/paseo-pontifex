@@ -1,4 +1,9 @@
 import { MarkdownRenderer } from "@/components/markdown/renderer";
+import { resolveMarkdownFileDirectory } from "@/components/markdown/image-source";
+import {
+  AssistantFileLinkResolverProvider,
+  useAssistantFileLinkEnvironment,
+} from "@/assistant-file-links";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import { useCallback, useMemo, useRef, useState } from "react";
 import { ScrollView, Text, View, type LayoutChangeEvent } from "react-native";
@@ -30,6 +35,8 @@ export function FileMarkdownPreview({
 }) {
   const { settings } = useAppSettings();
   const document = useMemo(() => parseMarkdownPreviewDocument(source), [source]);
+  const environment = useAssistantFileLinkEnvironment();
+  const relativePathBase = resolveMarkdownFileDirectory({ markdownPath: filePath, workspaceRoot });
   const outline = useMemo(() => {
     if (!settings.markdownOutlineEnabled) {
       return {
@@ -95,17 +102,22 @@ export function FileMarkdownPreview({
               {document.frontMatter.length > 0 ? (
                 <FrontMatterTable rows={document.frontMatter} />
               ) : null}
-              {outline.sections.map((section) => (
-                <MarkdownSection
-                  key={section.id}
-                  section={section}
-                  filePath={filePath}
-                  workspaceRoot={workspaceRoot}
-                  client={client}
-                  serverId={serverId}
-                  onLayout={handleSectionLayout}
-                />
-              ))}
+              <AssistantFileLinkResolverProvider
+                {...environment}
+                relativePathBase={relativePathBase ?? undefined}
+              >
+                {outline.sections.map((section) => (
+                  <MarkdownSection
+                    key={section.id}
+                    section={section}
+                    filePath={filePath}
+                    workspaceRoot={workspaceRoot}
+                    client={client}
+                    serverId={serverId}
+                    onLayout={handleSectionLayout}
+                  />
+                ))}
+              </AssistantFileLinkResolverProvider>
             </View>
           </View>
         </ScrollView>
