@@ -6042,6 +6042,61 @@ test("lists commands with explicit requestId via RPC", async () => {
   });
 });
 
+test("asks a side question via RPC", async () => {
+  const logger = createMockLogger();
+  const mock = createMockTransport();
+
+  const client = new DaemonClient({
+    url: "ws://test",
+    clientId: "clsk_unit_test",
+    logger,
+    reconnect: { enabled: false },
+    transportFactory: () => mock.transport,
+  });
+  clients.push(client);
+
+  const connectPromise = client.connect();
+  mock.triggerOpen();
+  await connectPromise;
+
+  const promise = client.askSideQuestion({
+    agentId: "agent-1",
+    question: "what changed?",
+    requestId: "req-side-question",
+  });
+  expect(mock.sent).toHaveLength(1);
+
+  const request = parseSentFrame(mock.sent[0]);
+  expect(request).toMatchObject({
+    type: "agent.side_question.request",
+    agentId: "agent-1",
+    question: "what changed?",
+    requestId: "req-side-question",
+  });
+
+  mock.triggerMessage(
+    JSON.stringify({
+      type: "session",
+      message: {
+        type: "agent.side_question.response",
+        payload: {
+          agentId: "agent-1",
+          answer: "The tests pass.",
+          error: null,
+          requestId: "req-side-question",
+        },
+      },
+    }),
+  );
+
+  await expect(promise).resolves.toEqual({
+    agentId: "agent-1",
+    answer: "The tests pass.",
+    error: null,
+    requestId: "req-side-question",
+  });
+});
+
 test("preserves legacy listCommands id overload", async () => {
   const logger = createMockLogger();
   const mock = createMockTransport();

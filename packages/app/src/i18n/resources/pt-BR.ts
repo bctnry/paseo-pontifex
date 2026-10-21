@@ -189,6 +189,14 @@ export const ptBR: TranslationResources = {
     clientCommands: {
       archiveAgent: "Arquivar o agente atual",
       freshDraft: "Arquivar este agente e iniciar um novo rascunho",
+      sideQuestion: "Fazer uma pergunta paralela sem adicioná-la à conversa",
+    },
+    sideQuestion: {
+      loading: "Perguntando…",
+      empty: "Adicione uma pergunta após /btw",
+      emptyAnswer: "O agente retornou uma resposta vazia",
+      attachmentsUnsupported: "Remova os anexos antes de fazer uma pergunta paralela",
+      unsupported: "Este host não oferece suporte a perguntas paralelas. Atualize o host.",
     },
     github: {
       searching: "Buscando...",

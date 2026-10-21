@@ -707,6 +707,7 @@ describe("ClaudeAgentSession features", () => {
       applyFlagSettings: vi.fn(async () => undefined),
       setModel: vi.fn(async () => undefined),
       getContextUsage: vi.fn(async () => undefined),
+      askSideQuestion: vi.fn(async (question: string) => ({ response: `answer:${question}` })),
       [Symbol.asyncIterator](): AsyncIterator<SDKMessage, void> {
         return {
           next: async () => {
@@ -723,6 +724,25 @@ describe("ClaudeAgentSession features", () => {
     });
     return { queryFactory, queryMock, launches };
   }
+
+  test("asks a side question through the active SDK query", async () => {
+    const { queryFactory, queryMock } = createQueryMock();
+    const session = await new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    }).createSession({ provider: "claude", cwd: process.cwd(), modeId: "default" });
+    try {
+      await expect(session.askSideQuestion?.("what changed?")).resolves.toBe(
+        "answer:what changed?",
+      );
+      expect(queryMock.askSideQuestion).toHaveBeenCalledWith("what changed?", {
+        signal: undefined,
+      });
+    } finally {
+      await session.close();
+    }
+  });
 
   test("publishes a resolution when the SDK aborts a permission callback", async () => {
     const { queryFactory } = createQueryMock();

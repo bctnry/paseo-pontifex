@@ -10,4 +10,5 @@ export const V2_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindBoth: true,
   supportsRewindConversation: false,
   supportsRewindFiles: false,
+  supportsSideQuestions: true,
 };

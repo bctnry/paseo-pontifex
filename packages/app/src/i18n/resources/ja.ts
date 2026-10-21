@@ -190,6 +190,14 @@ export const ja: TranslationResources = {
     clientCommands: {
       archiveAgent: "現在のエージェントをアーカイブ",
       freshDraft: "このエージェントをアーカイブして新しい下書きを開始",
+      sideQuestion: "会話に追加せずに補足の質問をする",
+    },
+    sideQuestion: {
+      loading: "質問中…",
+      empty: "/btw の後に質問を入力してください",
+      emptyAnswer: "エージェントが空の回答を返しました",
+      attachmentsUnsupported: "補足の質問をする前に添付ファイルを外してください",
+      unsupported: "このホストは補足の質問に対応していません。ホストを更新してください。",
     },
     github: {
       searching: "検索中...",

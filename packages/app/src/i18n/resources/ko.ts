@@ -188,6 +188,14 @@ export const ko: TranslationResources = {
     clientCommands: {
       archiveAgent: "현재 에이전트 보관",
       freshDraft: "이 에이전트를 보관하고 새 초안을 시작합니다",
+      sideQuestion: "대화에 추가하지 않고 곁가지 질문을 합니다",
+    },
+    sideQuestion: {
+      loading: "질문 중…",
+      empty: "/btw 뒤에 질문을 입력하세요",
+      emptyAnswer: "에이전트가 빈 답변을 반환했습니다",
+      attachmentsUnsupported: "곁가지 질문을 하기 전에 첨부 파일을 제거하세요",
+      unsupported: "이 호스트는 곁가지 질문을 지원하지 않습니다. 호스트를 업데이트하세요.",
     },
     github: {
       searching: "검색 중...",

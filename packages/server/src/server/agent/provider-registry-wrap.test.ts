@@ -23,6 +23,7 @@ type OptionalAgentSessionMethodName = {
 const OPTIONAL_AGENT_SESSION_METHOD_NAMES = [
   "steerActiveTurn",
   "listCommands",
+  "askSideQuestion",
   "setModel",
   "setThinkingOption",
   "setFeature",
@@ -144,6 +145,11 @@ class FakeSession implements AgentSession {
     return [];
   }
 
+  async askSideQuestion(question: string) {
+    this.recordedCalls.push(`askSideQuestion:${question}`);
+    return "side answer";
+  }
+
   async setModel() {
     this.recordedCalls.push("setModel");
   }
@@ -191,6 +197,7 @@ describe("wrapSessionProvider", () => {
 
     await wrapped.steerActiveTurn?.("follow-up", { expectedTurnId: "turn-1" });
     await wrapped.listCommands?.();
+    await wrapped.askSideQuestion?.("what changed?");
     await wrapped.setModel?.("sonnet");
     await wrapped.setThinkingOption?.("high");
     await wrapped.setFeature?.("feature-1", true);
@@ -206,6 +213,7 @@ describe("wrapSessionProvider", () => {
     expect(session.recordedCalls).toEqual([
       "steerActiveTurn",
       "listCommands",
+      "askSideQuestion:what changed?",
       "setModel",
       "setThinkingOption",
       "setFeature",

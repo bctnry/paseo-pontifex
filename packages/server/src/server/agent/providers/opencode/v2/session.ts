@@ -37,6 +37,14 @@ import { messages } from "./history.js";
 import { SessionPermissions } from "./permissions.js";
 import { SessionUsage } from "./usage.js";
 
+// Matches OpenCode's own /btw plugin: session.generate exposes the session's tools but
+// runs no tool loop, so the model must answer from the conversation it already has.
+const OPENCODE_SIDE_QUESTION_INSTRUCTIONS = [
+  "The user is asking a quick side question about the conversation so far.",
+  "Answer directly and concisely in markdown from what you already know.",
+  "Do not call any tools and do not take any actions.",
+].join(" ");
+
 export class OpenCodeV2Session implements AgentSession {
   readonly provider = "opencode";
   readonly capabilities = V2_CAPABILITIES;
@@ -360,6 +368,21 @@ export class OpenCodeV2Session implements AgentSession {
   async listCommands() {
     await this.reconnectIfExited();
     return commands(this.client, this.config.cwd);
+  }
+  async askSideQuestion(question: string, options?: { signal?: AbortSignal }) {
+    await this.reconnectIfExited();
+    const signal = options?.signal
+      ? AbortSignal.any([this.abort.signal, options.signal])
+      : this.abort.signal;
+    const result = await this.client.session.generate(
+      {
+        sessionID: this.id,
+        prompt: `${OPENCODE_SIDE_QUESTION_INSTRUCTIONS}\n\n${question}`,
+      },
+      { signal },
+    );
+    const answer = result.text.trim();
+    return answer ? answer : null;
   }
   describePersistence(): AgentPersistenceHandle {
     return {

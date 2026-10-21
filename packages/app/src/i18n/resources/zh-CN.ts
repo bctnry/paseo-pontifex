@@ -188,6 +188,14 @@ export const zhCN: TranslationResources = {
     clientCommands: {
       archiveAgent: "归档当前 Agent",
       freshDraft: "归档此 Agent 并开始新的草稿",
+      sideQuestion: "在不加入对话的情况下询问一个旁支问题",
+    },
+    sideQuestion: {
+      loading: "正在询问…",
+      empty: "请在 /btw 后输入问题",
+      emptyAnswer: "Agent 返回了空回答",
+      attachmentsUnsupported: "提问旁支问题前请移除附件",
+      unsupported: "此主机不支持旁支问题。请更新主机。",
     },
     github: {
       searching: "正在搜索...",

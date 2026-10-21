@@ -376,6 +376,7 @@ const CLAUDE_CAPABILITIES: AgentCapabilityFlags = {
   supportsRewindConversation: true,
   supportsRewindFiles: true,
   supportsRewindBoth: true,
+  supportsSideQuestions: true,
 };
 
 const DEFAULT_MODES: AgentMode[] = [
@@ -2969,6 +2970,25 @@ class ClaudeAgentSession implements AgentSession {
       commandMap.set(REWIND_COMMAND_NAME, REWIND_COMMAND);
     }
     return Array.from(commandMap.values()).sort((a, b) => a.name.localeCompare(b.name));
+  }
+
+  async askSideQuestion(
+    question: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<string | null> {
+    // The SDK's side-question control request is newer than its published type surface.
+    const query = (await this.ensureQuery()) as Query & {
+      askSideQuestion?: (
+        question: string,
+        options?: { signal?: AbortSignal },
+      ) => Promise<{ response: string | null }>;
+    };
+    if (!query.askSideQuestion) {
+      throw new Error("This Claude Code version does not support side questions");
+    }
+    const result = await query.askSideQuestion(question, { signal: options?.signal });
+    const answer = result.response?.trim();
+    return answer ? answer : null;
   }
 
   async revertConversation(input: { messageId: string }): Promise<void> {

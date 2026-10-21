@@ -3152,6 +3152,9 @@ export class Session {
       case "list_commands_request":
         await this.handleListCommandsRequest(msg);
         return;
+      case "agent.side_question.request":
+        await this.handleSideQuestionRequest(msg);
+        return;
       case "register_push_token":
         this.handleRegisterPushToken(msg.token);
         return;
@@ -5126,6 +5129,40 @@ export class Session {
           error: getErrorMessage(error),
           requestId,
         },
+      });
+    }
+  }
+
+  /**
+   * Handle a side question that uses the current session context without allocating a turn.
+   */
+  private async handleSideQuestionRequest(
+    msg: Extract<SessionInboundMessage, { type: "agent.side_question.request" }>,
+  ): Promise<void> {
+    const { agentId, question, requestId } = msg;
+    try {
+      const existing = this.agentManager.getAgent(agentId);
+      if (!existing) {
+        const stored = await this.agentStorage.get(agentId);
+        if (!stored || stored.archivedAt) {
+          throw new Error(`Agent not found: ${agentId}`);
+        }
+        await ensureAgentLoaded(agentId, {
+          agentManager: this.agentManager,
+          agentStorage: this.agentStorage,
+          logger: this.sessionLogger,
+        });
+      }
+      const answer = await this.agentManager.askSideQuestion(agentId, question);
+      this.emit({
+        type: "agent.side_question.response",
+        payload: { agentId, answer, error: null, requestId },
+      });
+    } catch (error) {
+      this.sessionLogger.warn({ err: error, agentId }, "Failed to answer side question");
+      this.emit({
+        type: "agent.side_question.response",
+        payload: { agentId, answer: null, error: getErrorMessage(error), requestId },
       });
     }
   }

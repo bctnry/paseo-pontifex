@@ -190,6 +190,14 @@ export const ru: TranslationResources = {
     clientCommands: {
       archiveAgent: "Архивировать текущего агента",
       freshDraft: "Архивировать этого агента и создать новый черновик",
+      sideQuestion: "Задать побочный вопрос, не добавляя его в разговор",
+    },
+    sideQuestion: {
+      loading: "Вопрос отправлен…",
+      empty: "Добавьте вопрос после /btw",
+      emptyAnswer: "Агент вернул пустой ответ",
+      attachmentsUnsupported: "Удалите вложения перед тем, как задать побочный вопрос",
+      unsupported: "Этот хост не поддерживает побочные вопросы. Обновите хост.",
     },
     github: {
       searching: "Идет поиск...",

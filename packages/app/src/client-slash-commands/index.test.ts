@@ -66,6 +66,7 @@ describe("resolveClientSlashCommand", () => {
         command.execution,
       ]),
     ).toEqual([
+      ["btw", [], "insert"],
       ["exit", ["quit", "q"], "immediate"],
       ["clear", ["new"], "immediate"],
     ]);
@@ -73,25 +74,44 @@ describe("resolveClientSlashCommand", () => {
 
   it("resolves canonical names and aliases after trimming", () => {
     expect(resolveClientSlashCommand({ text: " /quit ", hasAttachments: false })).toMatchObject({
-      name: "exit",
-      kind: "archive-agent",
-      execution: "immediate",
+      command: { name: "exit", kind: "archive-agent", execution: "immediate" },
+      args: "",
     });
     expect(resolveClientSlashCommand({ text: "/exit", hasAttachments: false })).toMatchObject({
-      name: "exit",
-      kind: "archive-agent",
+      command: { name: "exit", kind: "archive-agent" },
+      args: "",
     });
     expect(resolveClientSlashCommand({ text: "/q", hasAttachments: false })).toMatchObject({
-      name: "exit",
-      kind: "archive-agent",
+      command: { name: "exit", kind: "archive-agent" },
+      args: "",
     });
     expect(resolveClientSlashCommand({ text: "/clear", hasAttachments: false })).toMatchObject({
-      name: "clear",
-      kind: "replace-agent-with-draft",
+      command: { name: "clear", kind: "replace-agent-with-draft" },
+      args: "",
     });
     expect(resolveClientSlashCommand({ text: "/new", hasAttachments: false })).toMatchObject({
-      name: "clear",
-      kind: "replace-agent-with-draft",
+      command: { name: "clear", kind: "replace-agent-with-draft" },
+      args: "",
+    });
+  });
+
+  it("resolves /btw with its question", () => {
+    expect(
+      resolveClientSlashCommand({ text: "/btw what changed in step 2?", hasAttachments: false }),
+    ).toMatchObject({
+      command: { name: "btw", kind: "side-question", execution: "insert" },
+      args: "what changed in step 2?",
+    });
+    expect(resolveClientSlashCommand({ text: "/btw", hasAttachments: false })).toMatchObject({
+      command: { name: "btw", kind: "side-question" },
+      args: "",
+    });
+    expect(
+      resolveClientSlashCommand({ text: "/btw check this", hasAttachments: true }),
+    ).toMatchObject({
+      command: { name: "btw", kind: "side-question" },
+      args: "check this",
+      hasAttachments: true,
     });
   });
 

@@ -157,7 +157,12 @@ import { useComposerForgeAutoAttach } from "./forge-auto-attach";
 import { readClipboardImage } from "./clipboard-image";
 import { normalizeNativePastedImages, type NativePastedFile } from "./native-pasted-image";
 import { PluginResourceAttachmentPill, usePluginAttachmentPicker } from "@/plugins";
-import { resolveClientSlashCommand, type ClientSlashCommand } from "@/client-slash-commands";
+import {
+  resolveClientSlashCommand,
+  type ClientSlashCommand,
+  type ResolvedClientSlashCommand,
+} from "@/client-slash-commands";
+import { SideQuestionSheet, type SideQuestionState } from "@/components/side-question-sheet";
 import {
   appendWorkspaceFileAttachment,
   getWorkspaceFileAttachmentKey,
@@ -280,6 +285,7 @@ function buildAgentStateSelector(serverId: string, agentId: string) {
       contextWindowUsedTokens: agent?.lastUsage?.contextWindowUsedTokens ?? null,
       totalCostUsd: agent?.lastUsage?.totalCostUsd ?? null,
       model: agent?.model ?? null,
+      supportsSideQuestions: agent?.capabilities?.supportsSideQuestions === true,
     };
   };
 }
@@ -1322,6 +1328,10 @@ function ComposerContentImpl({
   const supportsForgeSearch = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.forgeSearch === true,
   );
+  const supportsSideQuestion =
+    useSessionStore(
+      (state) => state.sessions[serverId]?.serverInfo?.features?.sideQuestions === true,
+    ) && agentState.supportsSideQuestions;
   const forgeAutoAttachRef = useRef<ReturnType<typeof useComposerForgeAutoAttach>>(null);
   const [isForgeResolving, setIsForgeResolving] = useState(false);
   const forgeConfiguration = useMemo(
@@ -1366,6 +1376,8 @@ function ComposerContentImpl({
   const isFullscreen = useComposerFullscreen(editingSession);
   const [sendError, setSendError] = useState<string | null>(null);
   const [isMessageInputFocused, setIsMessageInputFocused] = useState(false);
+  const [sideQuestion, setSideQuestion] = useState<SideQuestionState | null>(null);
+  const sideQuestionRequestRef = useRef(0);
   const [isGithubPickerOpen, setIsGithubPickerOpen] = useState(false);
   const [githubSearchQuery, setGithubSearchQuery] = useState("");
   const [lightboxMetadata, setLightboxMetadata] = useState<AttachmentMetadata | null>(null);
@@ -1401,7 +1413,61 @@ function ComposerContentImpl({
   );
 
   const runClientSlashCommand = useCallback(
-    (command: ClientSlashCommand): boolean => {
+    (resolved: ResolvedClientSlashCommand): boolean => {
+      const { command, args } = resolved;
+
+      if (command.kind === "side-question") {
+        if (resolved.hasAttachments) {
+          setSendError(t("composer.sideQuestion.attachmentsUnsupported"));
+          return true;
+        }
+        if (!supportsSideQuestion) {
+          setSendError(t("composer.sideQuestion.unsupported"));
+          return true;
+        }
+        const question = args.trim();
+        if (!question) {
+          setSendError(t("composer.sideQuestion.empty"));
+          focusMessageInputWithPlatformStrategy(messageInputRef);
+          return true;
+        }
+        if (!client) {
+          setSendError(t("common.errors.daemonClientUnavailable"));
+          return true;
+        }
+
+        if (blurOnSubmit) messageInputRef.current?.blur();
+        clearDraft("sent");
+        replaceUserInput("");
+        setSelectedAttachments([]);
+        resetSuppression();
+        setSendError(null);
+
+        const requestId = sideQuestionRequestRef.current + 1;
+        sideQuestionRequestRef.current = requestId;
+        setSideQuestion({ question, answer: null, error: null, loading: true });
+        void client
+          .askSideQuestion({ agentId, question, timeout: 5 * 60_000 })
+          .then((payload) => {
+            if (sideQuestionRequestRef.current !== requestId) return;
+            if (payload.error !== null) throw new Error(payload.error);
+            if (!payload.answer) throw new Error(t("composer.sideQuestion.emptyAnswer"));
+            setSideQuestion({ question, answer: payload.answer, error: null, loading: false });
+            return;
+          })
+          .catch((error) => {
+            if (sideQuestionRequestRef.current !== requestId) return;
+            console.error("[Composer] Failed to ask side question:", error);
+            setSideQuestion({
+              question,
+              answer: null,
+              error: error instanceof Error ? error.message : String(error),
+              loading: false,
+            });
+          });
+        return true;
+      }
+
       if (command.execution !== "immediate" || !onClientSlashCommand) {
         return false;
       }
@@ -1426,13 +1492,29 @@ function ComposerContentImpl({
       return true;
     },
     [
+      agentId,
       blurOnSubmit,
       clearDraft,
+      client,
       onClientSlashCommand,
       resetSuppression,
       setSelectedAttachments,
       replaceUserInput,
+      supportsSideQuestion,
+      t,
     ],
+  );
+
+  const closeSideQuestion = useCallback(() => {
+    sideQuestionRequestRef.current += 1;
+    setSideQuestion(null);
+  }, []);
+
+  const handleAutocompleteClientSlashCommand = useCallback(
+    (command: ClientSlashCommand) => {
+      runClientSlashCommand({ command, args: "", hasAttachments: false });
+    },
+    [runClientSlashCommand],
   );
 
   const runPluginClientSlashCommand = useCallback(
@@ -2339,7 +2421,8 @@ function ComposerContentImpl({
       agentId,
       draft: commandDraft,
       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
-      onClientSlashCommand: runClientSlashCommand,
+      onClientSlashCommand: handleAutocompleteClientSlashCommand,
+      supportsSideQuestion,
       pluginClientSlashCommands,
     }),
     [
@@ -2349,7 +2432,8 @@ function ComposerContentImpl({
       commandDraft,
       buildOutgoingAttachments,
       attachments,
-      runClientSlashCommand,
+      handleAutocompleteClientSlashCommand,
+      supportsSideQuestion,
       pluginClientSlashCommands,
     ],
   );
@@ -2390,6 +2474,7 @@ function ComposerContentImpl({
 
   return (
     <>
+      <SideQuestionSheet state={sideQuestion} onClose={closeSideQuestion} />
       <ComposerKeyboardRegistration
         handlerId={keyboardHandlerIdRef.current}
         messageInputRef={messageInputRef}

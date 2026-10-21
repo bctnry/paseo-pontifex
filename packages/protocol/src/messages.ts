@@ -380,6 +380,8 @@ const AgentCapabilityFlagsSchema: z.ZodType<AgentCapabilityFlags> = z
     supportsRewindFiles: z.boolean().optional().default(false),
     // COMPAT(rewind): added in v0.1.X, drop when floor >= v0.1.X.
     supportsRewindBoth: z.boolean().optional().default(false),
+    // COMPAT(sideQuestions): added in v0.12.0, remove gate after 2027-04-21.
+    supportsSideQuestions: z.boolean().optional().default(false),
   })
   .catchall(z.boolean());
 
@@ -2923,6 +2925,13 @@ export const ListCommandsRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const SideQuestionRequestSchema = z.object({
+  type: z.literal("agent.side_question.request"),
+  agentId: z.string(),
+  question: z.string().min(1),
+  requestId: z.string(),
+});
+
 export const RegisterPushTokenMessageSchema = z.object({
   type: z.literal("register_push_token"),
   token: z.string(),
@@ -3284,6 +3293,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   ListProviderModelsRequestMessageSchema,
   ListProviderModesRequestMessageSchema,
   ListProviderFeaturesRequestMessageSchema,
+  SideQuestionRequestSchema,
   ListAvailableProvidersRequestMessageSchema,
   GetProvidersSnapshotRequestMessageSchema,
   RefreshProvidersSnapshotRequestMessageSchema,
@@ -3691,6 +3701,8 @@ export const ServerInfoStatusPayloadSchema = z
         agentDetach: z.boolean().optional(),
         // COMPAT(agentThinkingUpdate): added in v0.2.4, remove gate after 2027-01-28.
         agentThinkingUpdate: z.boolean().optional(),
+        // COMPAT(sideQuestions): added in v0.12.0, remove gate after 2027-04-21.
+        sideQuestions: z.boolean().optional(),
         // COMPAT(daemonDiagnostics): added in v0.1.100, remove gate after 2026-12-25 once daemon floor >= v0.1.100.
         daemonDiagnostics: z.boolean().optional(),
         // COMPAT(daemonSelfUpdate): added in v0.1.93, remove gate after 2026-12-13.
@@ -6397,6 +6409,16 @@ export const ListCommandsResponseSchema = z.object({
   }),
 });
 
+export const SideQuestionResponseSchema = z.object({
+  type: z.literal("agent.side_question.response"),
+  payload: z.object({
+    agentId: z.string(),
+    answer: z.string().nullable(),
+    error: z.string().nullable(),
+    requestId: z.string(),
+  }),
+});
+
 // ============================================================================
 // Terminal Outbound Messages
 // ============================================================================
@@ -7072,6 +7094,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   UsageListReportsUpdateMessageSchema,
   UsageListReportsResponseMessageSchema,
   ListCommandsResponseSchema,
+  SideQuestionResponseSchema,
   ListTerminalsResponseSchema,
   TerminalsChangedSchema,
   CreateTerminalResponseSchema,
@@ -7522,6 +7545,8 @@ export type ClearAgentAttentionResponseMessage = z.infer<
 export type ClientHeartbeatMessage = z.infer<typeof ClientHeartbeatMessageSchema>;
 export type ListCommandsRequest = z.infer<typeof ListCommandsRequestSchema>;
 export type ListCommandsResponse = z.infer<typeof ListCommandsResponseSchema>;
+export type SideQuestionRequest = z.infer<typeof SideQuestionRequestSchema>;
+export type SideQuestionResponse = z.infer<typeof SideQuestionResponseSchema>;
 export type RegisterPushTokenMessage = z.infer<typeof RegisterPushTokenMessageSchema>;
 export type PushUnregisterRequest = z.infer<typeof PushUnregisterRequestSchema>;
 export type PushUnregisterResponse = z.infer<typeof PushUnregisterResponseSchema>;

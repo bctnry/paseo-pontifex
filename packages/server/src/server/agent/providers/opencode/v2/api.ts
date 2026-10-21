@@ -14,6 +14,7 @@ export interface V2Api {
     | "environment"
     | "instructions"
     | "prompt"
+    | "generate"
     | "command"
     | "compact"
     | "interrupt"

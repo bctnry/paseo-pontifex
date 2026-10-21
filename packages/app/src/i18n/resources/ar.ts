@@ -188,6 +188,14 @@ export const ar: TranslationResources = {
     clientCommands: {
       archiveAgent: "أرشفة الوكيل الحالي",
       freshDraft: "أرشفة هذا الوكيل وابدأ مسودة جديدة",
+      sideQuestion: "اطرح سؤالًا جانبيًا دون إضافته إلى المحادثة",
+    },
+    sideQuestion: {
+      loading: "جارٍ السؤال…",
+      empty: "أضف سؤالًا بعد /btw",
+      emptyAnswer: "أعاد الوكيل إجابة فارغة",
+      attachmentsUnsupported: "أزل المرفقات قبل طرح سؤال جانبي",
+      unsupported: "هذا المضيف لا يدعم الأسئلة الجانبية. حدّث المضيف.",
     },
     github: {
       searching: "جارٍ البحث...",

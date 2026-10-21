@@ -586,6 +586,10 @@ type WriteProjectConfigPayload = Extract<
 >["payload"];
 
 type ListCommandsPayload = ListCommandsResponse["payload"];
+type SideQuestionPayload = Extract<
+  SessionOutboundMessage,
+  { type: "agent.side_question.response" }
+>["payload"];
 type ListCommandsDraftConfig = Pick<
   AgentSessionConfig,
   "provider" | "cwd" | "modeId" | "model" | "thinkingOptionId" | "featureValues"
@@ -600,6 +604,12 @@ interface ListCommandsOptions {
   agentId: string;
   requestId?: string;
   draftConfig?: ListCommandsDraftConfig;
+}
+export interface AskSideQuestionOptions {
+  agentId: string;
+  question: string;
+  requestId?: string;
+  timeout?: number;
 }
 type LegacyListCommandsOptions = Omit<ListCommandsOptions, "agentId">;
 type SetVoiceModePayload = Extract<
@@ -5478,6 +5488,18 @@ export class DaemonClient {
         ...(options.draftConfig ? { draftConfig: options.draftConfig } : {}),
       },
       responseType: "list_commands_response",
+    });
+  }
+
+  async askSideQuestion(options: AskSideQuestionOptions): Promise<SideQuestionPayload> {
+    return this.sendNamespacedCorrelatedSessionRequest({
+      requestId: options.requestId,
+      message: {
+        type: "agent.side_question.request",
+        agentId: options.agentId,
+        question: options.question,
+      },
+      timeout: options.timeout,
     });
   }
 

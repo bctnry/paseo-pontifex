@@ -190,6 +190,15 @@ export const es: TranslationResources = {
     clientCommands: {
       archiveAgent: "Archivar el agente actual",
       freshDraft: "Archive este agente y comience un nuevo borrador",
+      sideQuestion: "Hacer una pregunta secundaria sin añadirla a la conversación",
+    },
+    sideQuestion: {
+      loading: "Preguntando…",
+      empty: "Añade una pregunta después de /btw",
+      emptyAnswer: "El agente devolvió una respuesta vacía",
+      attachmentsUnsupported:
+        "Elimina los archivos adjuntos antes de hacer una pregunta secundaria",
+      unsupported: "Este host no admite preguntas secundarias. Actualiza el host.",
     },
     github: {
       searching: "Búsqueda...",

@@ -498,6 +498,7 @@ interface AgentSession {
   close(): Promise<void>;
   // Optional:
   listCommands?(): Promise<AgentSlashCommand[]>;
+  askSideQuestion?(question: string, options?: { signal?: AbortSignal }): Promise<string | null>;
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;
   setFeature?(featureId: string, value: unknown): Promise<void>;
@@ -508,6 +509,8 @@ interface AgentSession {
 ```
 
 `setMode` and `setThinkingOption` may return an `AgentProviderNotice` when the provider knows the change needs user-facing context. For example, providers that stage changes until the next turn should return an `info` notice while a turn is already running. The app renders the notice generically as a toast; provider-specific lifecycle behavior stays in the provider implementation.
+
+`askSideQuestion` answers `/btw` from the session's existing context without starting a turn or appending the question or answer to the conversation. Implement it only when the provider exposes an ephemeral one-shot path, and set `capabilities.supportsSideQuestions` so the composer offers the command.
 
 ### Steps
 

@@ -26,6 +26,7 @@ export class V2Harness {
   readonly history: SessionMessageInfo[] = [];
   readonly creates: SessionCreateInput[] = [];
   readonly prompts: string[] = [];
+  readonly generatedPrompts: string[] = [];
   readonly environments: Array<{ sessionID: string; variables: Record<string, string> }> = [];
   readonly mcpAdds: string[] = [];
   releases = 0;
@@ -66,6 +67,11 @@ export class V2Harness {
   prompt: V2Api["session"]["prompt"] = async (input) => {
     this.prompts.push(input.text);
     if (!this.autoComplete) this.startExecution();
+  };
+  generateAnswer = "side answer";
+  generate: V2Api["session"]["generate"] = async (input) => {
+    this.generatedPrompts.push(input.prompt);
+    return { text: this.generateAnswer };
   };
   interrupt: V2Api["session"]["interrupt"] = async () => {
     this.finishExecution("interrupted");
@@ -159,6 +165,7 @@ export class V2Harness {
         )
           this.finishExecution();
       },
+      generate: (input, options) => this.generate(input, options),
       interrupt: (input, options) => this.interrupt(input, options),
       command: unexpected,
       compact: unexpected,

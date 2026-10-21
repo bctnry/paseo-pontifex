@@ -191,6 +191,14 @@ export const fr: TranslationResources = {
     clientCommands: {
       archiveAgent: "Archiver l’agent actuel",
       freshDraft: "Archiver cet agent et démarrer un nouveau brouillon",
+      sideQuestion: "Poser une question annexe sans l’ajouter à la conversation",
+    },
+    sideQuestion: {
+      loading: "Question en cours…",
+      empty: "Ajoutez une question après /btw",
+      emptyAnswer: "L’agent a renvoyé une réponse vide",
+      attachmentsUnsupported: "Retirez les pièces jointes avant de poser une question annexe",
+      unsupported: "Cet hôte ne prend pas en charge les questions annexes. Mettez l’hôte à jour.",
     },
     github: {
       searching: "Recherche…",

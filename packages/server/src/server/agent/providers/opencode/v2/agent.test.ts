@@ -42,6 +42,24 @@ describe("OpenCode v2 session lifecycle", () => {
       await session.close();
     }
   });
+  test("asks a side question without starting a turn", async () => {
+    const harness = new V2Harness();
+    const client = new OpenCodeV2AgentClient({
+      logger: createTestLogger(),
+      runtime: harness.runtime,
+    });
+    const session = await client.createSession({ provider: "opencode", cwd: "/tmp/project" });
+    try {
+      await expect(session.askSideQuestion?.("what changed?")).resolves.toBe("side answer");
+      expect(harness.generatedPrompts).toHaveLength(1);
+      expect(harness.generatedPrompts[0]).toContain("quick side question");
+      expect(harness.generatedPrompts[0]).toContain("what changed?");
+      expect(harness.prompts).toEqual([]);
+    } finally {
+      await session.close();
+    }
+  });
+
   test.each(["reconnect", "watchdog"])(
     "recovers a missed completion through %s without reconnecting a quiet stream",
     async (recovery) => {

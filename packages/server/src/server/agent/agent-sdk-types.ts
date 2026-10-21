@@ -697,6 +697,12 @@ export interface AgentSession {
   /** Release live runtime resources without archiving or deleting the durable native session. */
   close(): Promise<void>;
   listCommands?(): Promise<AgentSlashCommand[]>;
+  /**
+   * Answer a question from the current conversation context without allocating a turn or
+   * appending anything to the conversation. Providers that expose an explicit side-question
+   * API implement this; callers must treat a missing method as unsupported.
+   */
+  askSideQuestion?(question: string, options?: { signal?: AbortSignal }): Promise<string | null>;
   setModel?(modelId: string | null): Promise<void>;
   setThinkingOption?(thinkingOptionId: string | null): Promise<void | AgentProviderNotice>;
   setFeature?(featureId: string, value: unknown): Promise<void>;

@@ -2504,6 +2504,18 @@ export class AgentManager {
     return true;
   }
 
+  async askSideQuestion(
+    agentId: string,
+    question: string,
+    options?: { signal?: AbortSignal },
+  ): Promise<string | null> {
+    const agent = this.requireSessionAgent(agentId);
+    if (!agent.session.askSideQuestion) {
+      throw new Error(`Provider '${agent.provider}' does not support side questions`);
+    }
+    return await agent.session.askSideQuestion(question, options);
+  }
+
   async appendTimelineItem(
     agentId: string,
     item: AgentTimelineItem,

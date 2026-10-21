@@ -184,6 +184,14 @@ export const en = {
     clientCommands: {
       archiveAgent: "Archive the current agent",
       freshDraft: "Archive this agent and start a fresh draft",
+      sideQuestion: "Ask a side question without adding it to the conversation",
+    },
+    sideQuestion: {
+      loading: "Asking…",
+      empty: "Add a question after /btw",
+      emptyAnswer: "The agent returned an empty answer",
+      attachmentsUnsupported: "Remove attachments before asking a side question",
+      unsupported: "This host does not support side questions. Update the host.",
     },
     github: {
       searching: "Searching...",
