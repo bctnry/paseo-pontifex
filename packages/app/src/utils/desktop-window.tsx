@@ -169,7 +169,27 @@ export function WindowChromeProvider({ children }: { children: ReactNode }) {
       const subscribeToResized = desktopWindow.onResized;
       connecting = true;
       void (async () => {
-        async function syncWindowState() {
+        async function syncWindowState(payload?: unknown) {
+          const event =
+            typeof payload === "object" && payload !== null
+              ? (payload as { isFullscreen?: unknown; isMaximized?: unknown })
+              : null;
+          if (
+            event &&
+            typeof event.isFullscreen === "boolean" &&
+            typeof event.isMaximized === "boolean"
+          ) {
+            const isFullscreen = event.isFullscreen;
+            const isMaximized = event.isMaximized;
+            if (active) {
+              setWindowState((previous) =>
+                previous.isFullscreen === isFullscreen && previous.isMaximized === isMaximized
+                  ? previous
+                  : { isFullscreen, isMaximized },
+              );
+            }
+            return;
+          }
           try {
             const [isFullscreen, isMaximized] = await Promise.all([
               readFullscreen(),

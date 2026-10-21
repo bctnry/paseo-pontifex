@@ -487,12 +487,12 @@ export class DirectorySync {
     input: RefreshAgentDirectoryInput,
     loadDirectoryCache: boolean,
   ): Promise<RefreshAgentDirectoryResult> {
-    if (loadDirectoryCache) {
-      this.primeAgentTransactionForCacheLoad();
-      await this.loadCachedDirectory();
-    }
+    const cacheLoad = loadDirectoryCache
+      ? (this.primeAgentTransactionForCacheLoad(), this.loadCachedDirectory())
+      : Promise.resolve();
     const onlineConnection = this.getOnlineConnection();
     if (!onlineConnection) {
+      await cacheLoad;
       this.callbacks.markAgentReady();
       return {
         agents: new Map(useSessionStore.getState().sessions[this.serverId]?.agents),
@@ -516,6 +516,9 @@ export class DirectorySync {
       if (completion.kind === "stale") {
         throw new DirectoryRefreshSupersededError("agent completion was superseded");
       }
+      // The network request overlaps cache hydration. Wait only at the commit,
+      // after the response is ready, so the cache baseline is merged in order.
+      await cacheLoad;
       this.revision += 1;
       const agents = this.commitAgentSnapshot(completion.snapshot, completion.deltas);
       this.persistAgentCursors(completion.snapshot, completion.deltas);
@@ -648,11 +651,8 @@ export class DirectorySync {
       this.refreshAgents({ subscribe: {} }),
       this.refreshWorkspaces({ subscribe: true }),
     ]);
-    this.checkpoints?.replaceDirectoryBaseline?.(this.serverId, {
-      agents: this.agents.snapshot(),
-      ...this.workspaces.snapshot(),
-      checkpoint: this.cursors,
-    });
+    // Both refresh paths persist their snapshots and mutation deltas. Replacing
+    // the whole baseline here would only re-queue every row for another write.
     if (this.getOnlineConnection()) await this.connectWorkspaceLabels();
   }
 

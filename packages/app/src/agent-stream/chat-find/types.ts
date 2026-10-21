@@ -10,6 +10,7 @@ export interface ChatFindProps {
   serverId: string;
   epoch: string | null;
   items: StreamItem[];
+  headItems?: StreamItem[] | null;
   viewportRef: RefObject<StreamViewportHandle | null>;
   revealLoadedMessage(messageId: string): boolean;
   visibleMessageIds: MountedMessageIds;

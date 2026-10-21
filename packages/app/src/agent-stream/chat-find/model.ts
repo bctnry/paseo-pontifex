@@ -74,6 +74,7 @@ export class ChatFindModel {
   private listeners = new Set<() => void>();
   private historyListeners = new Set<() => void>();
   private items: StreamItem[] = [];
+  private headItems: StreamItem[] = [];
   private epoch: string | null = null;
   private resultEpoch: string | null = null;
   private locations: Location[] = [];
@@ -168,7 +169,7 @@ export class ChatFindModel {
       this.fail(error, signal);
     }
   }
-  updateHistory(epoch: string | null, items: StreamItem[]) {
+  updateHistory(epoch: string | null, items: StreamItem[], headItems: StreamItem[] | null = []) {
     if (
       this.resultEpoch !== null &&
       epoch !== null &&
@@ -179,11 +180,22 @@ export class ChatFindModel {
     }
     this.epoch = epoch;
     this.items = items;
+    this.headItems = headItems ?? [];
     this.historyListeners.forEach((listener) => listener());
+  }
+  private *allHistoryItems(): Iterable<StreamItem> {
+    yield* this.items;
+    yield* this.headItems;
+  }
+  private containsHistoryItem(target: Target): boolean {
+    for (const item of this.allHistoryItems()) {
+      if (item.id === target.id && item.timelineCursor?.seq === target.seq) return true;
+    }
+    return false;
   }
   private target(location: Location, exact: boolean): Target | null {
     let before = 0;
-    for (const item of this.items) {
+    for (const item of this.allHistoryItems()) {
       if (item.timelineCursor?.epoch !== this.resultEpoch) continue;
       const seq = item.timelineCursor.seq;
       if (seq < location.seq) {
@@ -227,9 +239,7 @@ export class ChatFindModel {
       index = (index + this.locations.length) % this.locations.length;
       const location = this.locations[index]!;
       const cached = this.resolved.get(location);
-      const stillLoaded =
-        cached &&
-        this.items.some((item) => item.id === cached.id && item.timelineCursor?.seq === cached.seq);
+      const stillLoaded = cached ? this.containsHistoryItem(cached) : false;
       let target = stillLoaded ? cached : this.target(location, true);
       if (!target) {
         await tagged("connection", this.operations.load(epoch, location.seq));

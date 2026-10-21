@@ -179,15 +179,16 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     expect(queryClient.getQueryData(checkoutStatusQueryKey(serverId, cwd))).toEqual(pushed);
   });
 
-  it("invalidates recent commits when checkout status is pushed", () => {
+  it("invalidates recent commits when the branch or ahead-behind count changes", () => {
     const queryClient = createQueryClient();
+    queryClient.setQueryData(checkoutStatusQueryKey(serverId, cwd), checkoutStatus());
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd), { commits: [] });
     queryClient.setQueryData(checkoutCommitsQueryKey(serverId, "/repo2"), { commits: [] });
 
     applyCheckoutStatusUpdateFromEvent({
       queryClient,
       serverId,
-      message: checkoutStatusUpdate(checkoutStatus()),
+      message: checkoutStatusUpdate(checkoutStatus({ aheadBehind: { ahead: 1, behind: 0 } })),
     });
 
     expect(queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd))?.isInvalidated).toBe(
@@ -196,6 +197,22 @@ describe("applyCheckoutStatusUpdateFromEvent", () => {
     expect(
       queryClient.getQueryState(checkoutCommitsQueryKey(serverId, "/repo2"))?.isInvalidated,
     ).toBe(false);
+  });
+
+  it("keeps recent commits valid when only the dirty state changes", () => {
+    const queryClient = createQueryClient();
+    queryClient.setQueryData(checkoutStatusQueryKey(serverId, cwd), checkoutStatus());
+    queryClient.setQueryData(checkoutCommitsQueryKey(serverId, cwd), { commits: [] });
+
+    applyCheckoutStatusUpdateFromEvent({
+      queryClient,
+      serverId,
+      message: checkoutStatusUpdate(checkoutStatus({ isDirty: true })),
+    });
+
+    expect(queryClient.getQueryState(checkoutCommitsQueryKey(serverId, cwd))?.isInvalidated).toBe(
+      false,
+    );
   });
 
   it("drops the checkout's cached draft slash commands when its branch changes", () => {

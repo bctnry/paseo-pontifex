@@ -17,6 +17,7 @@ import React, {
 import { useTranslation } from "react-i18next";
 import { StyleSheet as RNStyleSheet, Text, View } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import equal from "fast-deep-equal";
 import invariant from "tiny-invariant";
 import { shallow, useShallow } from "zustand/shallow";
 import { useStoreWithEqualityFn } from "zustand/traditional";
@@ -608,7 +609,7 @@ function AgentPanelBody({
         null
       );
     },
-    (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b),
+    (a, b) => a === b || equal(a, b),
   );
   const agentState = useSessionStore(
     useShallow((state) => selectChatAgentState(state, serverId, agentId)),
@@ -775,7 +776,7 @@ function ChatAgentContent({
         null
       );
     },
-    (a, b) => a === b || JSON.stringify(a) === JSON.stringify(b),
+    (a, b) => a === b || equal(a, b),
   );
   const isInitializingFromMap = useSessionStore((state) =>
     agentId ? (state.sessions[serverId]?.initializingAgents?.get(agentId) ?? false) : false,

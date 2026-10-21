@@ -1074,16 +1074,13 @@ const AgentStreamViewComponent = forwardRef<AgentStreamViewHandle, AgentStreamVi
       [expandedToolCallGroupIds, isMobile, presentation.historyGroupUpdatesByHostId],
     );
 
-    const findItems = useMemo(
-      () => [...effectiveStreamItems, ...(effectiveStreamHead ?? [])],
-      [effectiveStreamItems, effectiveStreamHead],
-    );
     return (
       <ChatFind
         agentId={agentId}
         serverId={resolvedServerId}
         epoch={timelineEpoch}
-        items={findItems}
+        items={effectiveStreamItems}
+        headItems={effectiveStreamHead}
         viewportRef={viewportRef}
         revealLoadedMessage={revealLoadedHistory}
         visibleMessageIds={mountedMessageIds}

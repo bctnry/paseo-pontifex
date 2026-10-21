@@ -185,18 +185,31 @@ export function useSidebarWorkspacesList(options?: {
     }
   }, [isActive, runtime, serverIds]);
 
-  const loadingState = deriveSidebarLoadingState({
+  const { isLoading, isInitialLoad, isRevalidating } = deriveSidebarLoadingState({
     isActive,
     serverIds,
     hydratedServerIds: directoryServerIds,
     hasProjects: projects.length > 0,
   });
 
-  return {
-    workspacePlacements,
-    projects,
-    projectNamesByViewKey,
-    ...loadingState,
-    refreshAll,
-  };
+  return useMemo(
+    () => ({
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    }),
+    [
+      workspacePlacements,
+      projects,
+      projectNamesByViewKey,
+      isLoading,
+      isInitialLoad,
+      isRevalidating,
+      refreshAll,
+    ],
+  );
 }

@@ -3,21 +3,20 @@ import type { StreamItem } from "@/types/stream";
 import type { StreamHistoryRowRevision } from "./strategy";
 
 interface HistoryRowDisplayVariants {
-  regular?: StreamItem;
   compact?: StreamItem;
 }
 
 const historyRowDisplayVariants = new WeakMap<StreamItem, HistoryRowDisplayVariants>();
 
 function getHistoryRowDisplayVariant(item: StreamItem, compact: boolean): StreamItem {
+  if (!compact) return item;
   let variants = historyRowDisplayVariants.get(item);
   if (!variants) {
     variants = {};
     historyRowDisplayVariants.set(item, variants);
   }
-  const key = compact ? "compact" : "regular";
-  variants[key] ??= { ...item };
-  return variants[key];
+  variants.compact ??= { ...item };
+  return variants.compact;
 }
 
 // Item identity is the render signal for history rows: the row boundary in view.tsx bails out
@@ -29,19 +28,16 @@ export function useRevisedHistoryRows(
   items: StreamItem[],
   revision: StreamHistoryRowRevision | undefined,
 ): StreamItem[] {
-  const globalDisplayState = revision?.globalDisplayState ?? false;
-  const displayStateById = revision?.displayStateById;
-  const contentById = revision?.contentById;
-  const globallyRevisedRows = useMemo(
-    () => items.map((item) => getHistoryRowDisplayVariant(item, globalDisplayState)),
-    [items, globalDisplayState],
-  );
-  const displayStateRevisedRows = useMemo(
-    () => globallyRevisedRows.map((item) => (displayStateById?.has(item.id) ? { ...item } : item)),
-    [globallyRevisedRows, displayStateById],
-  );
-  return useMemo(
-    () => displayStateRevisedRows.map((item) => (contentById?.has(item.id) ? { ...item } : item)),
-    [displayStateRevisedRows, contentById],
-  );
+  return useMemo(() => {
+    if (!revision) return items;
+    const { contentById, displayStateById, globalDisplayState } = revision;
+    if (!globalDisplayState && displayStateById.size === 0 && contentById.size === 0) {
+      return items;
+    }
+    return items.map((item) => {
+      const displayItem = getHistoryRowDisplayVariant(item, globalDisplayState);
+      if (!displayStateById.has(item.id) && !contentById.has(item.id)) return displayItem;
+      return { ...displayItem };
+    });
+  }, [items, revision]);
 }

@@ -53,4 +53,6 @@ export interface ReplicaRowStore {
   deleteHost(serverId: string): Promise<void>;
   renameHost(oldServerId: string, newServerId: string): Promise<void>;
   clear(): Promise<void>;
+  readMetadata?(key: string): Promise<string | null>;
+  writeMetadata?(key: string, value: string): Promise<void>;
 }

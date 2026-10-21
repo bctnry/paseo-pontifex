@@ -261,5 +261,31 @@ export function createSqliteReplicaRowStore(
     });
   }
 
-  return { open, read, readAll, readHostSummaries, apply, deleteHost, renameHost, clear };
+  async function readMetadata(key: string): Promise<string | null> {
+    const rows = await getConnection().all<StoredMeta>(
+      "SELECT value FROM meta WHERE key = ? LIMIT 1",
+      [key],
+    );
+    return rows[0]?.value ?? null;
+  }
+
+  async function writeMetadata(key: string, value: string): Promise<void> {
+    await getConnection().run(
+      "INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT (key) DO UPDATE SET value = excluded.value",
+      [key, value],
+    );
+  }
+
+  return {
+    open,
+    read,
+    readAll,
+    readHostSummaries,
+    apply,
+    deleteHost,
+    renameHost,
+    clear,
+    readMetadata,
+    writeMetadata,
+  };
 }

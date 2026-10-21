@@ -968,6 +968,10 @@ export const AssistantMessage = memo(function AssistantMessage({
   );
 
   const measureMessage = useStableEvent((event: import("react-native").LayoutChangeEvent) => {
+    // The revealed text changes every frame while a message streams. Hashing
+    // each intermediate height would fill the estimate cache with values that
+    // can never be reused; only the final layout is cacheable.
+    if (phase !== "complete" || revealedMessage.length < renderedMessage.text.length) return;
     setAssistantMessageHeight({ markdown: revealedMessage, ...event.nativeEvent.layout });
   });
   return (

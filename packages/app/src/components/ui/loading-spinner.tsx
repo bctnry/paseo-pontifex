@@ -1,4 +1,4 @@
-import { useLayoutEffect, useMemo, useState } from "react";
+import React, { useLayoutEffect, useMemo, useState } from "react";
 import { View, type StyleProp, type ViewStyle } from "react-native";
 import Animated, {
   makeMutable,

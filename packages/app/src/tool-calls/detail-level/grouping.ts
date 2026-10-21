@@ -33,9 +33,40 @@ export interface ToolCallGroupLookup<TGroup> {
   readonly size: number;
   get(id: string): TGroup | undefined;
   has(id: string): boolean;
+  keys(): IterableIterator<string>;
 }
 
 const EMPTY_GROUPS = new Map<string, never>();
+
+function createOverlayLookup<TGroup>(
+  history: ToolCallGroupLookup<TGroup>,
+  live: ToolCallGroupLookup<TGroup>,
+): ToolCallGroupLookup<TGroup> {
+  let extra = 0;
+  for (const id of live.keys()) {
+    if (!history.has(id)) extra += 1;
+  }
+  return {
+    size: history.size + extra,
+    get: (id) => live.get(id) ?? history.get(id),
+    has: (id) => live.has(id) || history.has(id),
+    *keys() {
+      yield* history.keys();
+      for (const id of live.keys()) {
+        if (!history.has(id)) yield id;
+      }
+    },
+  };
+}
+
+function sameRun(left: ToolCallRun, right: ToolCallRun): boolean {
+  if (left.isSealed !== right.isSealed || left.latest !== right.latest) return false;
+  if (left.calls.length !== right.calls.length) return false;
+  for (let index = 0; index < left.calls.length; index += 1) {
+    if (left.calls[index] !== right.calls[index]) return false;
+  }
+  return true;
+}
 
 export function describeToolCall(item: ToolCallItem): ToolCallDescriptor {
   if (item.payload.source === "agent") {
@@ -146,7 +177,7 @@ export function prepareGroupedHistory<TGroup>(input: {
   };
 }
 
-export function groupLiveToolCalls<TGroup>(input: {
+export function groupLiveToolCalls<TGroup extends { run: ToolCallRun }>(input: {
   history: GroupedHistory<TGroup>;
   head: StreamItem[];
   isTurnActive: boolean;
@@ -167,7 +198,11 @@ export function groupLiveToolCalls<TGroup>(input: {
       head.push(createHost(run));
     }
     if (hostPlacement === "head" || pendingIncludesHead || !isSealed) {
-      liveGroups.set(run.id, input.buildGroup(run));
+      const existing = input.history.groupsByHostId.get(run.id);
+      liveGroups.set(
+        run.id,
+        existing && sameRun(existing.run, run) ? existing : input.buildGroup(run),
+      );
     }
     pending = [];
     hostPlacement = null;
@@ -210,19 +245,17 @@ export function groupLiveToolCalls<TGroup>(input: {
       historyGroupUpdatesByHostId: EMPTY_GROUPS,
     };
   }
-  const groupsByHostId = new Map(input.history.groupsByHostId);
   let historyGroupUpdatesByHostId: Map<string, TGroup> | null = null;
   for (const [id, group] of liveGroups) {
-    groupsByHostId.set(id, group);
-    if (input.history.groupsByHostId.has(id)) {
-      historyGroupUpdatesByHostId ??= new Map();
-      historyGroupUpdatesByHostId.set(id, group);
-    }
+    if (!input.history.groupsByHostId.has(id)) continue;
+    if (input.history.groupsByHostId.get(id) === group) continue;
+    historyGroupUpdatesByHostId ??= new Map();
+    historyGroupUpdatesByHostId.set(id, group);
   }
   return {
     tail: input.history.tail,
     head,
-    groupsByHostId,
+    groupsByHostId: createOverlayLookup(input.history.groupsByHostId, liveGroups),
     historyGroupUpdatesByHostId: historyGroupUpdatesByHostId ?? EMPTY_GROUPS,
   };
 }

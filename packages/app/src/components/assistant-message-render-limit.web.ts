@@ -11,9 +11,15 @@ const graphemeSegmenter =
 
 export const ASSISTANT_MESSAGE_RENDER_CHARACTER_LIMIT = 32_000;
 
+let cachedCapped: { text: string; capped: true } | null = null;
+
 export function capAssistantMessageForRender(message: string): CappedAssistantMessage {
   if (message.length <= ASSISTANT_MESSAGE_RENDER_CHARACTER_LIMIT) {
     return { text: message, capped: false };
+  }
+  // Streaming appends never move a cap that was already found at the limit.
+  if (cachedCapped && message.startsWith(cachedCapped.text)) {
+    return cachedCapped;
   }
 
   let end = ASSISTANT_MESSAGE_RENDER_CHARACTER_LIMIT;
@@ -26,5 +32,6 @@ export function capAssistantMessageForRender(message: string): CappedAssistantMe
     }
   }
 
-  return { text: message.slice(0, end), capped: true };
+  cachedCapped = { text: message.slice(0, end), capped: true as const };
+  return cachedCapped;
 }

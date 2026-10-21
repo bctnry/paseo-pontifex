@@ -143,6 +143,9 @@ export function ChangedFilesTree({
       keyExtractor={keyExtractor}
       style={styles.scrollView}
       contentContainerStyle={styles.contentContainer}
+      initialNumToRender={24}
+      maxToRenderPerBatch={40}
+      windowSize={12}
       testID="changes-file-tree"
     />
   );

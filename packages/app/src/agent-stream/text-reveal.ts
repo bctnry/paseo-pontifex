@@ -61,6 +61,36 @@ export function computeRevealStep(input: {
 }
 
 const ZERO_WIDTH_JOINER = 0x200d;
+const CARRIAGE_RETURN = 0x0d;
+const LINE_FEED = 0x0a;
+const COMBINING_OR_EXTENDER = /^(?:\p{Mark}|\p{Emoji_Modifier}|\u200d|\ufe0f)$/u;
+
+function isRegionalIndicator(codePoint: number): boolean {
+  return codePoint >= 0x1f1e6 && codePoint <= 0x1f1ff;
+}
+
+function isHangulJamo(codePoint: number): boolean {
+  return (
+    (codePoint >= 0x1100 && codePoint <= 0x11ff) ||
+    (codePoint >= 0xa960 && codePoint <= 0xa97f) ||
+    (codePoint >= 0xd7b0 && codePoint <= 0xd7ff)
+  );
+}
+
+function asciiBoundaryOffset(previous: number, next: number): number | null {
+  if (previous >= 0x80 || next >= 0x80) return null;
+  return previous === CARRIAGE_RETURN && next === LINE_FEED ? -1 : 0;
+}
+
+function needsGraphemeSegmentation(previous: number, next: number): boolean {
+  return (
+    COMBINING_OR_EXTENDER.test(String.fromCodePoint(next)) ||
+    previous === ZERO_WIDTH_JOINER ||
+    isHangulJamo(previous) ||
+    isHangulJamo(next) ||
+    (isRegionalIndicator(previous) && isRegionalIndicator(next))
+  );
+}
 
 const graphemeSegmenter =
   typeof Intl.Segmenter === "function"
@@ -90,6 +120,24 @@ export function clampToSafeRevealBoundary(text: string, index: number): number {
   }
   if (index >= text.length) {
     return text.length;
+  }
+
+  const previous = text.charCodeAt(index - 1);
+  const next = text.charCodeAt(index);
+  const asciiOffset = asciiBoundaryOffset(previous, next);
+  if (asciiOffset !== null) {
+    return index + asciiOffset;
+  }
+  const isSurrogatePair =
+    previous >= 0xd800 && previous <= 0xdbff && next >= 0xdc00 && next <= 0xdfff;
+  const previousCodePoint = text.codePointAt(index - 1) ?? previous;
+  const previousCharacter =
+    previous >= 0xdc00 && previous <= 0xdfff && index >= 2
+      ? (text.codePointAt(index - 2) ?? previousCodePoint)
+      : previousCodePoint;
+  const nextCodePoint = text.codePointAt(index) ?? next;
+  if (!isSurrogatePair && !needsGraphemeSegmentation(previousCharacter, nextCodePoint)) {
+    return index;
   }
 
   const segment = graphemeSegmenter?.segment(text).containing(index);

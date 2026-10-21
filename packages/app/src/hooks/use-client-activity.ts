@@ -61,9 +61,14 @@ export function useClientActivity({
     if (isNative) return;
     if (typeof document === "undefined") return;
 
+    let activityHeartbeatTimer: ReturnType<typeof setTimeout> | null = null;
     const handleUserActivity = () => {
       tracker.recordUserActivity();
-      tracker.maybeSendImmediateHeartbeat();
+      if (activityHeartbeatTimer !== null) return;
+      activityHeartbeatTimer = setTimeout(() => {
+        activityHeartbeatTimer = null;
+        tracker.maybeSendImmediateHeartbeat();
+      }, 250);
     };
 
     const handleVisibilityChange = () => {
@@ -82,6 +87,7 @@ export function useClientActivity({
     window.addEventListener("touchstart", handleUserActivity, { passive: true });
 
     return () => {
+      if (activityHeartbeatTimer !== null) clearTimeout(activityHeartbeatTimer);
       document.removeEventListener("visibilitychange", handleVisibilityChange);
       window.removeEventListener("focus", handleUserActivity);
       window.removeEventListener("pointerdown", handleUserActivity);

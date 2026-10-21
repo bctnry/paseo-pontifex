@@ -15,6 +15,16 @@ export {
 };
 
 const browserRegistry = new PaseoBrowserWebviewRegistry();
+const browserDestroyedListeners = new Set<
+  (event: { browserId: string; hostWebContentsId: number }) => void
+>();
+
+export function subscribeToPaseoBrowserDestroyed(
+  listener: (event: { browserId: string; hostWebContentsId: number }) => void,
+): () => void {
+  browserDestroyedListeners.add(listener);
+  return () => browserDestroyedListeners.delete(listener);
+}
 
 interface BrowserWebContentsIdentity {
   readonly id: number;
@@ -58,7 +68,15 @@ export function preparePaseoBrowserWebContents(contents: RegisteredBrowserWebCon
   // Preserve Chromium throttling when the host window is hidden. Browser
   // residency and screenshot capture do not require a lifetime override.
   contents.once("destroyed", () => {
+    const registration = browserRegistry.getRegistrationForWebContents(webContentsId);
     browserRegistry.unregisterWebContents(webContentsId);
+    if (!registration) return;
+    for (const listener of browserDestroyedListeners) {
+      listener({
+        browserId: registration.browserId,
+        hostWebContentsId: registration.hostWebContentsId,
+      });
+    }
   });
 }
 

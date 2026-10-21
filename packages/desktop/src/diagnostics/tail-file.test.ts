@@ -22,6 +22,14 @@ describe("tailFile", () => {
     expect(tailFile(filePath, 2)).toBe("two\nthree");
   });
 
+  it("reads a large file from the end without splitting UTF-8", () => {
+    const filePath = path.join(testDir, "large.log");
+    const lines = Array.from({ length: 2000 }, (_, index) => `line-${index}-${"あ".repeat(32)}`);
+    writeFileSync(filePath, lines.join("\n"));
+
+    expect(tailFile(filePath, 2)).toBe(lines.slice(-2).join("\n"));
+  });
+
   it("keeps missing files empty", () => {
     expect(tailFile(path.join(testDir, "missing.log"), 2)).toBe("");
     expect(tailFile(path.join(testDir, "missing.log"), 2, { throwOnReadError: true })).toBe("");

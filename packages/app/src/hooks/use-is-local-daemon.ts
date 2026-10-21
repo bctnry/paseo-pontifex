@@ -24,7 +24,11 @@ function useLocalDaemonServerIdQuery() {
     enabled: isDesktopApp,
     staleTime: Infinity,
     gcTime: Infinity,
-    refetchInterval: (activeQuery) => (activeQuery.state.data?.serverId ? false : 1000),
+    refetchInterval: (activeQuery) => {
+      if (activeQuery.state.data?.serverId) return false;
+      const attempts = activeQuery.state.dataUpdateCount + activeQuery.state.fetchFailureCount;
+      return Math.min(1000 * 2 ** Math.min(attempts, 3), 5_000);
+    },
     refetchOnMount: false,
     refetchOnReconnect: false,
     refetchOnWindowFocus: false,

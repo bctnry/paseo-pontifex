@@ -212,6 +212,27 @@ function matchesProjectedRow(existing: StreamItem, incoming: StreamItem): boolea
   );
 }
 
+function projectedRowLookupKey(item: StreamItem): string | null {
+  const identity = streamTimelineItemIdentity(item);
+  if (identity !== null) return `id:${identity}`;
+  if (item.kind === "assistant_message") {
+    return `assistant:${item.messageId ?? ""}:${item.text}:${item.timestamp.getTime()}`;
+  }
+  if (item.kind === "thought") {
+    return `thought:${item.text}:${item.timestamp.getTime()}`;
+  }
+  return null;
+}
+
+function indexProjectedRows(items: StreamItem[]): Map<string, number> {
+  const index = new Map<string, number>();
+  for (let position = 0; position < items.length; position += 1) {
+    const key = projectedRowLookupKey(items[position]!);
+    if (key !== null && !index.has(key)) index.set(key, position);
+  }
+  return index;
+}
+
 function reconcilePromptWindowItems(input: {
   hydrated: StreamItem[];
   tail: StreamItem[];
@@ -226,11 +247,22 @@ function reconcilePromptWindowItems(input: {
   let head = input.head;
   const page: StreamItem[] = [];
   const acknowledgedClientMessageIds: string[] = [];
+  const tailIndexByIdentity = indexProjectedRows(tail);
+  const headIndexByIdentity = indexProjectedRows(head);
   for (const item of input.hydrated) {
     if (item.kind !== "user_message") {
-      const tailIndex = tail.findIndex((candidate) => matchesProjectedRow(candidate, item));
-      const headIndex =
-        tailIndex < 0 ? head.findIndex((candidate) => matchesProjectedRow(candidate, item)) : -1;
+      const lookupKey = projectedRowLookupKey(item);
+      const tailIndex =
+        lookupKey !== null
+          ? (tailIndexByIdentity.get(lookupKey) ?? -1)
+          : tail.findIndex((candidate) => matchesProjectedRow(candidate, item));
+      let headIndex = -1;
+      if (tailIndex < 0) {
+        headIndex =
+          lookupKey !== null
+            ? (headIndexByIdentity.get(lookupKey) ?? -1)
+            : head.findIndex((candidate) => matchesProjectedRow(candidate, item));
+      }
       const lane = tailIndex >= 0 ? tail : head;
       const index = tailIndex >= 0 ? tailIndex : headIndex;
       const existing = lane[index];

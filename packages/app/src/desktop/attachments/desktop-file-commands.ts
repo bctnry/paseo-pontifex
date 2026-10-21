@@ -41,6 +41,14 @@ export async function copyDesktopAttachmentFile(input: {
   });
 }
 
+export async function readDesktopAttachmentSourceBytes(input: {
+  path: string;
+}): Promise<Uint8Array> {
+  return await invokeDesktopCommand<Uint8Array>("read_attachment_source_bytes", {
+    path: input.path,
+  });
+}
+
 export async function deleteDesktopAttachmentFile(input: { path: string }): Promise<boolean> {
   return await invokeDesktopCommand<boolean>("delete_attachment_file", {
     path: input.path,

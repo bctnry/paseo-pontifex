@@ -23,6 +23,7 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 
 class MemoryStorage implements ReplicaRowStore {
   readonly rows = new Map<string, ReplicaRow>();
+  readonly metadata = new Map<string, string>();
   readonly changes: ReplicaRowChanges[] = [];
   readonly reads: Array<{
     serverId: string;
@@ -43,6 +44,14 @@ class MemoryStorage implements ReplicaRowStore {
   }
 
   async open(): Promise<void> {}
+
+  async readMetadata(key: string): Promise<string | null> {
+    return this.metadata.get(key) ?? null;
+  }
+
+  async writeMetadata(key: string, value: string): Promise<void> {
+    this.metadata.set(key, value);
+  }
 
   async read(
     serverId: string,
@@ -1060,6 +1069,14 @@ describe("ReplicaCache", () => {
     await cache.readAgent(SERVER_ID, "missing");
     commitDirectory(cache, SERVER_ID, directory());
     await cache.flush();
+
+    const nextBoot = new ReplicaCache(storage, {
+      clearLegacyCache: async () => {
+        storage.cleanups += 1;
+      },
+    });
+    nextBoot.setHosts([SERVER_ID]);
+    await nextBoot.readAgent(SERVER_ID, "missing");
 
     expect(storage.cleanups).toBe(1);
   });

@@ -57,6 +57,7 @@ export function ChatFind({
   serverId,
   epoch,
   items,
+  headItems = [],
   viewportRef,
   revealLoadedMessage,
   visibleMessageIds,
@@ -95,8 +96,8 @@ export function ChatFind({
   );
   const state = useSyncExternalStore(model.subscribe, model.getSnapshot, model.getSnapshot);
   useEffect(() => {
-    model.updateHistory(epoch, items);
-  }, [model, epoch, items]);
+    model.updateHistory(epoch, items, headItems);
+  }, [model, epoch, headItems, items]);
   useEffect(() => () => model.close(), [model]);
   useEffect(() => {
     if (!active) model.close();

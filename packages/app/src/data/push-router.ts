@@ -69,6 +69,23 @@ export interface ServerDataQueryMeta extends Record<string, unknown> {
   serverData: ServerDataRoute;
 }
 
+function addQueryKey(map: Map<string, Set<QueryKey>>, key: string, queryKey: QueryKey): void {
+  let keys = map.get(key);
+  if (!keys) {
+    keys = new Set();
+    map.set(key, keys);
+  }
+  keys.add(queryKey);
+}
+
+function replaceQueryKeyMap(
+  target: Map<string, Set<QueryKey>>,
+  source: Map<string, Set<QueryKey>>,
+): void {
+  target.clear();
+  for (const [key, queryKeys] of source) target.set(key, queryKeys);
+}
+
 export type ProvidersSnapshotUpdate = ProvidersSnapshotUpdateMessage;
 
 interface ServerDataPushClient {
@@ -216,6 +233,8 @@ export async function applyProvidersSnapshotUpdate(input: {
 export function mountServerDataPushRouter(input: PushRouterInput): () => void {
   const activeCheckoutDiffSubscriptions = new Map<string, CheckoutDiffRegistration>();
   const activeTerminalSubscriptions = new Map<string, WorkspaceTerminalsRegistration>();
+  const checkoutDiffQueryKeys = new Map<string, Set<QueryKey>>();
+  const terminalQueryKeys = new Map<string, Set<QueryKey>>();
   let disposed = false;
 
   function reconcileSubscriptions(
@@ -230,6 +249,8 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
 
     const desiredCheckoutDiffSubscriptions = new Map<string, CheckoutDiffRoute>();
     const desiredTerminalSubscriptions = new Map<string, WorkspaceTerminalsRoute>();
+    const nextCheckoutDiffQueryKeys = new Map<string, Set<QueryKey>>();
+    const nextTerminalQueryKeys = new Map<string, Set<QueryKey>>();
     for (const query of input.queryClient.getQueryCache().getAll()) {
       const route = getActiveServerDataRoute(query, input.serverId, {
         checkoutDiff: fallbackActive.checkoutDiff,
@@ -240,10 +261,15 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       }
       if (route.domain === "checkoutDiff") {
         desiredCheckoutDiffSubscriptions.set(route.subscriptionId, route);
+        addQueryKey(nextCheckoutDiffQueryKeys, route.subscriptionId, query.queryKey);
         continue;
       }
-      desiredTerminalSubscriptions.set(workspaceTerminalSubscriptionKey(route), route);
+      const key = workspaceTerminalSubscriptionKey(route);
+      desiredTerminalSubscriptions.set(key, route);
+      addQueryKey(nextTerminalQueryKeys, key, query.queryKey);
     }
+    replaceQueryKeyMap(checkoutDiffQueryKeys, nextCheckoutDiffQueryKeys);
+    replaceQueryKeyMap(terminalQueryKeys, nextTerminalQueryKeys);
 
     reconcileCheckoutDiffSubscriptions({
       active: activeCheckoutDiffSubscriptions,
@@ -251,6 +277,7 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       desired: desiredCheckoutDiffSubscriptions,
       serverId: input.serverId,
       queryClient: input.queryClient,
+      queryKeys: checkoutDiffQueryKeys,
     });
     reconcileTerminalSubscriptions({
       active: activeTerminalSubscriptions,
@@ -258,11 +285,9 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       desired: desiredTerminalSubscriptions,
       apply: (route, payload) =>
         applyTerminalsChanged({
-          activeCheckoutDiffSubscriptions,
-          activeTerminalSubscriptions,
           queryClient: input.queryClient,
-          serverId: input.serverId,
           route,
+          queryKeys: terminalQueryKeys.get(workspaceTerminalSubscriptionKey(route)),
           message: { type: "terminals_changed", payload },
         }),
     });
@@ -328,6 +353,7 @@ function reconcileCheckoutDiffSubscriptions(input: {
   desired: Map<string, CheckoutDiffRoute>;
   serverId: string;
   queryClient: QueryClient;
+  queryKeys: Map<string, Set<QueryKey>>;
 }): void {
   for (const [key, current] of input.active) {
     const desired = input.desired.get(key);
@@ -346,10 +372,8 @@ function reconcileCheckoutDiffSubscriptions(input: {
       if (input.active.get(key) !== registration) return;
       const { subscriptionId, ...snapshot } = payload;
       setCheckoutDiffPayload({
-        activeCheckoutDiffSubscriptions: input.active,
         queryClient: input.queryClient,
-        serverId: input.serverId,
-        subscriptionId: key,
+        queryKeys: input.queryKeys.get(key),
         payload: {
           ...snapshot,
           files: orderCheckoutDiffFiles(payload.files),
@@ -426,59 +450,28 @@ function applyDaemonConfigStatus(input: {
 }
 
 function setCheckoutDiffPayload(input: {
-  activeCheckoutDiffSubscriptions: Map<string, CheckoutDiffRoute>;
   queryClient: QueryClient;
-  serverId: string;
-  subscriptionId: string;
+  queryKeys: Set<QueryKey> | undefined;
   payload: CheckoutDiffCachePayload;
 }): void {
-  for (const query of input.queryClient.getQueryCache().getAll()) {
-    const route =
-      getServerDataRoute(query) ??
-      getActiveCheckoutDiffRouteForQueryKey({
-        active: input.activeCheckoutDiffSubscriptions,
-        queryKey: query.queryKey,
-        serverId: input.serverId,
-      });
-    if (
-      !route ||
-      route.domain !== "checkoutDiff" ||
-      route.serverId !== input.serverId ||
-      route.subscriptionId !== input.subscriptionId
-    ) {
-      continue;
-    }
-    query.setOptions({ ...query.options, structuralSharing: shareCheckoutDiff });
-    input.queryClient.setQueryData<CheckoutDiffCachePayload>(query.queryKey, input.payload);
+  for (const queryKey of input.queryKeys ?? []) {
+    const query = input.queryClient.getQueryCache().find({ queryKey, exact: true });
+    query?.setOptions({ ...query.options, structuralSharing: shareCheckoutDiff });
+    input.queryClient.setQueryData<CheckoutDiffCachePayload>(queryKey, input.payload);
   }
 }
 
 function applyTerminalsChanged(input: {
-  activeCheckoutDiffSubscriptions: Map<string, CheckoutDiffRoute>;
-  activeTerminalSubscriptions: Map<string, WorkspaceTerminalsRoute>;
   queryClient: QueryClient;
-  serverId: string;
+  queryKeys: Set<QueryKey> | undefined;
   message: TerminalsChangedMessage;
   route: WorkspaceTerminalsRoute;
 }): void {
-  for (const query of input.queryClient.getQueryCache().getAll()) {
-    const route = getActiveServerDataRoute(query, input.serverId, {
-      checkoutDiff: input.activeCheckoutDiffSubscriptions,
-      workspaceTerminals: input.activeTerminalSubscriptions,
-    });
-    if (
-      !route ||
-      route.domain !== "workspaceTerminals" ||
-      !areWorkspaceTerminalsRoutesEqual(route, input.route)
-    ) {
-      continue;
-    }
-
-    const matchingTerminals = input.message.payload.terminals.filter(
-      (terminal) => terminal.workspaceId === route.workspaceId,
-    );
-
-    input.queryClient.setQueryData<ListTerminalsPayload>(query.queryKey, (current) => ({
+  const matchingTerminals = input.message.payload.terminals.filter(
+    (terminal) => terminal.workspaceId === input.route.workspaceId,
+  );
+  for (const queryKey of input.queryKeys ?? []) {
+    input.queryClient.setQueryData<ListTerminalsPayload>(queryKey, (current) => ({
       cwd: input.message.payload.cwd,
       terminals: matchingTerminals,
       requestId: current?.requestId ?? `terminals-changed-${Date.now()}`,

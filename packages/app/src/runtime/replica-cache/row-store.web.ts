@@ -357,7 +357,34 @@ export function createIndexedDbReplicaRowStore(
     });
   }
 
-  return { open, read, readAll, readHostSummaries, apply, deleteHost, renameHost, clear };
+  async function readMetadata(key: string): Promise<string | null> {
+    const transaction = getDatabase().transaction(META_STORE, "readonly");
+    const completion = transactionComplete(transaction);
+    const value = await requestResult<string | undefined>(
+      transaction.objectStore(META_STORE).get(key),
+    );
+    await completion;
+    return value ?? null;
+  }
+
+  async function writeMetadata(key: string, value: string): Promise<void> {
+    await runTransaction(getDatabase(), META_STORE, async (transaction) => {
+      await requestResult(transaction.objectStore(META_STORE).put(value, key));
+    });
+  }
+
+  return {
+    open,
+    read,
+    readAll,
+    readHostSummaries,
+    apply,
+    deleteHost,
+    renameHost,
+    clear,
+    readMetadata,
+    writeMetadata,
+  };
 }
 
 export function createReplicaRowStore(): ReplicaRowStore {

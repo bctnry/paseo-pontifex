@@ -1,7 +1,7 @@
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { BrowserAutomationBrowserIdSchema } from "@getpaseo/protocol/browser-automation/rpc-schemas";
 import { create } from "zustand";
-import { persist } from "zustand/middleware";
+import { persist, type PersistStorage, type StorageValue } from "zustand/middleware";
 import { createValidatedPersistStorage } from "@/storage/validated-persist-storage";
 import {
   applyBrowserPatch,
@@ -43,6 +43,59 @@ function createBrowserId(): string {
   return BrowserAutomationBrowserIdSchema.parse(browserId);
 }
 
+const BROWSER_STORE_WRITE_INTERVAL_MS = 250;
+
+function createBrowserStoreStorage(): PersistStorage<BrowserIndexState> {
+  const base = createValidatedPersistStorage(AsyncStorage, BrowserIndexStateSchema);
+  interface PendingWrite {
+    name: string;
+    value: StorageValue<BrowserIndexState>;
+  }
+  let pending: PendingWrite | null = null;
+  let timer: ReturnType<typeof setTimeout> | null = null;
+  let lastWriteAt = 0;
+
+  const flush = async () => {
+    timer = null;
+    const next = pending;
+    pending = null;
+    if (!next) return;
+    lastWriteAt = Date.now();
+    try {
+      await base.setItem(next.name, next.value);
+    } catch (error) {
+      console.error("[browser-store] Failed to persist browser state", error);
+    }
+  };
+
+  const storage: PersistStorage<BrowserIndexState> = {
+    getItem: base.getItem,
+    removeItem: (name) => {
+      if (pending?.name === name) pending = null;
+      return base.removeItem(name);
+    },
+    async setItem(name, value) {
+      const now = Date.now();
+      if (lastWriteAt === 0 || now - lastWriteAt >= BROWSER_STORE_WRITE_INTERVAL_MS) {
+        if (timer) {
+          clearTimeout(timer);
+          timer = null;
+        }
+        if (pending) await flush();
+        lastWriteAt = now;
+        await base.setItem(name, value);
+        return;
+      }
+      pending = { name, value };
+      timer ??= setTimeout(
+        () => void flush(),
+        BROWSER_STORE_WRITE_INTERVAL_MS - (now - lastWriteAt),
+      );
+    },
+  };
+  return storage;
+}
+
 export const useBrowserStore = create<BrowserStoreState>()(
   persist(
     (set) => ({
@@ -76,7 +129,7 @@ export const useBrowserStore = create<BrowserStoreState>()(
     }),
     {
       name: "workspace-browser-store",
-      storage: createValidatedPersistStorage(AsyncStorage, BrowserIndexStateSchema),
+      storage: createBrowserStoreStorage(),
       partialize: (state) => sanitizeBrowsersForPersist(state),
       merge: (persistedState, currentState) => ({
         ...currentState,

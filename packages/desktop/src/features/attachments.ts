@@ -148,6 +148,14 @@ export async function copyAttachmentFileToManagedStorage(input: {
   };
 }
 
+export async function readAttachmentSourceBytes(input: { path?: unknown }): Promise<Uint8Array> {
+  if (typeof input.path !== "string" || input.path.trim().length === 0) {
+    throw new Error("Attachment source path is required.");
+  }
+  const bytes = await readFile(path.resolve(input.path.trim()));
+  return new Uint8Array(bytes);
+}
+
 export async function readManagedFileBase64(input: { path?: unknown }): Promise<string> {
   const filePath = resolveManagedAttachmentPath(input.path);
   const bytes = await readFile(filePath);

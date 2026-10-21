@@ -2,7 +2,7 @@ import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { copyAttachmentFileToManagedStorage } from "./attachments";
+import { copyAttachmentFileToManagedStorage, readAttachmentSourceBytes } from "./attachments";
 
 const originalPaseoHome = process.env.PASEO_HOME;
 let testHome: string | null = null;
@@ -43,6 +43,16 @@ describe("desktop attachment files", () => {
       byteSize: 9,
     });
     await expect(readFile(result.path, "utf8")).resolves.toBe("# Report\n");
+  });
+
+  it("reads source bytes directly for upload without a managed copy", async () => {
+    const paseoHome = await useTempPaseoHome();
+    const sourcePath = path.join(paseoHome, "report.md");
+    await writeFile(sourcePath, "# Report\n");
+
+    const bytes = await readAttachmentSourceBytes({ path: sourcePath });
+
+    expect([...bytes]).toEqual([...Buffer.from("# Report\n")]);
   });
 
   it("normalizes legacy bare extensions for managed copies", async () => {

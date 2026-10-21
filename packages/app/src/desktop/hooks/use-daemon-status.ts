@@ -1,4 +1,4 @@
-import { useCallback } from "react";
+import { useCallback, useMemo } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import {
@@ -11,10 +11,11 @@ import {
 import { useDesktopIpcQueryErrorToast } from "@/desktop/hooks/desktop-ipc-error";
 
 const DAEMON_STATUS_QUERY_KEY = ["desktopDaemonStatus"] as const;
+const DAEMON_LOGS_QUERY_KEY = ["desktopDaemonLogs"] as const;
 
 interface DaemonStatusData {
   status: DesktopDaemonStatus;
-  logs: DesktopDaemonLogs;
+  logs: DesktopDaemonLogs | null;
 }
 
 export function useDaemonStatus() {
@@ -22,17 +23,32 @@ export function useDaemonStatus() {
   const queryClient = useQueryClient();
   const enabled = shouldUseDesktopDaemon();
 
-  const query = useQuery<DaemonStatusData, Error>({
+  const query = useQuery<DesktopDaemonStatus, Error>({
     queryKey: DAEMON_STATUS_QUERY_KEY,
     enabled,
     staleTime: 30_000,
     refetchOnMount: "always",
     retry: false,
-    queryFn: async () => {
-      const [status, logs] = await Promise.all([getDesktopDaemonStatus(), getDesktopDaemonLogs()]);
-      return { status, logs };
-    },
+    queryFn: getDesktopDaemonStatus,
   });
+  const logsQuery = useQuery<DesktopDaemonLogs, Error>({
+    queryKey: DAEMON_LOGS_QUERY_KEY,
+    enabled,
+    staleTime: 30_000,
+    refetchOnMount: false,
+    retry: false,
+    queryFn: getDesktopDaemonLogs,
+  });
+  const data = useMemo<DaemonStatusData | null>(
+    () =>
+      query.data
+        ? {
+            status: query.data,
+            logs: logsQuery.data ?? null,
+          }
+        : null,
+    [logsQuery.data, query.data],
+  );
   useDesktopIpcQueryErrorToast({
     error: query.error,
     message: t("desktop.daemon.loadFailed"),
@@ -41,9 +57,7 @@ export function useDaemonStatus() {
 
   const setStatus = useCallback(
     (status: DesktopDaemonStatus) => {
-      queryClient.setQueryData<DaemonStatusData>(DAEMON_STATUS_QUERY_KEY, (prev) =>
-        prev ? { ...prev, status } : undefined,
-      );
+      queryClient.setQueryData<DesktopDaemonStatus>(DAEMON_STATUS_QUERY_KEY, status);
     },
     [queryClient],
   );
@@ -53,7 +67,7 @@ export function useDaemonStatus() {
   }, [queryClient]);
 
   return {
-    data: query.data ?? null,
+    data,
     isLoading: query.isLoading,
     error: query.error instanceof Error ? query.error.message : null,
     setStatus,

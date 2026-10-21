@@ -352,6 +352,7 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
   const pendingAutoScrollFrameRef = useRef<number | null>(null);
   const pendingAutoScrollTimeoutRef = useRef<number | null>(null);
   const historyStartReadyRef = useRef(false);
+  const [contentWidth, setContentWidth] = useState(0);
   const [historyStartPaginationState, setHistoryStartPaginationState] = useState(
     createHistoryStartPaginationState,
   );
@@ -440,7 +441,6 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
       unsubscribe?.();
     };
   }, []);
-  const contentWidth = contentRef.current?.getBoundingClientRect().width;
   const rowVirtualizer = useVirtualizer({
     count: segments.historyVirtualized.length,
     enabled: shouldUseVirtualizer,
@@ -767,11 +767,22 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
   }, [
     contentWidth,
     isActive,
-    segments,
+    segments.historyMounted,
+    segments.historyVirtualized,
     virtualRows,
     measureVirtualizedRows,
     reconcileReadingPosition,
   ]);
+
+  useEffect(() => {
+    const heights = measuredRowHeights.current;
+    const liveIds = new Set<string>();
+    for (const item of segments.historyVirtualized) liveIds.add(item.id);
+    for (const item of segments.historyMounted) liveIds.add(item.id);
+    for (const id of heights.keys()) {
+      if (!liveIds.has(id)) heights.delete(id);
+    }
+  }, [segments.historyMounted, segments.historyVirtualized]);
 
   const stopFollowingOutputFromUserIntent = useStableEvent(() => {
     cancelPendingStickToBottom();
@@ -953,10 +964,18 @@ function WebStreamViewport(props: StreamRenderInput & { isMobileBreakpoint: bool
       updateScrollMetrics();
       evaluateHistoryStart();
     }
+    if (contentNode) {
+      const width = contentNode.getBoundingClientRect().width;
+      setContentWidth((previous) => (Math.abs(previous - width) < 0.5 ? previous : width));
+    }
     const observer = new ResizeObserver(() => {
       flushSync(() => {
         measureVirtualizedRows();
       });
+      if (contentNode) {
+        const width = contentNode.getBoundingClientRect().width;
+        setContentWidth((previous) => (Math.abs(previous - width) < 0.5 ? previous : width));
+      }
       const nextGeometry = getObservedViewportGeometry(scrollContainer);
       if (pendingResumeGeometryCheckRef.current) {
         pendingResumeGeometryCheckRef.current = false;

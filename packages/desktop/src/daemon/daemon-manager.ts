@@ -16,6 +16,7 @@ import {
   copyAttachmentFileToManagedStorage,
   deleteManagedAttachmentFile,
   garbageCollectManagedAttachmentFiles,
+  readAttachmentSourceBytes,
   readManagedFileBase64,
   writeAttachmentBase64,
   writeAttachmentBytes,
@@ -220,7 +221,16 @@ function resolveDesktopAppVersion(): string {
 // Daemon lifecycle
 // ---------------------------------------------------------------------------
 
-export async function resolveDesktopDaemonStatus(): Promise<DesktopDaemonStatus> {
+let inFlightStatusProbe: Promise<DesktopDaemonStatus> | null = null;
+
+export function resolveDesktopDaemonStatus(): Promise<DesktopDaemonStatus> {
+  inFlightStatusProbe ??= resolveDesktopDaemonStatusUncached().finally(() => {
+    inFlightStatusProbe = null;
+  });
+  return inFlightStatusProbe;
+}
+
+async function resolveDesktopDaemonStatusUncached(): Promise<DesktopDaemonStatus> {
   const home = getPaseoHome();
 
   try {
@@ -433,6 +443,7 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
     write_attachment_base64: (args) => writeAttachmentBase64(args ?? {}),
     write_attachment_bytes: (args) => writeAttachmentBytes(args ?? {}),
     copy_attachment_file: (args) => copyAttachmentFileToManagedStorage(args ?? {}),
+    read_attachment_source_bytes: (args) => readAttachmentSourceBytes(args ?? {}),
     read_file_base64: (args) => readManagedFileBase64(args ?? {}),
     delete_attachment_file: (args) => deleteManagedAttachmentFile(args ?? {}),
     garbage_collect_attachment_files: (args) => garbageCollectManagedAttachmentFiles(args ?? {}),
@@ -477,14 +488,15 @@ export function createDaemonCommandHandlers(): Record<string, DesktopCommandHand
 export function registerDaemonManager(): void {
   const handlers = createDaemonCommandHandlers();
 
-  ipcMain.handle(
-    "paseo:invoke",
-    async (_event, command: string, args?: Record<string, unknown>) => {
-      const handler = handlers[command];
-      if (!handler) {
-        throw new Error(`Unknown desktop command: ${command}`);
-      }
-      return await handler(args);
-    },
-  );
+  ipcMain.handle("paseo:invoke", async (event, command: string, args?: Record<string, unknown>) => {
+    if (command === "open_local_daemon_transport") {
+      openLocalTransportSession(args, event.sender.id);
+      return;
+    }
+    const handler = handlers[command];
+    if (!handler) {
+      throw new Error(`Unknown desktop command: ${command}`);
+    }
+    return await handler(args);
+  });
 }

@@ -1,6 +1,9 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import { buildWorkspaceAgentActivityIndex } from "./workspace-agent-activity";
+import {
+  buildWorkspaceAgentActivityIndex,
+  updateWorkspaceAgentActivityIndex,
+} from "./workspace-agent-activity";
 
 function agent(input: {
   id: string;
@@ -279,6 +282,49 @@ describe("workspace agent activity index", () => {
 
     expect(next).toBe(previous);
     expect(next.get("workspace-a")?.enteredAt).toEqual(new Date("2026-06-01T10:00:00.000Z"));
+  });
+
+  it("updates only workspaces touched by changed agents", () => {
+    const previousAgents = new Map([
+      [
+        "root-a",
+        agent({
+          id: "root-a",
+          workspaceId: "workspace-a",
+          status: "running",
+          updatedAt: "2026-06-01T10:00:00.000Z",
+        }),
+      ],
+      [
+        "root-b",
+        agent({
+          id: "root-b",
+          workspaceId: "workspace-b",
+          status: "idle",
+          updatedAt: "2026-06-01T10:01:00.000Z",
+        }),
+      ],
+    ]);
+    const previous = buildWorkspaceAgentActivityIndex(previousAgents);
+    const nextAgents = new Map(previousAgents);
+    nextAgents.set(
+      "root-a",
+      agent({
+        id: "root-a",
+        workspaceId: "workspace-a",
+        status: "idle",
+        updatedAt: "2026-06-01T10:05:00.000Z",
+      }),
+    );
+
+    const next = updateWorkspaceAgentActivityIndex(previousAgents, nextAgents, previous);
+
+    expect(next).not.toBe(previous);
+    expect(next.get("workspace-a")?.status).toBe("done");
+    expect(next.get("workspace-b")).toBe(previous.get("workspace-b"));
+    expect(updateWorkspaceAgentActivityIndex(previousAgents, previousAgents, previous)).toBe(
+      previous,
+    );
   });
 
   it("records a new entry time when an agent changes status", () => {

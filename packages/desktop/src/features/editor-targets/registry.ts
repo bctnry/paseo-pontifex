@@ -58,13 +58,12 @@ export async function listAvailableEditorTargets(
   runtime: EditorTargetRuntime,
   targets: readonly EditorTarget[] = EDITOR_TARGETS,
 ): Promise<EditorTargetDescriptor[]> {
-  const descriptors: EditorTargetDescriptor[] = [];
-  for (const target of targets) {
-    if (await target.isInstalled(runtime)) {
-      descriptors.push(await target.describe(runtime));
-    }
-  }
-  return descriptors;
+  const descriptors = await Promise.all(
+    targets.map(async (target) =>
+      (await target.isInstalled(runtime)) ? await target.describe(runtime) : null,
+    ),
+  );
+  return descriptors.filter((descriptor): descriptor is EditorTargetDescriptor => !!descriptor);
 }
 
 export function getEditorTarget(

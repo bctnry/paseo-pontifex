@@ -210,188 +210,112 @@ Done in this pass.
 - Tests cover both a text `Buffer` frame and a binary frame, plus text/binary
   sends through the renderer transport.
 
-## P1 — significant waste
+### Live tool groups and history rows
 
-### P1.1 Live tool groups and history rows still do O(history) work per delta
+Done in this pass.
 
-- `packages/app/src/tool-calls/detail-level/grouping.ts:213-226` copies the
-  whole historical group map and creates a fresh update map while a live group
-  exists.
-- `packages/app/src/agent-stream/history-row-revision.ts:28-50` maps over all
-  virtualized rows, producing new array identities.
-- `packages/app/src/agent-stream/strategy-web.tsx:762-774` reruns measurement and
-  reading-position reconciliation whenever `segments` changes, including
-  live-head-only ticks; `:443` reads `getBoundingClientRect()` during render.
-- `packages/app/src/agent-stream/strategy-web.tsx:562-574` and `:956-996`
-  measure all mounted virtual rows and `flushSync` from ResizeObservers.
+- `groupLiveToolCalls` overlays live groups on the prepared history map instead of
+  copying it. Unchanged live groups reuse the prepared group object, and only
+  groups whose run identity actually changed enter `historyGroupUpdatesByHostId`.
+- `useRevisedHistoryRows` returns the input array when no revision applies. Compact
+  mode keeps one cached row variant; regular mode no longer clones every row.
+- The web viewport reads content width from a ResizeObserver-backed state instead of
+  `getBoundingClientRect()` during render. Its layout effect now depends on the two
+  history arrays, not the whole `segments` object, so live-head-only ticks skip
+  virtual-row measurement and reading-position reconciliation.
+- Measured row heights are pruned when their history identity leaves both segments.
 
-Fix: return a composite live→history lookup instead of copying, publish
-revisions only for groups that changed, return the previous row array when no
-revision applied, key measurement on history identity, skip virtual-row
-measurement for live-head growth, and cache content width from a resize effect.
-**Measure:** `agent-stream/stream-tick.bench.ts` with a tool-heavy turn.
+### Directory sync, git status, reconnect, and push routing
 
-### P1.2 Directory sync, git status, and reconnect amplify RPCs and writes
+Done in this pass.
 
-- `packages/app/src/runtime/directory-sync/index.ts:486-493` loads and
-  validates the cached directory before issuing the network fetch.
-- `:646-657` calls `replaceDirectoryBaseline` after both refreshes, re-queuing
-  every row that `commitSnapshot` already persisted.
-- `packages/app/src/git/checkout-status-cache.ts:78-80` invalidates the commit
-  list on every `checkout_status_update`.
-- `packages/app/src/runtime/host-runtime.ts:2383-2393` runs the full reconnect
-  invalidation set on every offline→online transition.
-- `packages/app/src/data/push-router.ts:435,464` scans the entire TanStack query
-  cache for every diff/terminal push.
+- Agent directory hydration starts alongside the network request. The refresh waits
+  for the cache only at commit time, so the cache baseline is still merged before the
+  snapshot replaces the replica.
+- `refreshAll` no longer calls `replaceDirectoryBaseline` after both refresh paths
+  have already persisted their snapshots and deltas.
+- Checkout commit caches are invalidated only when branch, base/upstream ref, or
+  ahead/behind counts change; dirty-state-only pushes keep the cached commit list.
+- Checkout-diff and workspace-terminal pushes use route-to-query-key indexes built
+  during subscription reconciliation instead of scanning the whole query cache per
+  event.
+- Reconnect repair skips sub-second flaps. A longer offline period still invalidates
+  checkout git and server-data caches, because pushes emitted while disconnected are
+  gone.
 
-Fix: start the network fetch concurrently with cache hydration; drop the
-redundant baseline; invalidate commits only when HEAD/branch/ahead-behind
-changed; debounce reconnect repair by offline duration; keep route→query-key
-mappings instead of scanning. **Measure:** RPC counts during boot/reconnect and
-while saving files.
+### Agent directory fanout
 
-### P1.3 Agent directory fanout rebuilds global indexes per event
+Done in this pass.
 
-- `packages/app/src/stores/session-store.ts:1501` rebuilds
-  `workspaceAgentActivity` by scanning all agents on every `setAgents`.
-- `packages/app/src/hooks/use-aggregated-agents.ts:106-111` deep-compares every
-  agent and re-sorts the full list on every agents-map change; the hook is
-  mounted at the root through the favicon status path.
-- `packages/app/src/utils/workspace-agent-activity.ts:16-63` scans all agents.
+- `setAgents` updates the workspace activity index incrementally. Only workspaces
+  touched by a changed or removed agent are recomputed, and unchanged entries keep
+  their identity.
+- The favicon reads a single running/attention selector from the session store. It
+  no longer builds and sorts the aggregated agent list just to choose an icon.
+- Directory demand for the favicon selector is still acquired for each host.
 
-Fix: update the activity index incrementally from the changed agent; scope the
-favicon/attention selector to running/attention agents instead of building the
-full sorted list. **Measure:** event-loop delay and render counts with 200+
-agents.
+### Desktop runtime follow-ups
 
-## P2 — desktop and smaller items
+Done in this pass.
 
-### Desktop runtime
+- Daemon log tails read bounded chunks backwards, decode UTF-8 once after
+  concatenation, and stop after enough newlines. The status and log queries are
+  split; logs are fetched once per mount window instead of on every status remount.
+- Window resize events are coalesced in the main process and carry fullscreen and
+  maximized booleans. The renderer applies them directly and avoids two IPC reads
+  per resize.
+- File-picker and drag-drop attachments read source bytes directly and cross IPC as
+  typed arrays. The managed copy + base64 decode round trip is gone from the upload
+  path.
+- Daemon status probes share an in-flight promise. Server-id polling backs off to a
+  five-second ceiling while the daemon has not reported an id.
+- Local transport events are sent only to the owning `webContents`; other windows no
+  longer receive and discard them.
+- Editor target discovery probes all targets in parallel.
+- Closed browser tabs notify the automation registry, which drops their snapshot ref
+  maps instead of retaining them until the host window closes.
+- Browser automation console buffers trim in place instead of allocating a new array
+  per message.
 
-- **P2.1 Daemon log tail blocks the main process.**
-  `packages/desktop/src/diagnostics/tail-file.ts:9` reads the whole file with
-  `readFileSync`; `packages/desktop/src/daemon/daemon-manager.ts:372` calls it
-  for `desktop_daemon_logs`, and
-  `packages/app/src/desktop/hooks/use-daemon-status.ts:25-34` fetches status and
-  logs together on every mount with `refetchOnMount: "always"`. Fix: bounded
-  read from the end; split status/log queries. **Low effort, high value on
-  multi-MB logs.**
-- **P2.2 Window resize IPC storm.** `packages/desktop/src/window/window-manager.ts:225`
-  sends an event per resize/fullscreen transition;
-  `packages/app/src/utils/desktop-window.tsx:172-188` responds with two `invoke`
-  calls and an unconditional state commit. Coalesce in main, include the
-  booleans, bail when unchanged.
-- **P2.3 Attachment copy/read/base64 round trip.**
-  `packages/app/src/attachments/selected-file.ts:20-27` copies a file to managed
-  storage, reads it back as base64, and decodes it for upload;
-  `packages/app/src/composer/actions.ts:125-152` reads up to 50 MB per file.
-  Read source bytes directly and pass typed arrays over IPC.
-- **P2.4 Daemon status spawns a CLI process per probe.**
-  `packages/desktop/src/daemon/daemon-manager.ts:229` falls back to
-  `runExternalCliJsonCommand(["daemon","status",...])` when an instance file
-  exists; `packages/app/src/hooks/use-is-local-daemon.ts:27` can poll every
-  second when the daemon never reports a server id. Memoize the probe, share the
-  in-flight promise, read pid/lock fields directly, and bound server-id polling.
-- **P2.5 Multi-window transport broadcast.**
-  `packages/desktop/src/daemon/local-transport.ts:85-89` sends every transport
-  event to every window; each renderer discards other sessions. Record the
-  owning `webContents.id` and send only to it.
-- **P2.6 Browser store persistence on every URL/title/loading patch.**
-  `packages/app/src/desktop/browser/store/index.ts:46-86` serializes all browser
-  records through `sanitizeBrowsersForPersist` on each update. Debounce or
-  persist only tab create/close/navigation settle.
-- **P2.7 Console log array copy per message.**
-  `packages/desktop/src/features/browser-automation/ipc.ts:210-215` allocates a
-  new 200-element array for every console message. Trim in place only when over
-  the cap.
-- **P2.8 Login-shell environment blocks first window.**
-  `packages/desktop/src/login-shell-env.ts:288-298` runs `spawnSync` of the
-  login shell before `app.whenReady()`/window creation
-  (`desktop-startup.ts:8-14`, `main.ts:1018-1022`). Make it async and await it
-  only on the child-process launch path.
-- **P2.9 Editor target discovery is sequential.**
-  `packages/desktop/src/features/editor-targets/registry.ts:57-68` awaits each
-  target's `isInstalled`/`describe`; `runtime.ts:59-91` probes PATH with sync
-  `existsSync` and reads each icon. Parallelize and load icons lazily.
-- **P2.10 Browser automation state for closed tabs.**
-  `packages/desktop/src/features/browser-automation/snapshot-engine.ts:70-112`
-  retains ref maps until `clearBrowser`; tab close never calls it. Add a
-  `paseo:browser:forget` IPC on close or evict on guest `destroyed`.
+### Small app follow-ups
 
-### Small, cheap wins
+Done in this pass.
 
-- **P2.11 `JSON.stringify` equality in the session-store notification path.**
-  `packages/app/src/panels/agent-panel.tsx:611,778` compares
-  `projectPlacement` with `JSON.stringify` twice per store notification. Use
-  `shallow` or explicit fields.
-- **P2.12 Height cache hashes the revealed message during streaming.**
-  `packages/app/src/components/message.tsx:970-972` calls
-  `setAssistantMessageHeight` on every `onLayout`;
-  `packages/app/src/utils/assistant-message-height-estimate.ts:22-66` FNV-hashes
-  the whole text. Skip cache writes while `phase === "streaming"` and record the
-  final height.
-- **P2.13 Grapheme clamp scans the full target every reveal frame.**
-  `packages/app/src/agent-stream/text-reveal.ts:95` runs
-  `graphemeSegmenter.segment(text).containing(index)` while the reveal trails.
-  Check code units around the boundary first; only fall back to the segmenter
-  when the cut can split a cluster.
-- **P2.14 `findItems` copies the whole timeline per delta.**
-  `packages/app/src/agent-stream/view.tsx:1077-1080` concatenates tail + head on
-  every head change; `chat-find/index.web.tsx:97-99` then updates history. Keep
-  the arrays separate or cache a two-array view.
-- **P2.15 History-page merge is O(page × tail).**
-  `packages/app/src/timeline/session-stream-reducers.ts:229-253` uses
-  `findIndex` per hydrated item. Build an identity/message-id index once per
-  merge.
-- **P2.16 Sidebar context value changes identity every provider render.**
-  `packages/app/src/hooks/use-sidebar-workspaces-list.ts:195-201` returns a
-  fresh object; `packages/app/src/components/sidebar/sidebar-model.tsx:178-204`
-  puts it in the context value. Memoize the returned object or drop `list` from
-  the value deps.
-- **P2.17 Each sidebar row subscribes to the whole label catalog.**
-  `packages/app/src/components/sidebar/sidebar-workspace-row-content.tsx:127`
-  uses `useWorkspaceLabelDefinitions`, which selects `state.hosts` (all hosts)
-  in `packages/app/src/workspace-labels/index.ts:107-115`. Select only the row's
-  host snapshot, or pass the resolved definitions down.
-- **P2.18 Explorer rows re-render on selection.**
-  `packages/app/src/components/file-explorer-pane.tsx:946-1025` puts
-  `selectedEntryPath` in `renderTreeRow`; rows are plain components. React
-  Compiler may mitigate this; if profiling shows it, pass selection through item
-  data/`extraData` and memoize the row.
-- **P2.19 Changes tree uses default windowing.**
-  `packages/app/src/git/changed-files-tree.tsx:139-148` has no
-  `initialNumToRender`/`windowSize`; `DiffFolderRow` is not memoized. Match the
-  file explorer's FlatList settings.
-- **P2.20 Banned `useUnistyles()` calls in warm subtrees.**
-  `packages/app/src/components/file-explorer-pane.tsx:1155` and
-  `packages/app/src/components/resize-handle.tsx:49` subscribe to every
-  Unistyles runtime change. Move colors to leaf components or
-  `StyleSheet.create`.
-- **P2.21 Over-cap assistant messages re-segment on every store tick.**
-  `packages/app/src/components/assistant-message-render-limit.web.ts:19-27`
-  segments the whole message to find the cut. The boundary is fixed per message
-  identity; compute it once.
-- **P2.22 `measuredRowHeights` is never pruned.**
-  `packages/app/src/agent-stream/strategy-web.tsx:360,740` retains geometry for
-  every row ever mounted, including replaced timeline epochs. Bound it or clear
-  it on epoch change.
-- **P2.23 Plugin timeline transforms deep-clone changed items.**
-  `packages/app/src/plugins/timeline/projection.ts:97-101` calls
-  `cloneAndFreeze(source)`; a running tool call with large `detail` is re-cloned
-  each tick. Clone only on mutation, or copy-on-write.
-- **P2.24 Heartbeat fires from `wheel`/`touchstart` events.**
-  `packages/app/src/hooks/use-client-activity.ts:77-82` and
-  `client-activity-tracker.ts:67-73` check the throttle on every wheel event.
-  Keep `recordUserActivity`, but drive immediate heartbeats from a trailing
-  timer.
-- **P2.25 Plugin bundles are `eval`'d synchronously at first catalog load.**
-  `packages/app/src/plugins/evaluate.ts:465-469` and
-  `plugins/registry.ts:106-110` run during the startup burst. Defer to an idle
-  callback or evaluate lazily when a plugin surface is rendered.
-- **P2.26 Legacy replica DB delete runs every cold start.**
-  `packages/app/src/runtime/replica-cache/index.ts:1550-1557` waits for
-  `deleteDatabase("paseo-replica-cache")` on every boot. Record a migration flag
-  in the new DB's `meta` store and skip after the first run.
+- Browser store persistence coalesces rapid URL/title/loading patches to one write per
+  250 ms.
+- Agent panel placement comparisons use deep equality instead of `JSON.stringify`.
+- Streaming assistant messages skip height-cache writes until the final layout.
+- Reveal boundary clamping handles ASCII, surrogate pairs, combining marks, ZWJ
+  sequences, flags, and Hangul jamo without segmenting the whole target on every
+  frame.
+- Chat find receives tail and head arrays separately instead of concatenating the
+  timeline per delta.
+- History-page reconciliation indexes projected rows once per merge.
+- Sidebar list results are memoized, and each workspace row subscribes only to its
+  own host label catalog.
+- Changes-tree lists use the file explorer's initial render, batch, and window sizes.
+- Explorer and resize-handle colors moved out of `useUnistyles()` into themed icon
+  wrappers and `StyleSheet.create`.
+- Over-cap assistant messages reuse the first computed cap while text only appends.
+- Heartbeats from wheel/touch activity are driven by a trailing timer.
+- Legacy replica DB cleanup records a metadata flag and skips after the first boot.
+
+## P2 — remaining
+
+These are deliberately left for a later pass; the common paths above are already
+covered.
+
+- **P2.4 Daemon status probe.** In-flight sharing and server-id backoff are in place.
+  Reading pid/lock fields without the CLI needs a daemon version source other than
+  the status websocket.
+- **P2.8 Login-shell environment.** The synchronous login-shell probe still runs
+  before the first window. Moving it to an async spawn needs a shared readiness
+  promise on the daemon launch path.
+- **P2.18 Explorer selection rows.** Rows still receive `selectedEntryPath` through
+  `renderTreeRow`. React Compiler mitigation is unmeasured; change only with a
+  profile that shows the rerenders.
+- **P2.23 Plugin timeline clone.** Running tool calls still deep-clone their detail
+  payload before each transform. A copy-on-write DTO needs plugin API changes.
 
 ## Already optimized — preserve these
 
@@ -424,10 +348,15 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 - Production daemon: `daemon.log` `ws_runtime_metrics` (`eventLoopDelay`,
   buffered amounts, git limiter stats).
 
-## Suggested order
+## Remaining order
 
-1. Desktop transport and log tail (P0.1, P2.1).
-2. History revision work (P1.1).
-3. Directory/git/reconnect amplification (P1.2).
-4. Agent-directory fanout (P1.3).
-5. Remaining P2 items as touch-time cleanup.
+1. Measure the completed paths before choosing another target: stream bench,
+   terminal latency over socket/SSH, and daemon log/status probes.
+2. Login-shell environment readiness (P2.8) if startup profiles still show the
+   synchronous shell probe on the critical path.
+3. Plugin timeline clone (P2.23) when a tool-heavy plugin setup shows detail cloning
+   in a profile.
+4. Explorer selection rerenders (P2.18) only if profiling still shows them after the
+   React Compiler pass.
+5. Daemon status direct lock reads (P2.4) once daemon version is available outside the
+   status websocket.

@@ -108,10 +108,15 @@ export function useWorkspaceLabelDefinitions(
   serverId: string,
   names: readonly string[] | undefined,
 ): readonly WorkspaceLabelDefinition[] {
-  const hostsById = useWorkspaceLabels((state) => state.hosts);
+  const host = useWorkspaceLabels((state) => state.hosts[serverId]);
   return useMemo(
-    () => selectWorkspaceLabelDefinitions({ hostsById, serverId, names }),
-    [hostsById, names, serverId],
+    () =>
+      selectWorkspaceLabelDefinitions({
+        hostsById: host ? { [serverId]: host } : {},
+        serverId,
+        names,
+      }),
+    [host, names, serverId],
   );
 }
 

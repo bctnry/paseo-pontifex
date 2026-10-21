@@ -75,9 +75,11 @@ export function applyCheckoutStatusUpdateFromEvent({
   if (previousStatus?.currentBranch !== payload.currentBranch) {
     void resetDraftAgentCommandsForCheckout(queryClient, { serverId, cwd: payload.cwd });
   }
-  void queryClient.invalidateQueries({
-    queryKey: checkoutCommitsQueryKey(serverId, payload.cwd),
-  });
+  if (hasCommitListChanged(previousStatus, payload)) {
+    void queryClient.invalidateQueries({
+      queryKey: checkoutCommitsQueryKey(serverId, payload.cwd),
+    });
+  }
   expireWorkingDiffComparisons({
     serverId,
     cwd: payload.cwd,
@@ -98,6 +100,23 @@ export function applyCheckoutStatusUpdateFromEvent({
   if (hasPrStatusChanged(previous, prStatus)) {
     void invalidatePrPaneTimelineForCheckout(queryClient, { serverId, cwd: prStatus.cwd });
   }
+}
+
+function hasCommitListChanged(
+  previous: CheckoutStatusPayload | undefined,
+  next: CheckoutStatusPayload,
+): boolean {
+  if (!previous) return true;
+  return (
+    previous.isGit !== next.isGit ||
+    previous.repoRoot !== next.repoRoot ||
+    previous.currentBranch !== next.currentBranch ||
+    previous.baseRef !== next.baseRef ||
+    previous.upstreamRef !== next.upstreamRef ||
+    !equal(previous.aheadBehind, next.aheadBehind) ||
+    previous.aheadOfOrigin !== next.aheadOfOrigin ||
+    previous.behindOfOrigin !== next.behindOfOrigin
+  );
 }
 
 // requestId changes on every emission and carries no PR state.

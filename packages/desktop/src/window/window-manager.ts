@@ -218,16 +218,30 @@ export function setupWindowResizeEvents(win: BrowserWindow): void {
   // A resize/fullscreen event can fire while the window is tearing down; sending
   // to a destroyed webContents throws. Guard so multi-window close doesn't surface
   // "Object has been destroyed" exceptions.
+  let pendingResize: ReturnType<typeof setTimeout> | null = null;
   const notifyResized = () => {
-    if (win.isDestroyed() || win.webContents.isDestroyed()) {
-      return;
-    }
-    win.webContents.send("paseo:window:resized", {});
+    if (pendingResize) return;
+    pendingResize = setTimeout(() => {
+      pendingResize = null;
+      if (win.isDestroyed() || win.webContents.isDestroyed()) {
+        return;
+      }
+      win.webContents.send("paseo:window:resized", {
+        isFullscreen: win.isFullScreen(),
+        isMaximized: win.isMaximized(),
+      });
+    }, 16);
   };
 
   win.on("resize", notifyResized);
   win.on("enter-full-screen", notifyResized);
   win.on("leave-full-screen", notifyResized);
+  win.once("closed", () => {
+    if (pendingResize) {
+      clearTimeout(pendingResize);
+      pendingResize = null;
+    }
+  });
 }
 
 /**

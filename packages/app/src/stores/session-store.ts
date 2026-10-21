@@ -50,7 +50,7 @@ import {
   type AgentLastActivityCommitter,
 } from "@/runtime/activity";
 import {
-  buildWorkspaceAgentActivityIndex,
+  updateWorkspaceAgentActivityIndex,
   type WorkspaceAgentActivity,
 } from "@/utils/workspace-agent-activity";
 import {
@@ -1501,7 +1501,8 @@ export const useSessionStore = create<SessionStore>()(
               [serverId]: {
                 ...session,
                 agents: nextAgents,
-                workspaceAgentActivity: buildWorkspaceAgentActivityIndex(
+                workspaceAgentActivity: updateWorkspaceAgentActivityIndex(
+                  session.agents,
                   nextAgents,
                   session.workspaceAgentActivity,
                 ),

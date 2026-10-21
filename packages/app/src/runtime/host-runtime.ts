@@ -230,6 +230,7 @@ const PROBE_LEAD_HEAD_START_MS = 250;
 const PROBE_STEADY_MS = 10_000;
 const PROBE_MAX_BACKOFF_MS = 30_000;
 const PROBE_INACTIVE_WHILE_ONLINE_MS = 120_000;
+const RECONNECT_REPAIR_MIN_OFFLINE_MS = 1_000;
 const ADAPTIVE_SWITCH_THRESHOLD_MS = 40;
 const ADAPTIVE_SWITCH_CONSECUTIVE_PROBES = 3;
 const CONFIGURED_OVERRIDE_BOOTSTRAP_RETRY_MS = 1_000;
@@ -2414,6 +2415,7 @@ export class HostRuntimeStore {
       },
     });
     const previousStatus = this.lastConnectionStatusByServer.get(serverId);
+    const previousStatusStartedAt = this.connectionStatusStartedAtByServer.get(serverId);
     const statusChanged = previousStatus !== snapshot.connectionStatus;
     const isUnavailable =
       snapshot.connectionStatus !== "online" && snapshot.connectionStatus !== "idle";
@@ -2427,12 +2429,18 @@ export class HostRuntimeStore {
       snapshot.connectionStatus === "online" && previousStatus !== "online";
     if (didTransitionOnline) {
       useSessionStore.getState().bumpHistorySyncGeneration(serverId);
-      // Checkout git data is push-driven; pushes emitted while disconnected are gone for
-      // good (the daemon dedupes by snapshot fingerprint). Mark the caches stale so active
-      // queries refetch now and evicted ones on their next mount.
-      void invalidateCheckoutGitQueriesForServer(queryClient, serverId);
-      invalidateServerDataQueriesAfterReconnect({ queryClient, serverId });
-      void queryClient.invalidateQueries({ queryKey: schedulesQueryBaseKey });
+      const offlineDurationMs =
+        previousStatusStartedAt === undefined ? Infinity : Date.now() - previousStatusStartedAt;
+      // A reconnect resubscribes the live directory and checkout subscriptions, which
+      // deliver a fresh snapshot. A sub-second flap does not need the full repair set.
+      if (wasUnavailable && offlineDurationMs >= RECONNECT_REPAIR_MIN_OFFLINE_MS) {
+        // Checkout git data is push-driven; pushes emitted while disconnected are gone for
+        // good (the daemon dedupes by snapshot fingerprint). Mark the caches stale so active
+        // queries refetch now and evicted ones on their next mount.
+        void invalidateCheckoutGitQueriesForServer(queryClient, serverId);
+        invalidateServerDataQueriesAfterReconnect({ queryClient, serverId });
+        void queryClient.invalidateQueries({ queryKey: schedulesQueryBaseKey });
+      }
     }
   }
 

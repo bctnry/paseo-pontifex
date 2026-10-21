@@ -1496,7 +1496,12 @@ export class ReplicaCache {
     this.preparePromise ??= (async () => {
       await this.rowStore.open();
       // COMPAT(replica-blob-cache): remove after 2026-11
-      await this.clearLegacyCache().catch(() => undefined);
+      const legacyCleanupKey = "legacy-blob-cache-cleared";
+      const cleaned = await this.rowStore.readMetadata?.(legacyCleanupKey).catch(() => null);
+      if (cleaned !== "1") {
+        await this.clearLegacyCache().catch(() => undefined);
+        await this.rowStore.writeMetadata?.(legacyCleanupKey, "1").catch(() => undefined);
+      }
     })();
     return this.preparePromise;
   }

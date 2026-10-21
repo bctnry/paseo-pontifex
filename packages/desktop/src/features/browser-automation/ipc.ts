@@ -23,6 +23,7 @@ import {
   getPaseoBrowserWebContentsForHostWindow,
   getWorkspaceActivePaseoBrowserIdForHostWindow,
   getPaseoBrowserWorkspaceId,
+  subscribeToPaseoBrowserDestroyed,
 } from "../browser-webviews/index.js";
 
 const MAX_CONSOLE_MESSAGES_PER_TAB = 200;
@@ -61,9 +62,14 @@ export class HostSnapshotEngineRegistry {
     });
     return snapshotEngine;
   }
+
+  public forget(hostWebContentsId: number, browserId: string): void {
+    this.entries.get(hostWebContentsId)?.snapshotEngine.clearBrowser(browserId);
+  }
 }
 
 const hostSnapshotEngines = new HostSnapshotEngineRegistry();
+let browserDestroyedSubscription: (() => void) | null = null;
 
 interface WebContentsDebugger {
   isAttached(): boolean;
@@ -211,7 +217,10 @@ function observeConsoleMessages(contents: BrowserAutomationWebContents, contents
     const entry = normalizeConsoleMessage({ level, message, line, sourceId });
     const messages = consoleMessagesByContentsId.get(contentsId) ?? [];
     messages.push(entry);
-    consoleMessagesByContentsId.set(contentsId, messages.slice(-MAX_CONSOLE_MESSAGES_PER_TAB));
+    if (messages.length > MAX_CONSOLE_MESSAGES_PER_TAB) {
+      messages.splice(0, messages.length - MAX_CONSOLE_MESSAGES_PER_TAB);
+    }
+    consoleMessagesByContentsId.set(contentsId, messages);
   });
   contents.once("destroyed", () => {
     observedContentsIds.delete(contentsId);
@@ -450,6 +459,9 @@ function createRegistry(hostWebContentsId: number): BrowserRegistry {
 
 export function registerBrowserAutomationIpc(options?: { ipc?: IpcHandlerRegistry }): void {
   const ipc = options?.ipc ?? ipcMain;
+  browserDestroyedSubscription ??= subscribeToPaseoBrowserDestroyed(
+    ({ browserId, hostWebContentsId }) => hostSnapshotEngines.forget(hostWebContentsId, browserId),
+  );
 
   ipc.handle("paseo:browser:execute-automation-command", async (event, rawRequest: unknown) => {
     const hostContents = (event as { sender?: HostWebContents }).sender;

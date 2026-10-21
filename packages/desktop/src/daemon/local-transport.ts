@@ -6,7 +6,7 @@ import {
   validatePort,
   validateSshHost,
 } from "@getpaseo/protocol/ssh-transport";
-import { BrowserWindow } from "electron";
+import { webContents } from "electron";
 import { WebSocket, type RawData } from "ws";
 
 export interface LocalTransportTarget {
@@ -31,10 +31,12 @@ export interface TransportEventPayload {
   code?: number | null;
   reason?: string | null;
   error?: string | null;
+  ownerWebContentsId?: number | null;
 }
 
 interface Session {
   id: string;
+  ownerWebContentsId: number | null;
   target: TransportTarget;
   ws: TransportWebSocket | null;
   state: "opening" | "open" | "closed";
@@ -72,7 +74,7 @@ export interface LocalTransportManagerDependencies {
 }
 
 export interface LocalTransportManager {
-  open(rawInput: unknown): void;
+  open(rawInput: unknown, ownerWebContentsId?: number): void;
   send(input: {
     sessionId: string;
     text?: string;
@@ -87,8 +89,16 @@ const SSH_STDERR_LIMIT = 8192;
 export const LOCAL_TRANSPORT_SETUP_TIMEOUT_MS = 30_000;
 
 function emitTransportEvent(payload: TransportEventPayload): void {
-  for (const win of BrowserWindow.getAllWindows()) {
-    win.webContents.send("paseo:event:local-daemon-transport-event", payload);
+  const owner =
+    payload.ownerWebContentsId != null ? webContents.fromId(payload.ownerWebContentsId) : null;
+  if (owner && !owner.isDestroyed()) {
+    owner.send("paseo:event:local-daemon-transport-event", payload);
+    return;
+  }
+  for (const target of webContents.getAllWebContents()) {
+    if (!target.isDestroyed()) {
+      target.send("paseo:event:local-daemon-transport-event", payload);
+    }
   }
 }
 
@@ -313,7 +323,12 @@ export function createLocalTransportManager(
 
   function emitEvent(payload: TransportEventPayload): void {
     try {
-      deps.emitEvent(payload);
+      const session = sessions.get(payload.sessionId);
+      deps.emitEvent(
+        session?.ownerWebContentsId != null
+          ? { ...payload, ownerWebContentsId: session.ownerWebContentsId }
+          : payload,
+      );
     } catch {
       // A renderer may disappear while the main process is broadcasting an event.
     }
@@ -482,7 +497,7 @@ export function createLocalTransportManager(
     });
   }
 
-  function open(rawInput: unknown): void {
+  function open(rawInput: unknown, ownerWebContentsId?: number): void {
     const { sessionId, target } = parseOpenTransportSessionInput(rawInput);
     if (sessions.has(sessionId)) {
       throw new Error(`Local transport session already exists: ${sessionId}`);
@@ -490,6 +505,7 @@ export function createLocalTransportManager(
 
     const session: Session = {
       id: sessionId,
+      ownerWebContentsId: ownerWebContentsId ?? null,
       target,
       ws: null,
       state: "opening",
@@ -564,8 +580,8 @@ const localTransportManager = createLocalTransportManager({
   emitEvent: emitTransportEvent,
 });
 
-export function openLocalTransportSession(rawInput: unknown): void {
-  localTransportManager.open(rawInput);
+export function openLocalTransportSession(rawInput: unknown, ownerWebContentsId?: number): void {
+  localTransportManager.open(rawInput, ownerWebContentsId);
 }
 
 export async function sendLocalTransportMessage(input: {
