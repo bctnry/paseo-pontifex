@@ -33,6 +33,36 @@ const COPIED_STYLES = [
   "paddingLeft",
 ] as const;
 
+interface MirrorStyleCache {
+  source: HTMLElement;
+  width: number;
+  presentationKey: boolean | undefined;
+  padding: number;
+  lineHeight: number;
+}
+
+function applyMirrorStyle(input: {
+  mirror: HTMLTextAreaElement;
+  source: HTMLElement;
+  width: number;
+  presentationKey: boolean | undefined;
+}): MirrorStyleCache {
+  const computedStyle = window.getComputedStyle(input.source);
+  for (const property of COPIED_STYLES) {
+    input.mirror.style[property] = computedStyle[property];
+  }
+  input.mirror.style.width = `${input.width}px`;
+  return {
+    source: input.source,
+    width: input.width,
+    presentationKey: input.presentationKey,
+    padding:
+      (Number.parseFloat(computedStyle.paddingTop) || 0) +
+      (Number.parseFloat(computedStyle.paddingBottom) || 0),
+    lineHeight: Number.parseFloat(computedStyle.lineHeight) || 0,
+  };
+}
+
 export function useComposerHeight({
   getText,
   textareaRef,
@@ -43,9 +73,18 @@ export function useComposerHeight({
 }: ComposerHeightArgs): ComposerHeightResult {
   const [height, setHeight] = useState(minHeight);
   const heightRef = useRef(minHeight);
-  const paramsRef = useRef({ getText, minHeight, maxHeight, onRenderedLinesChange });
-  paramsRef.current = { getText, minHeight, maxHeight, onRenderedLinesChange };
+  const paramsRef = useRef({
+    getText,
+    minHeight,
+    maxHeight,
+    onRenderedLinesChange,
+    presentationKey,
+  });
+  paramsRef.current = { getText, minHeight, maxHeight, onRenderedLinesChange, presentationKey };
   const mirrorRef = useRef<HTMLTextAreaElement | null>(null);
+  const styleCacheRef = useRef<MirrorStyleCache | null>(null);
+  const pendingTextRef = useRef<string | null>(null);
+  const frameRef = useRef<number | null>(null);
 
   const setBoundedHeight = useCallback((nextHeight: number) => {
     const { minHeight: currentMin, maxHeight: currentMax } = paramsRef.current;
@@ -55,31 +94,70 @@ export function useComposerHeight({
     setHeight(bounded);
   }, []);
 
-  const measure = useCallback(
+  const measureNow = useCallback(
     (text: string) => {
       const mirror = mirrorRef.current;
       const source = textareaRef.current;
       if (!mirror || !source || typeof window === "undefined") return;
+      if (!text) {
+        setBoundedHeight(paramsRef.current.minHeight);
+        paramsRef.current.onRenderedLinesChange?.(1);
+        return;
+      }
       const sourceWidth = source.clientWidth;
       if (sourceWidth <= 0) return;
 
-      const computedStyle = window.getComputedStyle(source);
-      for (const property of COPIED_STYLES) {
-        mirror.style[property] = computedStyle[property];
+      let cache = styleCacheRef.current;
+      if (
+        !cache ||
+        cache.source !== source ||
+        Math.abs(cache.width - sourceWidth) >= 1 ||
+        cache.presentationKey !== paramsRef.current.presentationKey
+      ) {
+        cache = applyMirrorStyle({
+          mirror,
+          source,
+          width: sourceWidth,
+          presentationKey: paramsRef.current.presentationKey,
+        });
+        styleCacheRef.current = cache;
       }
-      mirror.style.width = `${sourceWidth}px`;
+
       mirror.value = text.endsWith("\n") ? `${text} ` : text;
-      const padding =
-        parseFloat(computedStyle.paddingTop) + parseFloat(computedStyle.paddingBottom);
-      const lineHeight = parseFloat(computedStyle.lineHeight);
-      if (lineHeight > 0)
-        paramsRef.current.onRenderedLinesChange?.(
-          Math.round((mirror.scrollHeight - padding) / lineHeight),
-        );
-      setBoundedHeight(mirror.scrollHeight);
+      const scrollHeight = mirror.scrollHeight;
+      const onLinesChange = paramsRef.current.onRenderedLinesChange;
+      if (onLinesChange && cache.lineHeight > 0) {
+        onLinesChange(Math.round((scrollHeight - cache.padding) / cache.lineHeight));
+      }
+      setBoundedHeight(scrollHeight);
     },
     [setBoundedHeight, textareaRef],
   );
+
+  const scheduleMeasure = useCallback(
+    (text: string) => {
+      pendingTextRef.current = text;
+      if (frameRef.current !== null) return;
+      if (typeof requestAnimationFrame !== "function") {
+        const pending = pendingTextRef.current;
+        pendingTextRef.current = null;
+        if (pending !== null) measureNow(pending);
+        return;
+      }
+      frameRef.current = requestAnimationFrame(() => {
+        frameRef.current = null;
+        const pending = pendingTextRef.current;
+        pendingTextRef.current = null;
+        if (pending !== null) measureNow(pending);
+      });
+    },
+    [measureNow],
+  );
+
+  const invalidateStyleCache = useCallback(() => {
+    styleCacheRef.current = null;
+    scheduleMeasure(paramsRef.current.getText());
+  }, [scheduleMeasure]);
 
   useEffect(() => {
     if (typeof document === "undefined") return;
@@ -103,16 +181,22 @@ export function useComposerHeight({
     });
     document.body.appendChild(mirror);
     mirrorRef.current = mirror;
-    measure(paramsRef.current.getText());
+    measureNow(paramsRef.current.getText());
     return () => {
+      if (frameRef.current !== null) {
+        cancelAnimationFrame(frameRef.current);
+        frameRef.current = null;
+      }
+      pendingTextRef.current = null;
       mirror.remove();
       mirrorRef.current = null;
+      styleCacheRef.current = null;
     };
-  }, [measure]);
+  }, [measureNow]);
 
   useLayoutEffect(() => {
-    measure(getText());
-  }, [maxHeight, minHeight, getText, measure, presentationKey]);
+    measureNow(getText());
+  }, [getText, maxHeight, measureNow, minHeight, onRenderedLinesChange, presentationKey]);
 
   useEffect(() => {
     const source = textareaRef.current;
@@ -122,17 +206,52 @@ export function useComposerHeight({
       const nextWidth = source.clientWidth;
       if (Math.abs(nextWidth - previousWidth) < 1) return;
       previousWidth = nextWidth;
-      measure(paramsRef.current.getText());
+      styleCacheRef.current = null;
+      scheduleMeasure(paramsRef.current.getText());
     });
     observer.observe(source);
     return () => observer.disconnect();
-  }, [measure, textareaRef, presentationKey]);
+  }, [scheduleMeasure, textareaRef, presentationKey]);
+
+  useEffect(() => {
+    if (typeof MutationObserver === "undefined" || typeof document === "undefined") return;
+    // Theme and root font changes can alter the textarea's computed font without
+    // changing its width. Invalidate the cached mirror styles instead of reading
+    // getComputedStyle on every keystroke.
+    const observer = new MutationObserver(invalidateStyleCache);
+    for (const target of [document.documentElement, document.body]) {
+      if (!target) continue;
+      observer.observe(target, {
+        attributes: true,
+        attributeFilter: ["class", "style", "data-theme"],
+      });
+    }
+    const source = textareaRef.current;
+    if (source) {
+      observer.observe(source, { attributes: true, attributeFilter: ["class"] });
+    }
+    const fonts = document.fonts;
+    const handleFontLoad = () => invalidateStyleCache();
+    fonts?.addEventListener?.("loadingdone", handleFontLoad);
+    return () => {
+      observer.disconnect();
+      fonts?.removeEventListener?.("loadingdone", handleFontLoad);
+    };
+  }, [invalidateStyleCache, textareaRef, presentationKey]);
 
   const onTextChange = useCallback(
-    (_previousText: string, nextText: string) => measure(nextText),
-    [measure],
+    (_previousText: string, nextText: string) => scheduleMeasure(nextText),
+    [scheduleMeasure],
   );
-  const reset = useCallback(() => setBoundedHeight(minHeight), [minHeight, setBoundedHeight]);
+  const reset = useCallback(() => {
+    if (frameRef.current !== null) {
+      cancelAnimationFrame(frameRef.current);
+      frameRef.current = null;
+    }
+    pendingTextRef.current = null;
+    setBoundedHeight(paramsRef.current.minHeight);
+    paramsRef.current.onRenderedLinesChange?.(1);
+  }, [setBoundedHeight]);
   const style = useMemo(() => ({ height, minHeight, maxHeight }), [height, maxHeight, minHeight]);
 
   return {

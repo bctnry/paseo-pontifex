@@ -1341,7 +1341,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       textareaRef: webTextareaRef,
       minHeight: MIN_INPUT_HEIGHT,
       maxHeight: maxInputHeight,
-      onRenderedLinesChange: setRenderedLines,
+      onRenderedLinesChange: isCompact && !isFullscreen ? setRenderedLines : undefined,
       presentationKey: isFullscreen,
     });
     const { style: composerHeightStyle, scrollEnabled: isComposerScrollEnabled } = composerHeight;

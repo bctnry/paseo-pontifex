@@ -126,6 +126,23 @@ The static export was loaded in a browser: `/welcome` rendered, Settings and its
 sections loaded their route chunks, and neither xterm nor CodeMirror was
 requested until their surface opened.
 
+### Composer typing work
+
+Done in this pass.
+
+- The web composer caches the textarea's computed font and padding on its hidden
+  mirror. The cache is invalidated by width changes, fullscreen presentation,
+  root theme/class mutations, and font-load completion instead of calling
+  `getComputedStyle` on every key.
+- Measurements are coalesced to one per animation frame. A burst of keystrokes
+  measures only the latest text.
+- Empty text short-circuits to the minimum height instead of measuring.
+- Rendered-line counting is only wired up for compact, non-fullscreen web
+  composers. Desktop typing no longer pays for a line calculation it never uses.
+
+The mirror still reads `scrollHeight` on each measured frame; that read is the
+remaining forced layout, now capped at once per frame.
+
 ### Workspace shell pointer work
 
 Done in this pass.
@@ -177,18 +194,7 @@ latency over socket and SSH; IPC payload sizes.
 
 ## P1 — significant waste
 
-### P1.1 Composer height measurement forces layout on every keystroke
-
-`packages/app/src/composer/input/height.web.ts:58-82` calls
-`getComputedStyle`, copies ~20 styles into a hidden mirror, sets its value, then
-reads `scrollHeight`. `packages/app/src/composer/input/input.tsx:1806-1814`
-calls it on every input change.
-
-Fix: cache computed font/padding values (refresh on ResizeObserver/theme
-change), measure the real textarea if possible, or coalesce measurement to one
-per animation frame. **Measure:** `profile-composer-typing.mjs`.
-
-### P1.2 Explorer toggle unmounts the dock and refetches listings
+### P1.1 Explorer toggle unmounts the dock and refetches listings
 
 - `packages/app/src/components/split-container.tsx:695` conditionally renders
   the Explorer dock, so hiding it unmounts `FileExplorerPane`.
@@ -203,7 +209,7 @@ Fix: keep the dock mounted and hide it like other retained panels, or skip
 initialization when `directories` already has entries; move the scrollbar thumb
 to a ref + rAF. **Measure:** `scripts/profile-explorer-toggle.mjs`.
 
-### P1.3 Live tool groups and history rows still do O(history) work per delta
+### P1.2 Live tool groups and history rows still do O(history) work per delta
 
 - `packages/app/src/tool-calls/detail-level/grouping.ts:213-226` copies the
   whole historical group map and creates a fresh update map while a live group
@@ -222,7 +228,7 @@ revision applied, key measurement on history identity, skip virtual-row
 measurement for live-head growth, and cache content width from a resize effect.
 **Measure:** `agent-stream/stream-tick.bench.ts` with a tool-heavy turn.
 
-### P1.4 Directory sync, git status, and reconnect amplify RPCs and writes
+### P1.3 Directory sync, git status, and reconnect amplify RPCs and writes
 
 - `packages/app/src/runtime/directory-sync/index.ts:486-493` loads and
   validates the cached directory before issuing the network fetch.
@@ -241,7 +247,7 @@ changed; debounce reconnect repair by offline duration; keep route→query-key
 mappings instead of scanning. **Measure:** RPC counts during boot/reconnect and
 while saving files.
 
-### P1.5 Startup waits on non-critical storage and parsing
+### P1.4 Startup waits on non-critical storage and parsing
 
 - `packages/app/src/runtime/host-runtime.ts:1637` awaits
   `projectIconCache.restore()` before `hostRegistryStatus = "ready"`.
@@ -261,7 +267,7 @@ plugins in an idle callback; probe the preferred connection first and defer
 fallbacks. **Measure:** time to splash resolution and time to first interactive
 workspace.
 
-### P1.6 Agent directory fanout rebuilds global indexes per event
+### P1.5 Agent directory fanout rebuilds global indexes per event
 
 - `packages/app/src/stores/session-store.ts:1501` rebuilds
   `workspaceAgentActivity` by scanning all agents on every `setAgents`.
@@ -438,8 +444,8 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 ## Suggested order
 
 1. Desktop transport and log tail (P0.1, P2.1).
-2. Composer height and Explorer retention (P1.1, P1.2).
-3. History revision work (P1.3).
-4. Directory/git/reconnect amplification (P1.4).
-5. Startup gates and agent-directory fanout (P1.5, P1.6).
+2. Explorer retention (P1.1).
+3. History revision work (P1.2).
+4. Directory/git/reconnect amplification (P1.3).
+5. Startup gates and agent-directory fanout (P1.4, P1.5).
 6. Remaining P2 items as touch-time cleanup.
