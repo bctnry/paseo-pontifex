@@ -1,4 +1,5 @@
 import {
+  memo,
   useCallback,
   useEffect,
   useMemo,
@@ -982,13 +983,13 @@ export function FileExplorerPane({
         );
       }
       return (
-        <TreeRowDispatcher
+        <MemoizedTreeRowDispatcher
           serverId={serverId}
           workspaceId={workspaceId}
           row={info.item.row}
           index={info.index}
           expandedPaths={expandedPaths}
-          selectedEntryPath={selectedEntryPath}
+          isSelected={selectedEntryPath === info.item.row.entry.path}
           isDirectoryLoading={isDirectoryLoading}
           onEntryPress={handleEntryPress}
           onSelectEntry={handleSelectEntry}
@@ -1441,7 +1442,7 @@ function TreeRowDispatcher({
   row,
   index,
   expandedPaths,
-  selectedEntryPath,
+  isSelected,
   isDirectoryLoading,
   onEntryPress,
   onSelectEntry,
@@ -1465,7 +1466,7 @@ function TreeRowDispatcher({
   row: ExplorerTreeRow;
   index: number;
   expandedPaths: Set<string>;
-  selectedEntryPath: string | null;
+  isSelected: boolean;
   isDirectoryLoading: (path: string) => boolean;
   onEntryPress: (entry: ExplorerEntry) => void;
   onSelectEntry: (entry: ExplorerEntry) => void;
@@ -1488,7 +1489,6 @@ function TreeRowDispatcher({
   const depth = row.depth;
   const isDirectory = entry.kind === "directory";
   const isExpanded = isDirectory && expandedPaths.has(entry.path);
-  const isSelected = selectedEntryPath === entry.path;
   const loading = isDirectory && isDirectoryLoading(entry.path);
 
   return (
@@ -1520,6 +1520,8 @@ function TreeRowDispatcher({
     />
   );
 }
+
+const MemoizedTreeRowDispatcher = memo(TreeRowDispatcher);
 
 function isExplorerPathWithin(candidatePath: string, parentPath: string): boolean {
   return candidatePath === parentPath || candidatePath.startsWith(`${parentPath}/`);

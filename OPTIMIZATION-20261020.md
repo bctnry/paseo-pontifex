@@ -294,6 +294,8 @@ Done in this pass.
 - Sidebar list results are memoized, and each workspace row subscribes only to its
   own host label catalog.
 - Changes-tree lists use the file explorer's initial render, batch, and window sizes.
+- Explorer rows are memoized and receive an `isSelected` boolean, so selecting a path
+  only re-renders the two rows whose selection changed.
 - Explorer and resize-handle colors moved out of `useUnistyles()` into themed icon
   wrappers and `StyleSheet.create`.
 - Over-cap assistant messages reuse the first computed cap while text only appends.
@@ -311,9 +313,6 @@ covered.
 - **P2.8 Login-shell environment.** The synchronous login-shell probe still runs
   before the first window. Moving it to an async spawn needs a shared readiness
   promise on the daemon launch path.
-- **P2.18 Explorer selection rows.** Rows still receive `selectedEntryPath` through
-  `renderTreeRow`. React Compiler mitigation is unmeasured; change only with a
-  profile that shows the rerenders.
 - **P2.23 Plugin timeline clone.** Running tool calls still deep-clone their detail
   payload before each transform. A copy-on-write DTO needs plugin API changes.
 
@@ -356,7 +355,5 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
    synchronous shell probe on the critical path.
 3. Plugin timeline clone (P2.23) when a tool-heavy plugin setup shows detail cloning
    in a profile.
-4. Explorer selection rerenders (P2.18) only if profiling still shows them after the
-   React Compiler pass.
-5. Daemon status direct lock reads (P2.4) once daemon version is available outside the
+4. Daemon status direct lock reads (P2.4) once daemon version is available outside the
    status websocket.
