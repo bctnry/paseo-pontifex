@@ -781,7 +781,7 @@ function DesktopSidebar({
     if (showTopStrip) {
       return (
         <View style={styles.sidebarTopStrip} testID="sidebar-top-strip">
-          <SidebarTopTextMark />
+          <SidebarTopTextMark color={theme.colors.accentForeground} />
           <TitlebarDragRegion />
         </View>
       );
@@ -794,7 +794,7 @@ function DesktopSidebar({
       );
     }
     return <TitlebarDragRegion />;
-  }, [ownsTopLeft, showTopStrip]);
+  }, [ownsTopLeft, showTopStrip, theme.colors.accentForeground]);
   const devBuildBadge = useMemo(
     () =>
       DEV_BUILD_LABEL ? (
@@ -986,12 +986,11 @@ const styles = StyleSheet.create((theme) => ({
     position: "relative",
   },
   sidebarTopStrip: {
-    height: HEADER_INNER_HEIGHT,
+    height: density.tightRowHeight,
     alignItems: "center",
     justifyContent: "center",
-    paddingHorizontal: theme.spacing[3],
-    paddingVertical: theme.spacing[1],
-    backgroundColor: "#ff7f00",
+    padding: theme.spacing[1],
+    backgroundColor: theme.colors.accent,
     userSelect: "none",
   },
   desktopChromeRow: {
