@@ -327,6 +327,18 @@ const dropCollisionDetection: CollisionDetection = (args) => {
   return closestCenter(args);
 };
 
+function useExplorerDockRetention(workspaceKey: string, active: boolean): boolean {
+  const [mountedByWorkspace, setMountedByWorkspace] = useState<Record<string, boolean>>({});
+  const mounted = Boolean(mountedByWorkspace[workspaceKey]);
+  useEffect(() => {
+    if (!active) return;
+    setMountedByWorkspace((current) =>
+      current[workspaceKey] ? current : { ...current, [workspaceKey]: true },
+    );
+  }, [active, workspaceKey]);
+  return active || mounted;
+}
+
 export function SplitContainer({
   layout,
   renderMainHeader,
@@ -459,6 +471,7 @@ export function SplitContainer({
   const renderExplorerSidebarDock = Boolean(
     !focusModeEnabled && explorerSidebarPane && explorerSidebarPane.hidden !== true,
   );
+  const shouldMountExplorerDock = useExplorerDockRetention(workspaceKey, renderExplorerSidebarDock);
   const mainColumnWindowChromeCorners = renderExplorerSidebarDock
     ? removeWindowChromeCorner(inheritedWindowChromeCorners, "top-right")
     : inheritedWindowChromeCorners;
@@ -764,21 +777,30 @@ export function SplitContainer({
               ) : null}
             </View>
           </WindowChromeRegion>
-          {renderExplorerSidebarDock && explorerSidebarPane ? (
+          {shouldMountExplorerDock && explorerSidebarPane ? (
             <>
-              <ResizeHandle
-                testID="workspace-explorer-sidebar-resize-handle"
-                direction="horizontal"
-                hitAreaAlignment="end"
-                groupId={EXPLORER_SIDEBAR_RESIZE_GROUP_ID}
-                index={0}
-                sizes={explorerSidebarDockSizes}
-                containerSize={workspaceShellWidth}
-                onPreviewResizeSplit={previewExplorerSidebarResize}
-                onResizeSplit={commitExplorerSidebarResize}
-              />
-              <View style={explorerSidebarDockStyle}>
+              {renderExplorerSidebarDock ? (
+                <ResizeHandle
+                  testID="workspace-explorer-sidebar-resize-handle"
+                  direction="horizontal"
+                  hitAreaAlignment="end"
+                  groupId={EXPLORER_SIDEBAR_RESIZE_GROUP_ID}
+                  index={0}
+                  sizes={explorerSidebarDockSizes}
+                  containerSize={workspaceShellWidth}
+                  onPreviewResizeSplit={previewExplorerSidebarResize}
+                  onResizeSplit={commitExplorerSidebarResize}
+                />
+              ) : null}
+              <View
+                pointerEvents={renderExplorerSidebarDock ? "auto" : "none"}
+                style={[
+                  explorerSidebarDockStyle,
+                  !renderExplorerSidebarDock && styles.explorerSidebarDockHidden,
+                ]}
+              >
                 <ExplorerSidebarDock
+                  active={renderExplorerSidebarDock}
                   pane={explorerSidebarPane}
                   uiTabs={uiTabs}
                   normalizedServerId={normalizedServerId}
@@ -1461,6 +1483,9 @@ const styles = StyleSheet.create((theme) => ({
     minWidth: 240,
     minHeight: 0,
     backgroundColor: theme.colors.surfaceSidebar,
+  },
+  explorerSidebarDockHidden: {
+    display: "none",
   },
   group: {
     flex: 1,

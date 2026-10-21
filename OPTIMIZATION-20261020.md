@@ -126,6 +126,23 @@ The static export was loaded in a browser: `/welcome` rendered, Settings and its
 sections loaded their route chunks, and neither xterm nor CodeMirror was
 requested until their surface opened.
 
+### Explorer retention work
+
+Done in this pass.
+
+- The desktop Explorer dock mounts on first reveal and then stays mounted when
+  hidden or when focus mode takes over. The resize handle is only mounted while
+  the dock is visible, and the retained panel receives `active` so its pane
+  children stop running as active surfaces.
+- `FileExplorerPane` skips its mount initialization when the session store
+  already has the root directory, instead of requesting `.` and every persisted
+  expanded directory again.
+- The web overlay scrollbar keeps scroll metrics in a ref and commits React state
+  at most once per animation frame. Disabled scrollbars no longer update state.
+
+The hidden dock still stays in memory for the life of the workspace. That is the
+intended tradeoff for preserving scroll, expansion, and selection state.
+
 ### Startup path work
 
 Done in this pass.
@@ -213,22 +230,7 @@ latency over socket and SSH; IPC payload sizes.
 
 ## P1 — significant waste
 
-### P1.1 Explorer toggle unmounts the dock and refetches listings
-
-- `packages/app/src/components/split-container.tsx:695` conditionally renders
-  the Explorer dock, so hiding it unmounts `FileExplorerPane`.
-- `packages/app/src/components/file-explorer-pane.tsx:1560-1600` re-requests `.`
-  plus every persisted expanded directory on mount, even when the session store
-  already has the data.
-- `packages/app/src/components/ui/overlay-scrollbar/use-overlay-flat-list-scrollbar.web.tsx:22`
-  sets React state on every scroll event; the explorer forwards
-  `scrollEventThrottle={16}` (`file-explorer-pane.tsx:1332-1334`).
-
-Fix: keep the dock mounted and hide it like other retained panels, or skip
-initialization when `directories` already has entries; move the scrollbar thumb
-to a ref + rAF. **Measure:** `scripts/profile-explorer-toggle.mjs`.
-
-### P1.2 Live tool groups and history rows still do O(history) work per delta
+### P1.1 Live tool groups and history rows still do O(history) work per delta
 
 - `packages/app/src/tool-calls/detail-level/grouping.ts:213-226` copies the
   whole historical group map and creates a fresh update map while a live group
@@ -247,7 +249,7 @@ revision applied, key measurement on history identity, skip virtual-row
 measurement for live-head growth, and cache content width from a resize effect.
 **Measure:** `agent-stream/stream-tick.bench.ts` with a tool-heavy turn.
 
-### P1.3 Directory sync, git status, and reconnect amplify RPCs and writes
+### P1.2 Directory sync, git status, and reconnect amplify RPCs and writes
 
 - `packages/app/src/runtime/directory-sync/index.ts:486-493` loads and
   validates the cached directory before issuing the network fetch.
@@ -266,7 +268,7 @@ changed; debounce reconnect repair by offline duration; keep route→query-key
 mappings instead of scanning. **Measure:** RPC counts during boot/reconnect and
 while saving files.
 
-### P1.4 Agent directory fanout rebuilds global indexes per event
+### P1.3 Agent directory fanout rebuilds global indexes per event
 
 - `packages/app/src/stores/session-store.ts:1501` rebuilds
   `workspaceAgentActivity` by scanning all agents on every `setAgents`.
@@ -443,8 +445,7 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 ## Suggested order
 
 1. Desktop transport and log tail (P0.1, P2.1).
-2. Explorer retention (P1.1).
-3. History revision work (P1.2).
-4. Directory/git/reconnect amplification (P1.3).
-5. Agent-directory fanout (P1.4).
-6. Remaining P2 items as touch-time cleanup.
+2. History revision work (P1.1).
+3. Directory/git/reconnect amplification (P1.2).
+4. Agent-directory fanout (P1.3).
+5. Remaining P2 items as touch-time cleanup.

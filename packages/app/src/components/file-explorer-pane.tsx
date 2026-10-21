@@ -505,6 +505,7 @@ export function FileExplorerPane({
     void initializeExplorer({
       hasWorkspaceScope,
       hasInitializedRef,
+      cachedDirectories: directories,
       workspaceStateKey,
       persistedExpandedPaths: expandedPaths,
       showHiddenFiles,
@@ -512,6 +513,7 @@ export function FileExplorerPane({
       setExpandedPathsForWorkspace,
     });
   }, [
+    directories,
     expandedPaths,
     hasWorkspaceScope,
     requestDirectoryListing,
@@ -1540,6 +1542,7 @@ function replaceExplorerPathPrefix(
 async function initializeExplorer({
   hasWorkspaceScope,
   hasInitializedRef,
+  cachedDirectories,
   workspaceStateKey,
   persistedExpandedPaths,
   showHiddenFiles,
@@ -1548,6 +1551,7 @@ async function initializeExplorer({
 }: {
   hasWorkspaceScope: boolean;
   hasInitializedRef: RefObject<boolean>;
+  cachedDirectories: ReadonlyMap<string, unknown>;
   workspaceStateKey: string | null;
   persistedExpandedPaths: ReadonlySet<string>;
   showHiddenFiles: boolean;
@@ -1561,6 +1565,10 @@ async function initializeExplorer({
     return;
   }
   hasInitializedRef.current = true;
+  // The session store already holds a hydrated tree when a retained dock is
+  // restored. Requesting `.`, then every expanded directory again would turn a
+  // visibility toggle into a burst of RPCs.
+  if (cachedDirectories.has(".")) return;
   const rootDirectory = await requestDirectoryListing(".", {
     recordHistory: false,
     setCurrentPath: false,

@@ -31,6 +31,7 @@ interface ExplorerSidebarDockProps extends Pick<
   onCloseTabsToLeft: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseTabsToRight: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
   onCloseOtherTabs: (tabId: string, tabs: WorkspaceTabDescriptor[]) => Promise<void> | void;
+  active: boolean;
   pane: SplitPane;
   uiTabs: WorkspaceTab[];
   normalizedServerId: string;
@@ -51,6 +52,7 @@ interface ExplorerSidebarDockProps extends Pick<
 
 /** A dock shell over the shared panel host. It owns no workspace-pane capabilities. */
 export function ExplorerSidebarDock({
+  active,
   pane,
   uiTabs,
   normalizedServerId,
@@ -116,7 +118,7 @@ export function ExplorerSidebarDock({
   );
 
   return (
-    <RetainedPanel active>
+    <RetainedPanel active={active}>
       <WindowChromeRegion corners="top-right">
         <View style={styles.dock} testID="workspace-explorer-sidebar">
           <WindowChromeSafeArea placement="inline" style={styles.tabRail}>
@@ -125,7 +127,7 @@ export function ExplorerSidebarDock({
               <WorkspaceDesktopTabsRow
                 host="explorer"
                 launchPurpose="supporting"
-                isFocused={isWorkspaceFocused}
+                isFocused={isWorkspaceFocused && active}
                 ownsKeyboardShortcuts={false}
                 onCopyResumeCommand={onCopyResumeCommand}
                 onCopyAgentId={onCopyAgentId}
@@ -163,8 +165,8 @@ export function ExplorerSidebarDock({
               activeTabId={activeTabId}
               normalizedServerId={normalizedServerId}
               normalizedWorkspaceId={normalizedWorkspaceId}
-              isWorkspaceFocused={isWorkspaceFocused}
-              isPaneFocused
+              isWorkspaceFocused={isWorkspaceFocused && active}
+              isPaneFocused={active}
               buildPaneContentModel={buildPaneContentModel}
             />
           </View>
