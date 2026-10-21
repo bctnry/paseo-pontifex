@@ -152,7 +152,6 @@ export function BackingOptions() {
 const SPOT_FEATURES: ReadonlyArray<string> = [
   "Your logo on the paseo.sh homepage and docs, around 70,000 visitors a month",
   "Your logo in the GitHub README, around 30,000 visitors a month",
-  "An announcement in the Discord, around 2,000 members",
   "An announcement from me on X",
 ];
 

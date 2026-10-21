@@ -46,7 +46,7 @@ describe("Hub init planning", () => {
 
 describe("Hub init scaffold", () => {
   it.each([
-    ["github", { connection: "github-getpaseo", repo: "getpaseo/paseo", user: "boudra" }],
+    ["github", { connection: "github-getpaseo", repo: "bctnry/paseo-pontifex", user: "boudra" }],
     ["slack", { connection: "slack-paseo", user: "U123456" }],
     ["discord", { connection: "discord-paseo", user: "987654321" }],
   ] satisfies readonly [HubInitProvider, Record<string, string>][])(
@@ -111,10 +111,10 @@ describe("Hub init scaffold", () => {
 
 describe("GitHub origin detection", () => {
   it.each([
-    ["git@github.com:getpaseo/paseo.git", "getpaseo/paseo"],
-    ["ssh://git@github.com/getpaseo/paseo.git", "getpaseo/paseo"],
-    ["https://github.com/getpaseo/paseo.git", "getpaseo/paseo"],
-    ["https://gitlab.com/getpaseo/paseo.git", undefined],
+    ["git@github.com:bctnry/paseo-pontifex.git", "bctnry/paseo-pontifex"],
+    ["ssh://git@github.com/bctnry/paseo-pontifex.git", "bctnry/paseo-pontifex"],
+    ["https://github.com/bctnry/paseo-pontifex.git", "bctnry/paseo-pontifex"],
+    ["https://gitlab.com/bctnry/paseo-pontifex.git", undefined],
   ])("resolves %s", (remote, expected) => {
     expect(githubRepositoryFromRemote(remote)).toBe(expected);
   });

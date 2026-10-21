@@ -12,17 +12,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/getpaseo/paseo/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaseo/paseo?style=flat&logo=github" alt="GitHub stars">
+  <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
+    <img src="https://img.shields.io/github/stars/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub stars">
   </a>
-  <a href="https://github.com/getpaseo/paseo/releases">
-    <img src="https://img.shields.io/github/v/release/getpaseo/paseo?style=flat&logo=github" alt="GitHub release">
+  <a href="https://github.com/bctnry/paseo-pontifex/releases">
+    <img src="https://img.shields.io/github/v/release/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub release">
   </a>
   <a href="https://x.com/moboudra">
     <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
-    <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
   </a>
   <a href="https://www.reddit.com/r/PaseoAI/">
     <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
@@ -38,10 +35,6 @@
 <p align="center">
   <img src="https://paseo.sh/mobile-mockup.png" alt="Paseo モバイルアプリ" width="100%">
 </p>
-
-> [!NOTE]
-> 私はひとりでメンテナンスしているため、GitHub Issues を毎日確認できるとは限りません。
-> 急ぎの問題や作業がブロックされている場合は、[Discord](https://discord.gg/jz8T2uahpH) から連絡するのが一番早いです。
 
 ---
 
@@ -80,7 +73,7 @@ Paseo はコーディングエージェントを管理するローカルサー�
 
 ### デスクトップアプリ（推奨）
 
-[paseo.sh/download](https://paseo.sh/download) または [GitHub のリリースページ](https://github.com/getpaseo/paseo/releases)からダウンロードしてください。アプリを開くとデーモンが自動的に起動します。追加のインストールは不要です。
+[paseo.sh/download](https://paseo.sh/download) または [GitHub のリリースページ](https://github.com/bctnry/paseo-pontifex/releases)からダウンロードしてください。アプリを開くとデーモンが自動的に起動します。追加のインストールは不要です。
 
 スマートフォンから接続するには、Settings 画面に表示される QR コードをスキャンしてください。
 
@@ -123,7 +116,7 @@ paseo --host workstation.local:6767 run "run the full test suite"
 スキルはエージェントに Paseo を使って他のエージェントをオーケストレーションする方法を教えます。
 
 ```bash
-npx skills add getpaseo/paseo
+npx skills add bctnry/paseo-pontifex
 ```
 
 どのエージェントとの会話でも使用できます。

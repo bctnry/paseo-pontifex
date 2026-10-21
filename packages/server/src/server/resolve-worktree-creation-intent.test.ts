@@ -158,8 +158,8 @@ describe("resolveWorktreeCreationIntent", () => {
       baseRefName: "main",
       headRefName: "daemon-shutdown-diagnostics",
       headOwnerLogin: "getpaseo",
-      headRepositorySshUrl: "git@github.com:getpaseo/paseo.git",
-      headRepositoryUrl: "https://github.com/getpaseo/paseo",
+      headRepositorySshUrl: "git@github.com:bctnry/paseo-pontifex.git",
+      headRepositoryUrl: "https://github.com/bctnry/paseo-pontifex",
       isCrossRepository: false,
     });
 

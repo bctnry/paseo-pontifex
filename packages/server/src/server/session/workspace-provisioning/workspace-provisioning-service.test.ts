@@ -446,7 +446,7 @@ test("ensureWorkspaceRecordUnarchived restores the owning archived project with 
 
 test("ensureWorkspaceRecordUnarchived preserves the consumed auto-archive change request", async () => {
   const repo = path.join(tmpDir, "repo");
-  const changeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const changeRequestUrl = "https://github.com/bctnry/paseo-pontifex/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT, {
@@ -468,7 +468,7 @@ test("ensureWorkspaceRecordUnarchived preserves the consumed auto-archive change
 
 test("ensureWorkspaceRecordUnarchived acknowledges a merged change request for a legacy archive", async () => {
   const repo = path.join(tmpDir, "repo");
-  const changeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const changeRequestUrl = "https://github.com/bctnry/paseo-pontifex/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT);
@@ -489,8 +489,8 @@ test("ensureWorkspaceRecordUnarchived acknowledges a merged change request for a
 
 test("ensureWorkspaceRecordUnarchived refreshes the latch for a different merged change request", async () => {
   const repo = path.join(tmpDir, "repo");
-  const previousChangeRequestUrl = "https://github.com/getpaseo/paseo/pull/2713";
-  const currentChangeRequestUrl = "https://github.com/getpaseo/paseo/pull/2714";
+  const previousChangeRequestUrl = "https://github.com/bctnry/paseo-pontifex/pull/2713";
+  const currentChangeRequestUrl = "https://github.com/bctnry/paseo-pontifex/pull/2714";
   gitRoots.add(repo);
   const created = await provisioning.findOrCreateWorkspaceForDirectory(repo);
   await workspaceRegistry.archive(created.workspaceId, ARCHIVED_AT, {

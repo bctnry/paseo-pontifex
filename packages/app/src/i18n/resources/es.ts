@@ -1264,7 +1264,6 @@ export const es: TranslationResources = {
       diagnostics: "Ejecutar diagnóstico",
       shortcuts: "Atajos de teclado",
       reportIssue: "Informar de un problema",
-      discord: "Discord",
       github: "Crear incidencia en GitHub",
       whatsNew: "Novedades",
       appName: "Paseo",

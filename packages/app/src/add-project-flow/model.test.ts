@@ -89,8 +89,8 @@ describe("Add Project navigation", () => {
   it("restores the GitHub destination query and active parent when reopening a repository", () => {
     const repository = {
       id: "repo-1",
-      nameWithOwner: "getpaseo/paseo",
-      cloneUrl: "git@github.com:getpaseo/paseo.git",
+      nameWithOwner: "bctnry/paseo-pontifex",
+      cloneUrl: "git@github.com:bctnry/paseo-pontifex.git",
       description: null,
       visibility: "public",
       updatedAt: null,
@@ -149,16 +149,16 @@ describe("Add Project options", () => {
   });
 
   it("offers manual URL and protocol-specific owner/repo clone choices", () => {
-    expect(buildManualGithubRepositoryChoices("git@github.com:getpaseo/paseo.git")).toEqual([
+    expect(buildManualGithubRepositoryChoices("git@github.com:bctnry/paseo-pontifex.git")).toEqual([
       expect.objectContaining({
-        id: "manual:git@github.com:getpaseo/paseo.git",
-        nameWithOwner: "getpaseo/paseo",
-        cloneUrl: "git@github.com:getpaseo/paseo.git",
+        id: "manual:git@github.com:bctnry/paseo-pontifex.git",
+        nameWithOwner: "bctnry/paseo-pontifex",
+        cloneUrl: "git@github.com:bctnry/paseo-pontifex.git",
       }),
     ]);
-    expect(buildManualGithubRepositoryChoices("getpaseo/paseo")).toEqual([
-      expect.objectContaining({ cloneProtocol: "https", cloneUrl: "getpaseo/paseo" }),
-      expect.objectContaining({ cloneProtocol: "ssh", cloneUrl: "getpaseo/paseo" }),
+    expect(buildManualGithubRepositoryChoices("bctnry/paseo-pontifex")).toEqual([
+      expect.objectContaining({ cloneProtocol: "https", cloneUrl: "bctnry/paseo-pontifex" }),
+      expect.objectContaining({ cloneProtocol: "ssh", cloneUrl: "bctnry/paseo-pontifex" }),
     ]);
     expect(buildManualGithubRepositoryChoices("paseo")).toEqual([]);
   });

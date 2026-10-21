@@ -1236,7 +1236,6 @@ export const en = {
       diagnostics: "Run diagnostics",
       shortcuts: "Keyboard shortcuts",
       reportIssue: "Report an issue",
-      discord: "Discord",
       github: "Create GitHub issue",
       whatsNew: "What's new",
       appName: "Paseo",

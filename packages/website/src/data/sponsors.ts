@@ -42,7 +42,7 @@ export const SPONSORS: ReadonlyArray<Sponsor> = [
 ];
 
 /** Where a sponsor link is shown. Becomes the link's `utm_medium`. */
-export type SponsorPlacement = "website" | "readme" | "discord" | "x";
+export type SponsorPlacement = "website" | "readme" | "x";
 
 export function sponsorHref(sponsor: Sponsor, placement: SponsorPlacement): string {
   const url = new URL(sponsor.url);

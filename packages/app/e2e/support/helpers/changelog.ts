@@ -1,6 +1,7 @@
 import { expect, type Locator, type Page } from "@playwright/test";
 
-const CHANGELOG_SOURCE_URL = "https://raw.githubusercontent.com/getpaseo/paseo/main/CHANGELOG.md";
+const CHANGELOG_SOURCE_URL =
+  "https://raw.githubusercontent.com/bctnry/paseo-pontifex/main/CHANGELOG.md";
 
 /**
  * Serves a changelog to the app instead of the repository's.

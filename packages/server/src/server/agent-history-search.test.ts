@@ -20,7 +20,7 @@ function candidate(input: {
     },
     project: {
       projectKey: "key",
-      projectName: input.projectName ?? "getpaseo/paseo",
+      projectName: input.projectName ?? "bctnry/paseo-pontifex",
       workspaceName: input.workspaceName ?? null,
       checkout: {
         cwd: "/tmp/repo",
@@ -71,9 +71,9 @@ describe("matchesAgentHistoryQuery", () => {
   });
 
   it("matches the project name", () => {
-    expect(matchesAgentHistoryQuery("paseo", candidate({ projectName: "getpaseo/paseo" }))).toBe(
-      true,
-    );
+    expect(
+      matchesAgentHistoryQuery("paseo", candidate({ projectName: "bctnry/paseo-pontifex" })),
+    ).toBe(true);
   });
 
   it("requires every token to match somewhere", () => {

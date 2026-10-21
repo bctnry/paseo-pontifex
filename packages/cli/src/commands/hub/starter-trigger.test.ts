@@ -11,7 +11,7 @@ describe("starter trigger connections", () => {
               slug: "github-getpaseo",
               accountLogin: "getpaseo",
               accountType: "Organization",
-              repositories: ["getpaseo/paseo"],
+              repositories: ["bctnry/paseo-pontifex"],
             },
           ],
           slack: [{ slug: "paseo", teamName: "Paseo" }],
@@ -19,14 +19,14 @@ describe("starter trigger connections", () => {
           daemons: [],
           linear: [],
         },
-        "getpaseo/paseo",
+        "bctnry/paseo-pontifex",
       ),
     ).toEqual([
       {
-        id: "github:getpaseo/paseo",
-        label: "GitHub — getpaseo/paseo",
+        id: "github:bctnry/paseo-pontifex",
+        label: "GitHub — bctnry/paseo-pontifex",
         provider: "github",
-        filters: { connection: "github-getpaseo", repo: "getpaseo/paseo" },
+        filters: { connection: "github-getpaseo", repo: "bctnry/paseo-pontifex" },
       },
       {
         id: "slack:paseo",
@@ -60,7 +60,7 @@ describe("starter trigger connections", () => {
           daemons: [],
           linear: [],
         },
-        "getpaseo/paseo",
+        "bctnry/paseo-pontifex",
       ),
     ).toEqual([]);
   });

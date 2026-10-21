@@ -12,17 +12,14 @@
 </p>
 
 <p align="center">
-  <a href="https://github.com/getpaseo/paseo/stargazers">
-    <img src="https://img.shields.io/github/stars/getpaseo/paseo?style=flat&logo=github" alt="GitHub stars">
+  <a href="https://github.com/bctnry/paseo-pontifex/stargazers">
+    <img src="https://img.shields.io/github/stars/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub stars">
   </a>
-  <a href="https://github.com/getpaseo/paseo/releases">
-    <img src="https://img.shields.io/github/v/release/getpaseo/paseo?style=flat&logo=github" alt="GitHub release">
+  <a href="https://github.com/bctnry/paseo-pontifex/releases">
+    <img src="https://img.shields.io/github/v/release/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub release">
   </a>
   <a href="https://x.com/moboudra">
     <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://discord.gg/jz8T2uahpH">
-    <img src="https://img.shields.io/badge/Discord-555?logo=discord" alt="Discord">
   </a>
   <a href="https://www.reddit.com/r/PaseoAI/">
     <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
@@ -96,7 +93,7 @@ You need at least one agent CLI installed and configured with your credentials:
 
 ### Desktop app (recommended)
 
-Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/getpaseo/paseo/releases). Open the app and the daemon starts automatically. Nothing else to install.
+Download it from [paseo.sh/download](https://paseo.sh/download) or the [GitHub releases page](https://github.com/bctnry/paseo-pontifex/releases). Open the app and the daemon starts automatically. Nothing else to install.
 
 To connect from your phone, open **Settings → your host → Pair Device**.
 
@@ -179,7 +176,7 @@ See the [SDK quickstart](https://paseo.sh/docs/sdk/quickstart), [recipes](https:
 Skills teach your agent to use Paseo to orchestrate other agents.
 
 ```bash
-npx skills add getpaseo/paseo
+npx skills add bctnry/paseo-pontifex
 ```
 
 Then use them in any agent conversation:

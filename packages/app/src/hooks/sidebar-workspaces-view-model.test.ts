@@ -297,18 +297,18 @@ describe("shared sidebar workspace model", () => {
     const model = buildSidebarWorkspacePlacementModel({
       projects: [
         project({
-          projectKey: "getpaseo/paseo",
-          projectName: "getpaseo/paseo",
-          iconWorkingDir: "/repo/getpaseo/paseo",
+          projectKey: "bctnry/paseo-pontifex",
+          projectName: "bctnry/paseo-pontifex",
+          iconWorkingDir: "/repo/bctnry/paseo-pontifex",
           hosts: [
             {
               serverId: "host-a",
-              iconWorkingDir: "/repo/getpaseo/paseo",
+              iconWorkingDir: "/repo/bctnry/paseo-pontifex",
               worktreeSupport: "supported" as const,
             },
             {
               serverId: "host-b",
-              iconWorkingDir: "/repo/getpaseo/paseo",
+              iconWorkingDir: "/repo/bctnry/paseo-pontifex",
               worktreeSupport: "supported" as const,
             },
           ],
@@ -328,8 +328,8 @@ describe("shared sidebar workspace model", () => {
               workspace({
                 id: "main",
                 name: "main",
-                projectId: "getpaseo/paseo",
-                projectDisplayName: "getpaseo/paseo",
+                projectId: "bctnry/paseo-pontifex",
+                projectDisplayName: "bctnry/paseo-pontifex",
                 status: "done",
               }),
             ],
@@ -344,8 +344,8 @@ describe("shared sidebar workspace model", () => {
               workspace({
                 id: "feature",
                 name: "feature/status-flow",
-                projectId: "getpaseo/paseo",
-                projectDisplayName: "getpaseo/paseo",
+                projectId: "bctnry/paseo-pontifex",
+                projectDisplayName: "bctnry/paseo-pontifex",
                 status: "running",
                 statusEnteredAt: new Date("2026-06-10T00:00:00.000Z"),
               }),
@@ -361,18 +361,18 @@ describe("shared sidebar workspace model", () => {
     ]);
     expect(model.projects).toEqual([
       expect.objectContaining({
-        viewKey: "getpaseo/paseo",
+        viewKey: "bctnry/paseo-pontifex",
         hosts: [
           {
             serverId: "host-a",
-            projectId: "getpaseo/paseo",
-            iconWorkingDir: "/repo/getpaseo/paseo",
+            projectId: "bctnry/paseo-pontifex",
+            iconWorkingDir: "/repo/bctnry/paseo-pontifex",
             worktreeSupport: "supported" as const,
           },
           {
             serverId: "host-b",
-            projectId: "getpaseo/paseo",
-            iconWorkingDir: "/repo/getpaseo/paseo",
+            projectId: "bctnry/paseo-pontifex",
+            iconWorkingDir: "/repo/bctnry/paseo-pontifex",
             worktreeSupport: "supported" as const,
           },
         ],
@@ -400,7 +400,9 @@ describe("shared sidebar workspace model", () => {
       ["host-a:main", "done", "main"],
       ["host-b:feature", "running", "feature/status-flow"],
     ]);
-    expect(model.projectNamesByViewKey).toEqual(new Map([["getpaseo/paseo", "getpaseo/paseo"]]));
+    expect(model.projectNamesByViewKey).toEqual(
+      new Map([["bctnry/paseo-pontifex", "bctnry/paseo-pontifex"]]),
+    );
   });
 
   it("preserves the collection when a retained sidebar reconnects to unchanged entries", () => {
@@ -583,7 +585,7 @@ describe("shouldShowSidebarHostLabels", () => {
     const projects = buildSidebarProjectsFromStructure({
       projects: [
         project({
-          projectKey: "getpaseo/paseo",
+          projectKey: "bctnry/paseo-pontifex",
           hosts: [
             {
               serverId: "host-a",

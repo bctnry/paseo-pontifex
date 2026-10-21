@@ -18,7 +18,7 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/getpaseo/paseo.git"
+    "url": "https://github.com/bctnry/paseo-pontifex.git"
   },
   "workspaces": [
     "plugins",

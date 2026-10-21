@@ -1,6 +1,6 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { DiscordIcon, GitHubIcon, RedditIcon } from "~/components/brand-icons";
+import { GitHubIcon, RedditIcon } from "~/components/brand-icons";
 import { SiteShell } from "~/components/site-shell";
 import { SponsorSection } from "~/components/sponsorship";
 import { parseReleaseAssetUrl } from "~/downloads";
@@ -19,7 +19,7 @@ export const Route = createFileRoute("/download_/thanks")({
   head: () =>
     pageMeta(
       "Thanks for downloading Paseo",
-      "Your Paseo download is starting. Join the community on Discord, GitHub, and Reddit, or sponsor Paseo.",
+      "Your Paseo download is starting. Find the project on GitHub or Reddit, or sponsor Paseo.",
       "/download/thanks",
     ),
   component: DownloadThanks,
@@ -27,16 +27,10 @@ export const Route = createFileRoute("/download_/thanks")({
 
 const COMMUNITY = [
   {
-    name: "Discord",
-    icon: <DiscordIcon className="h-6 w-6" />,
-    body: "Get help and share feedback.",
-    href: "https://discord.gg/jz8T2uahpH",
-  },
-  {
     name: "GitHub",
     icon: <GitHubIcon className="h-6 w-6" />,
     body: "Star, report issues, contribute.",
-    href: "https://github.com/getpaseo/paseo",
+    href: "https://github.com/bctnry/paseo-pontifex",
   },
   {
     name: "Reddit",
@@ -69,7 +63,7 @@ function DownloadThanks() {
       )}
 
       <div className="space-y-20 mt-16">
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
           {COMMUNITY.map((item) => (
             <a
               key={item.name}

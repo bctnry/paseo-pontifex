@@ -163,7 +163,7 @@ describe("Hub HTTP client", () => {
               slug: "getpaseo",
               accountLogin: "getpaseo",
               accountType: "Organization",
-              repositories: ["getpaseo/paseo"],
+              repositories: ["bctnry/paseo-pontifex"],
             },
           ],
           discord: [{ slug: "paseo", guildName: "Paseo" }],
