@@ -126,6 +126,25 @@ The static export was loaded in a browser: `/welcome` rendered, Settings and its
 sections loaded their route chunks, and neither xterm nor CodeMirror was
 requested until their surface opened.
 
+### Startup path work
+
+Done in this pass.
+
+- `loadFromStorage` no longer awaits `projectIconCache.restore()`. The host
+  registry becomes ready first; the icon cache hydrates in the background.
+- Icon restore is idempotent, does not replace a fresher query result, skips a
+  legacy blob above twice the budget, and evicts by a 2 MB string budget as well
+  as the entry cap.
+- `AppearanceProvider` renders a themed logo while settings load instead of
+  returning `null`; the boot theme is already seeded before React renders.
+- First plugin-catalog installation waits for an idle callback, so bundle
+  evaluation no longer runs in the first interactive turn.
+- Probe cycles start the active or preferred connection first, then start
+  fallbacks after the lead settles or 250 ms, whichever comes first.
+
+The icon cache still persists as one blob per flush. Per-entry writes remain a
+later improvement; the byte budget now caps what restore has to parse.
+
 ### Composer typing work
 
 Done in this pass.
@@ -247,27 +266,7 @@ changed; debounce reconnect repair by offline duration; keep route→query-key
 mappings instead of scanning. **Measure:** RPC counts during boot/reconnect and
 while saving files.
 
-### P1.4 Startup waits on non-critical storage and parsing
-
-- `packages/app/src/runtime/host-runtime.ts:1637` awaits
-  `projectIconCache.restore()` before `hostRegistryStatus = "ready"`.
-- `packages/app/src/projects/icon-cache.ts:82-119` reads one JSON blob of base64
-  icons and caps by entry count, not bytes; `:178-189` rewrites the whole blob on
-  every flush.
-- `packages/app/src/appearance/provider.tsx:186` returns `null` until settings
-  load, so even the splash cannot render.
-- `packages/app/src/plugins/evaluate.ts:465` `eval`s plugin bundles
-  synchronously during the first catalog sync.
-- `packages/app/src/runtime/host-runtime.ts:692-717` probes every saved
-  connection of every host before the first screen is interactive.
-
-Fix: don't await icon restore before marking the registry ready; render the
-splash with the boot theme; add a byte budget and per-entry icon keys; evaluate
-plugins in an idle callback; probe the preferred connection first and defer
-fallbacks. **Measure:** time to splash resolution and time to first interactive
-workspace.
-
-### P1.5 Agent directory fanout rebuilds global indexes per event
+### P1.4 Agent directory fanout rebuilds global indexes per event
 
 - `packages/app/src/stores/session-store.ts:1501` rebuilds
   `workspaceAgentActivity` by scanning all agents on every `setAgents`.
@@ -447,5 +446,5 @@ Do not "fix" the following without reading the linked docs; they are deliberate:
 2. Explorer retention (P1.1).
 3. History revision work (P1.2).
 4. Directory/git/reconnect amplification (P1.3).
-5. Startup gates and agent-directory fanout (P1.4, P1.5).
+5. Agent-directory fanout (P1.4).
 6. Remaining P2 items as touch-time cleanup.

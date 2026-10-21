@@ -7,6 +7,10 @@ const STORAGE_KEY = "@paseo:project-icon-cache";
 const CACHE_VERSION = 1;
 const PERSIST_DELAY_MS = 250;
 const MAX_ENTRIES = 512;
+// Base64 icons live in storage as strings. Keep the whole cache small enough to
+// parse during startup instead of letting 512 large PNGs turn it into a multi-MB blob.
+const MAX_CACHE_CHARS = 2 * 1024 * 1024;
+const MAX_RESTORE_CHARS = MAX_CACHE_CHARS * 2;
 
 export interface ProjectIconCacheStorage {
   getItem(key: string): Promise<string | null>;
@@ -27,6 +31,10 @@ interface StoredIcon extends ProjectIconIdentity {
 
 function keyOf(identity: ProjectIconIdentity): string {
   return JSON.stringify([identity.serverId, identity.projectId, identity.revision]);
+}
+
+function entrySize(entry: StoredIcon): number {
+  return entry.icon ? entry.icon.data.length + entry.icon.mimeType.length + 128 : 128;
 }
 
 function parseStoredIcon(value: unknown): StoredIcon | null {
@@ -64,6 +72,8 @@ export class ProjectIconCache {
   private activeServerIds = new Set<string>();
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private writeQueue: Promise<void> = Promise.resolve();
+  private totalChars = 0;
+  private restorePromise: Promise<void> | null = null;
 
   constructor(private readonly storage: ProjectIconCacheStorage) {}
 
@@ -72,14 +82,19 @@ export class ProjectIconCache {
     let changed = false;
     for (const [key, entry] of this.entries) {
       if (!this.activeServerIds.has(entry.serverId)) {
-        this.entries.delete(key);
+        this.deleteEntry(key);
         changed = true;
       }
     }
     if (changed) this.schedulePersist();
   }
 
-  async restore(): Promise<void> {
+  restore(): Promise<void> {
+    this.restorePromise ??= this.restoreFromStorage();
+    return this.restorePromise;
+  }
+
+  private async restoreFromStorage(): Promise<void> {
     let raw: string | null;
     try {
       raw = await this.storage.getItem(STORAGE_KEY);
@@ -87,18 +102,31 @@ export class ProjectIconCache {
       return;
     }
     if (!raw) return;
+    // A legacy blob over this size is more expensive to parse than it is worth.
+    // Drop it; the next flush rewrites the cache with the current byte budget.
+    if (raw.length > MAX_RESTORE_CHARS) {
+      this.schedulePersist();
+      return;
+    }
+    let changed = false;
     try {
       const parsed = JSON.parse(raw) as { version?: unknown; entries?: unknown };
       if (parsed.version !== CACHE_VERSION || !Array.isArray(parsed.entries)) return;
       for (const value of parsed.entries) {
         const entry = parseStoredIcon(value);
-        if (entry && this.activeServerIds.has(entry.serverId)) {
-          this.entries.set(keyOf(entry), entry);
-        }
+        if (!entry || !this.activeServerIds.has(entry.serverId)) continue;
+        const key = keyOf(entry);
+        // A live query may already have written a fresher result while IndexedDB
+        // was opening. Never replace it with the stored copy.
+        if (this.entries.has(key)) continue;
+        this.setEntry(key, entry);
+        changed = true;
       }
     } catch {
       // A corrupt cache is disposable.
     }
+    if (this.evictToBudget()) changed = true;
+    if (changed) this.schedulePersist();
   }
 
   private read(identity: ProjectIconIdentity): ProjectIconCacheRead {
@@ -108,14 +136,36 @@ export class ProjectIconCache {
 
   private write(identity: ProjectIconIdentity, icon: ProjectIcon | null): void {
     const key = keyOf(identity);
+    this.setEntry(key, { ...identity, icon });
+    this.evictToBudget();
+    this.schedulePersist();
+  }
+
+  private setEntry(key: string, entry: StoredIcon): void {
+    this.deleteEntry(key);
+    this.entries.set(key, entry);
+    this.totalChars += entrySize(entry);
+  }
+
+  private deleteEntry(key: string): void {
+    const existing = this.entries.get(key);
+    if (!existing) return;
     this.entries.delete(key);
-    this.entries.set(key, { ...identity, icon });
-    while (this.entries.size > MAX_ENTRIES) {
+    this.totalChars -= entrySize(existing);
+  }
+
+  private evictToBudget(): boolean {
+    let changed = false;
+    while (
+      (this.entries.size > MAX_ENTRIES || this.totalChars > MAX_CACHE_CHARS) &&
+      this.entries.size > 0
+    ) {
       const oldest = this.entries.keys().next().value;
       if (oldest === undefined) break;
-      this.entries.delete(oldest);
+      this.deleteEntry(oldest);
+      changed = true;
     }
-    this.schedulePersist();
+    return changed;
   }
 
   query(
@@ -167,9 +217,9 @@ export class ProjectIconCache {
   reconcileServerId(oldServerId: string, newServerId: string): void {
     for (const [key, entry] of this.entries) {
       if (entry.serverId !== oldServerId) continue;
-      this.entries.delete(key);
+      this.deleteEntry(key);
       const reconciled = { ...entry, serverId: newServerId };
-      this.entries.set(keyOf(reconciled), reconciled);
+      this.setEntry(keyOf(reconciled), reconciled);
     }
     if (this.activeServerIds.delete(oldServerId)) this.activeServerIds.add(newServerId);
     this.schedulePersist();

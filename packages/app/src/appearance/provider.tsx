@@ -7,7 +7,8 @@ import {
   useMemo,
   useState,
 } from "react";
-import { UnistylesRuntime } from "react-native-unistyles";
+import { View } from "react-native";
+import { StyleSheet, UnistylesRuntime } from "react-native-unistyles";
 import {
   DEFAULT_THEME_PREFERENCE,
   resolveContentMaxWidth,
@@ -33,6 +34,7 @@ import {
   PLUGIN_THEME_PREFERENCE,
   THEME_TO_UNISTYLES,
 } from "@/styles/theme";
+import { PaseoLogo } from "@/components/icons/paseo-logo";
 import { applyAppearance } from "./apply";
 import { useCustomThemeCatalog } from "./custom-themes";
 import { AppearanceSystemBars } from "./system-bars";
@@ -182,8 +184,9 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
   );
 
   // The first settings load changes appearance keys. Mount screens only after applying it
-  // so startup does not destroy and recreate an already-visible workspace.
-  if (!hasAppliedAppearance) return null;
+  // so startup does not destroy and recreate an already-visible workspace. The boot
+  // theme is already seeded before render, so a logo is enough to avoid a blank window.
+  if (!hasAppliedAppearance) return <BootSplashFallback />;
 
   return (
     <ContributedThemesContext.Provider value={value}>
@@ -192,6 +195,23 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
     </ContributedThemesContext.Provider>
   );
 }
+
+function BootSplashFallback() {
+  return (
+    <View style={bootSplashStyles.container}>
+      <PaseoLogo size={96} />
+    </View>
+  );
+}
+
+const bootSplashStyles = StyleSheet.create((theme) => ({
+  container: {
+    flex: 1,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: theme.colors.surface0,
+  },
+}));
 
 export function useContributedThemes(): ContributedThemes {
   const themes = useContext(ContributedThemesContext);

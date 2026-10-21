@@ -20,6 +20,27 @@ export function PluginCatalogSync({
   useEffect(() => {
     let cancelled = false;
     let refreshQueue = Promise.resolve();
+    let cancelIdle: (() => void) | null = null;
+    const waitForIdle = () =>
+      new Promise<void>((resolve) => {
+        const finish = () => {
+          cancelIdle = null;
+          resolve();
+        };
+        if (typeof globalThis.requestIdleCallback === "function") {
+          const handle = globalThis.requestIdleCallback(finish, { timeout: 1000 });
+          cancelIdle = () => {
+            globalThis.cancelIdleCallback?.(handle);
+            finish();
+          };
+          return;
+        }
+        const handle = setTimeout(finish, 0);
+        cancelIdle = () => {
+          clearTimeout(handle);
+          finish();
+        };
+      });
     if (!supported || !audio) {
       pluginRegistry.removeHost(serverId);
       return;
@@ -29,26 +50,26 @@ export function PluginCatalogSync({
       return;
     }
     const refresh = (replacePluginId?: string) => {
-      refreshQueue = refreshQueue.then(() =>
-        client
-          .getPluginCatalog()
-          .then((catalog) => {
-            if (!cancelled) {
-              pluginRegistry.installCatalog(serverId, catalog, {
-                replacePluginId,
-                client,
-                audio,
-              });
-            }
-            return undefined;
-          })
-          .catch((error) => {
-            if (!cancelled) {
-              console.warn(`[Plugins] Failed to load catalog for ${serverId}`, error);
-            }
-            return undefined;
-          }),
-      );
+      refreshQueue = refreshQueue.then(async () => {
+        try {
+          const catalog = await client.getPluginCatalog();
+          if (cancelled) return;
+          // Evaluating every client bundle is synchronous and can block the first
+          // interactive frame. Let navigation and the initial workspace settle first.
+          await waitForIdle();
+          if (cancelled) return;
+          pluginRegistry.installCatalog(serverId, catalog, {
+            replacePluginId,
+            client,
+            audio,
+          });
+        } catch (error) {
+          if (!cancelled) {
+            console.warn(`[Plugins] Failed to load catalog for ${serverId}`, error);
+          }
+        }
+        return undefined;
+      });
       return refreshQueue;
     };
     const observation = client.observeEvents([
@@ -78,6 +99,7 @@ export function PluginCatalogSync({
     });
     return () => {
       cancelled = true;
+      cancelIdle?.();
       void observation
         .release()
         .catch((error) => console.warn("[Plugins] Failed to release catalog", error));

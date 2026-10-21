@@ -226,6 +226,7 @@ export interface HostRuntimeStartOptions {
 }
 
 const PROBE_TICK_MS = 2_000;
+const PROBE_LEAD_HEAD_START_MS = 250;
 const PROBE_STEADY_MS = 10_000;
 const PROBE_MAX_BACKOFF_MS = 30_000;
 const PROBE_INACTIVE_WHILE_ONLINE_MS = 120_000;
@@ -855,22 +856,29 @@ export class HostRuntimeController {
     const activeConnectionId = this.snapshot.activeConnectionId;
     const hasActiveOnlineConnection = isOnline && activeConnectionId !== null;
 
-    const connectionsToProbe = this.host.connections.filter((connection) => {
-      if (this.authRejectedConnectionIds.has(connection.id)) return false;
-      const lastProbed = this.connectionLastProbedAt.get(connection.id);
-      if (lastProbed == null) {
-        return true;
-      }
-      const firstSeen = this.connectionFirstSeenAt.get(connection.id) ?? now;
-      const isActiveOnline = isOnline && connection.id === activeConnectionId;
-      const interval = probeIntervalForConnection(
-        firstSeen,
-        isActiveOnline,
-        hasActiveOnlineConnection,
-        now,
-      );
-      return now - lastProbed >= interval;
-    });
+    const preferredConnectionId = activeConnectionId ?? this.host.preferredConnectionId;
+    const connectionsToProbe = this.host.connections
+      .filter((connection) => {
+        if (this.authRejectedConnectionIds.has(connection.id)) return false;
+        const lastProbed = this.connectionLastProbedAt.get(connection.id);
+        if (lastProbed == null) {
+          return true;
+        }
+        const firstSeen = this.connectionFirstSeenAt.get(connection.id) ?? now;
+        const isActiveOnline = isOnline && connection.id === activeConnectionId;
+        const interval = probeIntervalForConnection(
+          firstSeen,
+          isActiveOnline,
+          hasActiveOnlineConnection,
+          now,
+        );
+        return now - lastProbed >= interval;
+      })
+      .sort((left, right) => {
+        const leftLead = left.id === preferredConnectionId ? 1 : 0;
+        const rightLead = right.id === preferredConnectionId ? 1 : 0;
+        return rightLead - leftLead;
+      });
 
     if (connectionsToProbe.length === 0) {
       return;
@@ -1017,6 +1025,8 @@ export class HostRuntimeController {
     };
 
     await new Promise<void>((resolve) => {
+      let fallbackStarted = false;
+      let fallbackTimer: ReturnType<typeof setTimeout> | null = null;
       const settleProbe = (): void => {
         remaining -= 1;
         void finalizeProbeCycle().finally(() => {
@@ -1026,8 +1036,28 @@ export class HostRuntimeController {
         });
       };
 
-      for (const connection of connectionsToProbe) {
+      let startProbe: (connection: HostConnection, isLead: boolean) => void;
+      const startFallbacks = (): void => {
+        if (fallbackStarted) return;
+        fallbackStarted = true;
+        if (fallbackTimer !== null) {
+          clearTimeout(fallbackTimer);
+          fallbackTimer = null;
+        }
+        for (let index = 1; index < connectionsToProbe.length; index += 1) {
+          const connection = connectionsToProbe[index];
+          if (connection) startProbe(connection, false);
+        }
+      };
+
+      startProbe = (connection, isLead) => {
         void (async () => {
+          if (!this.isCurrentProbeRequest(requestVersion)) {
+            if (isLead) startFallbacks();
+            settleProbe();
+            return;
+          }
+
           let connectedClient: DaemonClient | null = null;
           let shouldCloseClient = false;
           try {
@@ -1104,9 +1134,20 @@ export class HostRuntimeController {
             if (connectedClient && shouldCloseClient) {
               await connectedClient.close().catch(() => undefined);
             }
+            if (isLead) startFallbacks();
             settleProbe();
           }
         })();
+      };
+
+      const lead = connectionsToProbe[0];
+      if (!lead) {
+        resolve();
+        return;
+      }
+      startProbe(lead, true);
+      if (connectionsToProbe.length > 1) {
+        fallbackTimer = setTimeout(startFallbacks, PROBE_LEAD_HEAD_START_MS);
       }
     });
   }
@@ -1634,7 +1675,9 @@ export class HostRuntimeStore {
       this.hosts = profiles;
       this.replicaCache.setHosts(profiles.map((profile) => profile.serverId));
       projectIconCache.setHosts(profiles.map((profile) => profile.serverId));
-      await projectIconCache.restore();
+      // Icons are decoration. Restoring the IndexedDB blob must not delay the host
+      // registry becoming ready or the first screen becoming interactive.
+      void projectIconCache.restore();
       this.syncHosts(profiles);
       for (const profile of profiles) {
         void this.directorySyncByServer

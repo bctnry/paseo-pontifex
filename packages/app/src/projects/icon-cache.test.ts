@@ -70,6 +70,30 @@ describe("ProjectIconCache", () => {
     expect(reader.query(target, true, () => null, false)).toHaveProperty("initialData", null);
   });
 
+  it("evicts old icons when the cache exceeds its byte budget", async () => {
+    const storage = new MemoryStorage();
+    const cache = new ProjectIconCache(storage);
+    cache.setHosts([target.serverId]);
+    const largeIcon = { data: "A".repeat(64_000), mimeType: "image/png" };
+
+    for (let index = 0; index < 50; index += 1) {
+      const entryTarget = {
+        ...target,
+        projectId: `project-${index}`,
+      };
+      await cache.query(entryTarget, true, () => clientWith(largeIcon), true).queryFn();
+    }
+    await cache.flush();
+
+    const raw = [...storage.values.values()][0];
+    expect(raw).toBeTruthy();
+    const stored = JSON.parse(raw ?? "null") as { entries?: Array<{ projectId?: string }> };
+    expect(stored.entries?.length).toBeGreaterThan(0);
+    expect(stored.entries?.length).toBeLessThan(50);
+    expect(stored.entries?.some((entry) => entry.projectId === "project-0")).toBe(false);
+    expect(raw?.length).toBeLessThanOrEqual(2 * 1024 * 1024 + 512);
+  });
+
   it("misses only the project whose revision changed", async () => {
     const cache = new ProjectIconCache(new MemoryStorage());
     const other = { ...target, projectId: "project-b" };
