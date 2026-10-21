@@ -1,8 +1,7 @@
 import { useEffect } from "react";
 import { createFileRoute } from "@tanstack/react-router";
-import { GitHubIcon, RedditIcon } from "~/components/brand-icons";
+import { GitHubIcon } from "~/components/brand-icons";
 import { SiteShell } from "~/components/site-shell";
-import { SponsorSection } from "~/components/sponsorship";
 import { parseReleaseAssetUrl } from "~/downloads";
 import { pageMeta } from "~/meta";
 import "~/styles.css";
@@ -19,7 +18,7 @@ export const Route = createFileRoute("/download_/thanks")({
   head: () =>
     pageMeta(
       "Thanks for downloading Paseo",
-      "Your Paseo download is starting. Find the project on GitHub or Reddit, or sponsor Paseo.",
+      "Your Paseo download is starting. Find the project on GitHub.",
       "/download/thanks",
     ),
   component: DownloadThanks,
@@ -31,12 +30,6 @@ const COMMUNITY = [
     icon: <GitHubIcon className="h-6 w-6" />,
     body: "Star, report issues, contribute.",
     href: "https://github.com/bctnry/paseo-pontifex",
-  },
-  {
-    name: "Reddit",
-    icon: <RedditIcon className="h-6 w-6" />,
-    body: "Workflows and questions.",
-    href: "https://www.reddit.com/r/PaseoAI/",
   },
 ];
 
@@ -63,7 +56,7 @@ function DownloadThanks() {
       )}
 
       <div className="space-y-20 mt-16">
-        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+        <div className="grid grid-cols-1 gap-4">
           {COMMUNITY.map((item) => (
             <a
               key={item.name}
@@ -82,7 +75,6 @@ function DownloadThanks() {
             </a>
           ))}
         </div>
-        <SponsorSection />
       </div>
     </SiteShell>
   );

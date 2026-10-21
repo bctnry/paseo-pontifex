@@ -1,7 +1,6 @@
 import { useCallback } from "react";
 import { View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
-import { Heart } from "lucide-react-native";
 import { Button } from "@/components/ui/button";
 import { GitHubIcon } from "@/components/icons/github-icon";
 import { openExternalUrl } from "@/utils/open-external-url";
@@ -11,10 +10,6 @@ const renderGitHubIcon = (color: string) => <GitHubIcon color={color} size={14} 
 export function CommunityLinks() {
   const handleOpenGitHub = useCallback(() => {
     void openExternalUrl("https://github.com/bctnry/paseo-pontifex");
-  }, []);
-
-  const handleOpenSponsor = useCallback(() => {
-    void openExternalUrl("https://github.com/sponsors/boudra");
   }, []);
 
   return (
@@ -27,16 +22,7 @@ export function CommunityLinks() {
         testID="community-links-github-star"
       >
         Star
-      </Button>
-      <Button
-        variant="ghost"
-        size="sm"
-        leftIcon={Heart}
-        onPress={handleOpenSponsor}
-        testID="community-links-sponsor"
-      >
-        Sponsor
-      </Button>
+      </Button>{" "}
     </View>
   );
 }

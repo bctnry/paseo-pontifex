@@ -45,12 +45,6 @@ export function SiteHeader() {
           Download
         </a>
         <a
-          href="/sponsor"
-          className="text-sm text-muted-foreground hover:text-foreground transition-colors"
-        >
-          Sponsor
-        </a>
-        <a
           href="https://github.com/bctnry/paseo-pontifex"
           target="_blank"
           rel="noopener noreferrer"

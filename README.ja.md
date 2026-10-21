@@ -20,12 +20,6 @@
   <a href="https://github.com/bctnry/paseo-pontifex/releases">
     <img src="https://img.shields.io/github/v/release/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub release">
   </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://www.reddit.com/r/PaseoAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
-  </a>
 </p>
 
 <p align="center">Claude Code、Codex、Copilot、OpenCode、Pi のエージェントを、ひとつのインターフェースで。</p>
@@ -47,17 +41,6 @@ Paseo Pontifex は、速度と使いやすい UI に焦点を当てた Paseo の
 - **音声コントロール:** 音声モードでタスクを口述したり問題を話し合ったりできます。ハンズフリーが必要なときに便利です。
 - **クロスデバイス:** iOS、Android、デスクトップ、Web、CLI に対応。机で作業を始め、スマートフォンで確認し、ターミナルから自動化できます。
 - **プライバシー優先:** Paseo にはテレメトリー・トラッキング・強制ログインは一切ありません。
-
-## スポンサー
-
-<!-- Sponsors: one cell per sponsor in the order of packages/website/src/data/sponsors.ts, then "become a sponsor" cells up to three. -->
-<table>
-  <tr>
-    <td align="center" width="33%"><a href="https://hoplite.sh/?utm_source=paseo&utm_medium=readme&utm_campaign=sponsor"><picture><source media="(prefers-color-scheme: dark)" srcset="packages/website/public/sponsors/hoplite-on-dark.svg"><img src="packages/website/public/sponsors/hoplite-on-light.svg" alt="Hoplite" height="40"></picture></a><br><sub>Cloud coding agents</sub></td>
-    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Paseo のスポンサーになる</a></td>
-    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Paseo のスポンサーになる</a></td>
-  </tr>
-</table>
 
 ## はじめかた
 
@@ -156,10 +139,6 @@ npm run build:server
 # リポジトリ全体のチェック
 npm run typecheck
 ```
-
-## Paseo を支援する
-
-Paseo は一人で開発しており、使ってくれる人たちの支援で成り立っています。[GitHub Sponsors](https://github.com/sponsors/boudra) で支援できます。企業として毎月[スポンサー](https://paseo.sh/sponsor#spot)になっていただくと、ロゴをこの README の冒頭と、paseo.sh のトップページおよびドキュメントに掲載します。
 
 ## 関連プロジェクト
 

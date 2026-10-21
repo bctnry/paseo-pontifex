@@ -20,12 +20,6 @@
   <a href="https://github.com/bctnry/paseo-pontifex/releases">
     <img src="https://img.shields.io/github/v/release/bctnry/paseo-pontifex?style=flat&logo=github" alt="GitHub release">
   </a>
-  <a href="https://x.com/moboudra">
-    <img src="https://img.shields.io/badge/%40moboudra-555?logo=x" alt="X">
-  </a>
-  <a href="https://www.reddit.com/r/PaseoAI/">
-    <img src="https://img.shields.io/badge/Reddit-555?logo=reddit" alt="Reddit">
-  </a>
 </p>
 
 <p align="center">One interface for Claude Code, Codex, Copilot, OpenCode, Pi, Antigravity, and Muse Code agents.</p>
@@ -59,17 +53,6 @@ Paseo Pontifex tracks [upstream Paseo](https://github.com/getpaseo/paseo) and ad
 - UI refinements keep common actions close and reduce visual noise.
 - Builds, branding, and release artifacts come from this fork.
 - Upstream docs describe the shared feature set. Report fork-specific issues here; upstream bugs belong in [getpaseo/paseo](https://github.com/getpaseo/paseo/issues).
-
-## Sponsors
-
-<!-- Sponsors: one cell per sponsor in the order of packages/website/src/data/sponsors.ts, then "become a sponsor" cells up to three. -->
-<table>
-  <tr>
-    <td align="center" width="33%"><a href="https://hoplite.sh/?utm_source=paseo&utm_medium=readme&utm_campaign=sponsor"><picture><source media="(prefers-color-scheme: dark)" srcset="packages/website/public/sponsors/hoplite-on-dark.svg"><img src="packages/website/public/sponsors/hoplite-on-light.svg" alt="Hoplite" height="56"></picture></a><br><sub>Cloud coding agents</sub></td>
-    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Become a sponsor</a></td>
-    <td align="center" width="33%"><a href="https://paseo.sh/sponsor">Become a sponsor</a></td>
-  </tr>
-</table>
 
 ## Plugins
 
@@ -225,10 +208,6 @@ npm run build:server
 # repo-wide checks
 npm run typecheck
 ```
-
-## Support Paseo
-
-Upstream Paseo is an independent project used by tens of thousands of developers daily, built by one person and funded by the people who use it. Support the upstream work on [GitHub Sponsors](https://github.com/sponsors/boudra). Companies can [sponsor Paseo](https://paseo.sh/sponsor#spot) monthly and have their logo shown at the top of this README and on the paseo.sh homepage and docs.
 
 ## Related projects
 
