@@ -1263,6 +1263,9 @@ export const es: TranslationResources = {
       hosts: "Hosts",
       settings: "Ajustes",
       closeSidebar: "Cerrar barra lateral",
+      hideSidebar: "Ocultar barra lateral",
+      refreshWorkspaces: "Actualizar espacios de trabajo",
+      menu: "Acciones de la barra lateral",
     },
     footer: {
       usage: "Uso",

@@ -1233,6 +1233,9 @@ export const ko: TranslationResources = {
       hosts: "호스트",
       settings: "설정",
       closeSidebar: "사이드바 닫기",
+      hideSidebar: "사이드바 숨기기",
+      refreshWorkspaces: "워크스페이스 새로 고침",
+      menu: "사이드바 작업",
     },
     footer: {
       usage: "사용량",

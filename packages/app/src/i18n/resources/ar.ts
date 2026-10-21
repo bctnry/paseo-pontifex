@@ -1226,6 +1226,9 @@ export const ar: TranslationResources = {
       hosts: "المضيفون",
       settings: "إعدادات",
       closeSidebar: "إغلاق الشريط الجانبي",
+      hideSidebar: "إخفاء الشريط الجانبي",
+      refreshWorkspaces: "تحديث مساحات العمل",
+      menu: "إجراءات الشريط الجانبي",
     },
     footer: {
       usage: "الاستخدام",

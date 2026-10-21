@@ -1234,6 +1234,9 @@ export const en = {
       hosts: "Hosts",
       settings: "Settings",
       closeSidebar: "Close sidebar",
+      hideSidebar: "Hide sidebar",
+      refreshWorkspaces: "Refresh workspaces",
+      menu: "Sidebar actions",
     },
     footer: {
       usage: "Usage",
