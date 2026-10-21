@@ -47,6 +47,7 @@ import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { ComboboxTrigger } from "@/components/ui/combobox-trigger";
 import { SearchField } from "@/components/ui/search-field";
 import { filterSettingsTargets } from "@/screens/settings/settings-search";
+import { shouldShowSidebarTopStrip } from "@/components/desktop-sidebar-layout";
 import { SidebarHeaderRow } from "@/components/sidebar/sidebar-header-row";
 import { HostPicker as SharedHostPicker } from "@/components/hosts/host-picker";
 import { HostStatusDot } from "@/components/host-status-dot";
@@ -70,6 +71,7 @@ import {
   resolveActiveHostServerId,
   type HostProfile,
 } from "@/types/host-connection";
+import { SidebarTopStrip } from "@/components/desktop/sidebar-top-strip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { WindowChromeRegion, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { confirmDialog } from "@/utils/confirm-dialog";
@@ -91,7 +93,7 @@ import { DesktopPermissionsSection } from "@/desktop/components/desktop-permissi
 import { DesktopNotificationsSection } from "@/desktop/components/desktop-notifications-section";
 import { BrowserDataSection } from "@/desktop/browser/settings/browser-data-section";
 import { IntegrationsSection } from "@/desktop/components/integrations-section";
-import { isElectronRuntime } from "@/desktop/host";
+import { getDesktopWindowChromeMode, isElectronRuntime } from "@/desktop/host";
 import { useDesktopAppUpdater } from "@/desktop/updates/use-desktop-app-updater";
 import { formatVersionWithPrefix } from "@/desktop/updates/desktop-updates";
 import { resolveAppVersion } from "@/utils/app-version";
@@ -1071,6 +1073,7 @@ function SettingsSidebar({
   const [searchQuery, setSearchQuery] = useState("");
   const insets = useSafeAreaInsets();
   const isDesktop = layout === "desktop";
+  const showTopStrip = shouldShowSidebarTopStrip(getDesktopWindowChromeMode());
   const outerContainerStyle = useMemo(
     () => [isDesktop ? sidebarStyles.desktopContainer : sidebarStyles.mobileContainer],
     [isDesktop],
@@ -1199,6 +1202,7 @@ function SettingsSidebar({
     >
       {isDesktop ? (
         <View style={innerContainerStyle}>
+          {showTopStrip ? <SidebarTopStrip testID="settings-sidebar-top-strip" /> : null}
           <View style={sidebarStyles.sidebarDragArea}>
             <TitlebarDragRegion />
             <WindowChromeSafeArea placement="below" />

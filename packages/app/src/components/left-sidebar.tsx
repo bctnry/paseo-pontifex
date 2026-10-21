@@ -23,9 +23,9 @@ import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-nativ
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StyleSheet, useUnistyles, withUnistyles } from "react-native-unistyles";
+import { SidebarTopStrip } from "@/components/desktop/sidebar-top-strip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { HeaderToggleButton } from "@/components/headers/header-toggle-button";
-import { SidebarTopTextMark } from "@/components/icons/sidebar-top-text-mark";
 import {
   IconButtonChromeProvider,
   iconButtonChromeGlyphSize,
@@ -779,12 +779,7 @@ function DesktopSidebar({
   );
   const sidebarChromeRow = useMemo(() => {
     if (showTopStrip) {
-      return (
-        <View style={styles.sidebarTopStrip} testID="sidebar-top-strip">
-          <SidebarTopTextMark color={theme.colors.accentForeground} />
-          <TitlebarDragRegion />
-        </View>
-      );
+      return <SidebarTopStrip />;
     }
     if (ownsTopLeft) {
       return (
@@ -794,7 +789,7 @@ function DesktopSidebar({
       );
     }
     return <TitlebarDragRegion />;
-  }, [ownsTopLeft, showTopStrip, theme.colors.accentForeground]);
+  }, [ownsTopLeft, showTopStrip]);
   const devBuildBadge = useMemo(
     () =>
       DEV_BUILD_LABEL ? (
@@ -984,14 +979,6 @@ const styles = StyleSheet.create((theme) => ({
   },
   sidebarDragArea: {
     position: "relative",
-  },
-  sidebarTopStrip: {
-    height: density.tightRowHeight,
-    alignItems: "center",
-    justifyContent: "center",
-    padding: theme.spacing[1],
-    backgroundColor: theme.colors.accent,
-    userSelect: "none",
   },
   desktopChromeRow: {
     position: "relative",
