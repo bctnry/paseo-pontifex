@@ -3,8 +3,8 @@ name: CI
 on:
   # This fork runs CI on pull requests and manual dispatch only. Main pushes
   # from upstream syncs must not spend runner minutes or touch shared secrets.
+  # Every base branch is intentional so stacked PRs and PRs into `next` run.
   pull_request:
-    branches: [main]
   workflow_dispatch:
 
 # A newer run on the same ref cancels the run still in progress.
@@ -412,6 +412,14 @@ jobs:
 
       - name: Run app unit tests
         run: npm run test --workspace=@getpaseo/app
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Run Android module tests
+        run: npm run test:android --workspace=@getpaseo/app
 
   playwright-1:
     name: playwright (shard 1/8)

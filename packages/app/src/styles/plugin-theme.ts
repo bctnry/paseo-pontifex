@@ -1,4 +1,5 @@
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginMessage, PluginText, PluginThemeContribution } from "@getpaseo/plugin";
+import { isPluginMessage } from "@getpaseo/plugin/client/host";
 import { z } from "zod";
 import { buildThemeFromPalette, type Theme } from "./theme";
 
@@ -19,18 +20,18 @@ export const themeColorsSchema = z.strictObject({
   ring: hexColorSchema,
 });
 
-const contributionSchema: z.ZodType<PluginThemeContribution> = z.strictObject({
+const contributionSchema: z.ZodType<PluginThemeContribution<PluginText>> = z.strictObject({
   id: z.string(),
-  name: z.string().trim().min(1).max(60),
+  name: z.union([z.string().trim().min(1).max(60), z.custom<PluginMessage>(isPluginMessage)]),
   appearance: z.enum(["light", "dark"]),
   colors: themeColorsSchema,
 });
 
-export function parsePluginThemeContribution(value: unknown): PluginThemeContribution {
+export function parsePluginThemeContribution(value: unknown): PluginThemeContribution<PluginText> {
   return contributionSchema.parse(value);
 }
 
-export function buildPluginTheme(contribution: PluginThemeContribution): Theme {
+export function buildPluginTheme(contribution: PluginThemeContribution<PluginText>): Theme {
   return buildThemeFromPalette({
     appearance: contribution.appearance,
     colors: contribution.colors,

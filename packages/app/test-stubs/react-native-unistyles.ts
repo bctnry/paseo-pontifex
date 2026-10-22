@@ -1,6 +1,9 @@
+import { lightHighlightColors } from "@getpaseo/highlight";
+
 const testTheme = {
   colorScheme: "light",
   colors: {
+    syntax: lightHighlightColors,
     foreground: "#111111",
     foregroundMuted: "#666666",
     statusSuccess: "#15803d",
@@ -31,28 +34,6 @@ const testTheme = {
       green: { 500: "#22c55e" },
       red: { 300: "#fca5a5" },
       white: "#ffffff",
-    },
-    syntax: {
-      keyword: "#7c3aed",
-      comment: "#71717a",
-      string: "#15803d",
-      number: "#b45309",
-      literal: "#b45309",
-      function: "#2563eb",
-      definition: "#2563eb",
-      class: "#a21caf",
-      type: "#0e7490",
-      tag: "#be123c",
-      attribute: "#b45309",
-      property: "#2563eb",
-      variable: "#111111",
-      operator: "#52525b",
-      punctuation: "#52525b",
-      regexp: "#be123c",
-      escape: "#b45309",
-      meta: "#71717a",
-      heading: "#111111",
-      link: "#2563eb",
     },
   },
   borderWidth: { 1: 1 },

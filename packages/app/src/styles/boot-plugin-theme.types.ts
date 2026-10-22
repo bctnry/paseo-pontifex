@@ -1,4 +1,4 @@
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginText, PluginThemeContribution } from "@getpaseo/plugin";
 import type { Theme } from "./plugin-theme";
 import { REGISTERED_THEMES } from "./theme";
 
@@ -8,7 +8,7 @@ export interface BootPluginTheme {
   name: string;
   swatch: string;
   theme: Theme;
-  contribution: PluginThemeContribution;
+  contribution: PluginThemeContribution<PluginText>;
 }
 
 export type BootThemeSettings =
@@ -18,7 +18,9 @@ export type BootThemeSettings =
 export interface BootPluginThemeSource {
   id: string;
   serverId: string;
-  contribution: PluginThemeContribution;
+  /** Resolved name, so the boot cache does not need the plugin translation runtime. */
+  name?: string;
+  contribution: PluginThemeContribution<PluginText>;
 }
 
 export interface BootCustomTheme {

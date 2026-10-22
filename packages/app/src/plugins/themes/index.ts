@@ -1,5 +1,5 @@
 import { useMemo } from "react";
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginThemeContribution } from "../types";
 import { useHostFeatureAvailabilityMap, useHostFeatureMap } from "@/runtime/host-features";
 import { useHosts } from "@/runtime/host-runtime";
 import { buildPluginTheme } from "@/styles/plugin-theme";
@@ -25,6 +25,7 @@ export interface PluginThemeOption {
 interface PluginThemeTarget {
   serverId: string;
   contribution: PluginThemeContribution;
+  plugin: InstalledPlugin;
 }
 
 function selectTarget(id: string, targets: PluginThemeTarget[]): PluginThemeTarget {
@@ -41,7 +42,7 @@ export function collectPluginThemes(
     if (!supportedHosts.has(plugin.serverId)) continue;
     for (const contribution of plugin.themes) {
       const id = `${plugin.id}/theme/${contribution.id}`;
-      const target = { serverId: plugin.serverId, contribution };
+      const target = { serverId: plugin.serverId, contribution, plugin };
       const targets = targetsById.get(id);
       if (targets) targets.push(target);
       else targetsById.set(id, [target]);
@@ -53,7 +54,7 @@ export function collectPluginThemes(
     return {
       id,
       serverId: target.serverId,
-      name: target.contribution.name,
+      name: target.plugin.i18n.resolve(target.contribution.name, target.plugin.locale),
       swatch: target.contribution.colors.background,
       theme: buildPluginTheme(target.contribution),
       contribution: target.contribution,

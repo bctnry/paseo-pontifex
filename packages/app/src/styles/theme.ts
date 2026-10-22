@@ -805,10 +805,7 @@ export function buildThemeFromPalette(input: {
     appearance === "dark" ? 0.12 : 0.06,
   );
   const foregroundExtraMuted = mixHexColors(colors.mutedForeground, colors.background, 0.3);
-  const terminalBrightBlack =
-    appearance === "dark"
-      ? mixHexColors(colors.background, colors.foreground, 0.3)
-      : mixHexColors(colors.foreground, colors.background, 0.3);
+  const terminalBrightBlack = colors.ring;
 
   if (appearance === "dark") {
     return buildDarkTheme(

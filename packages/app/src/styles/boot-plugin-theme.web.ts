@@ -1,4 +1,4 @@
-import type { PluginThemeContribution } from "@getpaseo/plugin";
+import type { PluginText, PluginThemeContribution } from "@getpaseo/plugin";
 import { APP_SETTINGS_KEY } from "@/hooks/use-settings/keys";
 import type {
   BootCustomTheme,
@@ -26,7 +26,8 @@ interface StoredBootPluginTheme {
   version: number;
   id: string;
   serverId: string;
-  contribution: PluginThemeContribution;
+  name: string;
+  contribution: PluginThemeContribution<PluginText>;
 }
 
 interface StoredBootCustomTheme {
@@ -62,7 +63,7 @@ function buildBootPluginTheme(stored: StoredBootPluginTheme): BootPluginTheme {
   return {
     id: stored.id,
     serverId: stored.serverId,
-    name: stored.contribution.name,
+    name: stored.name,
     swatch: stored.contribution.colors.background,
     theme: buildPluginTheme(stored.contribution),
     contribution: stored.contribution,
@@ -78,11 +79,19 @@ export function readBootPluginTheme(): BootPluginTheme | null {
     const record = parsed as Record<string, unknown>;
     if (record.version !== BOOT_PLUGIN_THEME_VERSION) return null;
     if (typeof record.id !== "string" || typeof record.serverId !== "string") return null;
+    const contribution = parsePluginThemeContribution(record.contribution);
+    let name = "Plugin theme";
+    if (typeof record.name === "string") {
+      name = record.name;
+    } else if (typeof contribution.name === "string") {
+      name = contribution.name;
+    }
     return buildBootPluginTheme({
       version: BOOT_PLUGIN_THEME_VERSION,
       id: record.id,
       serverId: record.serverId,
-      contribution: parsePluginThemeContribution(record.contribution),
+      name,
+      contribution,
     });
   } catch {
     return null;
@@ -94,6 +103,9 @@ export function rememberBootPluginTheme(input: BootPluginThemeSource): void {
     version: BOOT_PLUGIN_THEME_VERSION,
     id: input.id,
     serverId: input.serverId,
+    name:
+      input.name ??
+      (typeof input.contribution.name === "string" ? input.contribution.name : "Plugin theme"),
     contribution: input.contribution,
   };
   try {
@@ -130,10 +142,12 @@ export function readBootCustomTheme(): BootCustomTheme | null {
     const record = parsed as Record<string, unknown>;
     if (record.version !== BOOT_CUSTOM_THEME_VERSION) return null;
     if (typeof record.id !== "string") return null;
+    const contribution = parsePluginThemeContribution(record.contribution);
+    if (typeof contribution.name !== "string") return null;
     return buildBootCustomTheme({
       version: BOOT_CUSTOM_THEME_VERSION,
       id: record.id,
-      contribution: parsePluginThemeContribution(record.contribution),
+      contribution: { ...contribution, name: contribution.name },
     });
   } catch {
     return null;

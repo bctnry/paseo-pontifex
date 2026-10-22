@@ -127,6 +127,7 @@ export function AppearanceProvider({ children }: { children: ReactNode }) {
         rememberBootPluginTheme({
           id: livePluginTheme.id,
           serverId: livePluginTheme.serverId,
+          name: livePluginTheme.name,
           contribution: livePluginTheme.contribution,
         });
       } else if (pluginCatalogReady) {
