@@ -75,10 +75,42 @@ Confirm when prompted. Paseo prints a QR code and pairing link. Scan the QR code
 
 The relay is a transport, not a Paseo account service. You can point a host at your own relay instead of the official one.
 
+Run the relay service from [getpaseo/paseo-relay](https://github.com/getpaseo/paseo-relay). The Cloudflare adapter in this repository is legacy and is not the production relay.
+
+A single-node relay needs a reachable host and TLS in front of it. On a VPS with Docker and Caddy:
+
+```bash
+git clone https://github.com/getpaseo/paseo-relay.git
+cd paseo-relay
+docker build -t paseo-relay .
+docker run -d --name paseo-relay --restart unless-stopped \
+  -p 127.0.0.1:4000:4000 \
+  paseo-relay
+```
+
+Point `relay.example.com` at the host, then put Caddy in front of the loopback listener:
+
+```caddyfile
+relay.example.com {
+  reverse_proxy 127.0.0.1:4000
+}
+```
+
+Caddy terminates TLS and forwards the WebSocket upgrade. Keep port `4000` off the public firewall; expose only `80` and `443`. Check the relay before touching Paseo:
+
+```bash
+curl -fsS https://relay.example.com/health
+curl -fsS https://relay.example.com/ready
+```
+
+Then configure the host:
+
 1. Open **Settings → your host → Pair devices → Relay → Configure**.
 2. Select **Custom relay**.
-3. Enter the relay's internal `host:port`, its public `host:port` if clients reach it through a different address, and whether TLS is used.
-4. Save, then pair the device as usual.
+3. Enter the address the daemon uses and the address clients use. If the relay and daemon are on the same machine, the daemon can use `127.0.0.1:4000` without TLS while clients use `relay.example.com:443` with TLS. If they are on different machines, use `relay.example.com:443` for both and enable TLS.
+4. Save, enable the relay, then pair the device as usual.
+
+The relay only routes ciphertext and metadata. It does not receive the daemon key or readable agent traffic.
 
 The same settings live in `config.json`:
 
@@ -99,7 +131,7 @@ The same settings live in `config.json`:
 }
 ```
 
-`endpoint` is the address the daemon connects to. `publicEndpoint` is the address written into the pairing offer. `app.baseUrl` is the web app a pairing link opens; point it at a self-hosted web UI if you do not want the hosted one. The relay still sees only encrypted traffic and metadata, as described in [Security](/docs/security).
+`endpoint` is the address the daemon connects to. `publicEndpoint` is the address written into the pairing offer. `app.baseUrl` is the web app a pairing link opens. It must be reachable from the phone: use your self-hosted web UI, or `https://app.paseo.sh` for the hosted static client. The hosted page does not proxy agent traffic; the daemon and phone still meet at your relay. The relay still sees only encrypted traffic and metadata, as described in [Security](/docs/security).
 
 Switching back to **Paseo relay** restores `relay.paseo.sh:443` and TLS. The official relay remains available as a preset.
 
