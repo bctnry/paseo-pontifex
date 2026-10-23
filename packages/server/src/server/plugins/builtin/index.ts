@@ -1,4 +1,4 @@
-import { existsSync } from "node:fs";
+import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
 
@@ -11,7 +11,6 @@ export const builtinPlugins = [
   "grok-usage-source",
   "hoplite-provider",
   "kimi-usage-source",
-  "lingus-registry",
   "minimax-usage-source",
   "muse-provider",
   "opencode-go-usage-source",
@@ -33,6 +32,24 @@ export function resolveBuiltinPluginsRoot(moduleUrl: string | URL = import.meta.
   return candidates.find((candidate) => existsSync(candidate)) ?? candidates[0]!;
 }
 
+const LOCAL_BUILTIN_PLUGINS_FILENAME = "local-builtin-plugins.json";
+
+// Local checkouts can opt uncommitted built-ins in without changing the public list.
+// The file is ignored by git and absent from published packages.
+function readLocalBuiltinPlugins(root: string): string[] {
+  const file = path.join(root, LOCAL_BUILTIN_PLUGINS_FILENAME);
+  if (!existsSync(file)) return [];
+  const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
+  if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === "string" && id.length > 0)) {
+    throw new Error(`${file} must be a JSON array of plugin IDs`);
+  }
+  return parsed;
+}
+
+export function builtinPluginList(root = resolveBuiltinPluginsRoot()): readonly string[] {
+  return [...new Set([...builtinPlugins, ...readLocalBuiltinPlugins(root)])];
+}
+
 export interface BuiltinPlugin {
   id: string;
   directory: string;
@@ -43,7 +60,7 @@ export class BuiltinPluginLoader {
 
   constructor(
     private readonly root = resolveBuiltinPluginsRoot(),
-    private readonly list: readonly string[] = builtinPlugins,
+    private readonly list: readonly string[] = builtinPluginList(root),
   ) {
     this.ids = new Set(list);
   }

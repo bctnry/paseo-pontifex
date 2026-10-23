@@ -103,7 +103,9 @@ The author contract is in [runtime translations](../public-docs/plugins/referenc
 Built-in plugins ship from `plugins/<id>/`, with `paseo-plugin.json`, `index.server.ts`,
 `server/`, and optional client entry and icon. Add the plugin ID to `builtinPlugins` in
 `packages/server/src/server/plugins/builtin/index.ts`; the workspace, build copy, and CI
-checks cover that registry. Unlisted directories do not load.
+checks cover that registry. Unlisted directories do not load. A local checkout can opt an
+uncommitted built-in in with `plugins/local-builtin-plugins.json`, a JSON array of plugin IDs. The
+file is ignored by git and absent from published packages.
 
 Desktop packaging ships the entire built-in plugin directory as an external resource,
 including declarations. The external esbuild compiler cannot read Electron's `app.asar`
