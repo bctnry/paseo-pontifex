@@ -47,7 +47,7 @@ function setProcessRuntime(input: {
 describe("runtime-paths", () => {
   beforeEach(() => {
     mocks.app.isPackaged = true;
-    mocks.existsSync.mockReturnValue(true);
+    mocks.existsSync.mockImplementation((filePath: string) => !filePath.endsWith("/node"));
     setProcessRuntime({
       platform: "darwin",
       execPath: "/Applications/Paseo.app/Contents/MacOS/Paseo",
@@ -64,7 +64,13 @@ describe("runtime-paths", () => {
     });
   });
 
-  it("uses the macOS Helper executable for packaged daemon node launches", () => {
+  it("prefers the bundled Node runtime for packaged daemon launches", () => {
+    mocks.existsSync.mockReturnValue(true);
+
+    expect(resolveNodeExecPath()).toBe("/Applications/Paseo.app/Contents/Resources/node");
+  });
+
+  it("uses the macOS Helper executable when no bundled Node runtime is present", () => {
     expect(resolveNodeExecPath()).toBe(
       "/Applications/Paseo.app/Contents/Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper",
     );

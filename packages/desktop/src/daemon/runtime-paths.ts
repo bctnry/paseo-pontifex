@@ -27,14 +27,36 @@ function resolveServerPackageInfo(): PackageInfo {
   });
 }
 
+export function resolvePackagedNodeRuntimePath(): string | null {
+  if (!app.isPackaged) return null;
+
+  const candidate = path.join(
+    process.resourcesPath,
+    process.platform === "win32" ? "node.exe" : "node",
+  );
+  return existsSync(candidate) ? candidate : null;
+}
+
+export function resolvePackagedNodeEntrypointRoot(): string {
+  if (app.isPackaged) {
+    const unpackedRoot = path.join(process.resourcesPath, "app.asar.unpacked");
+    if (existsSync(unpackedRoot)) return unpackedRoot;
+  }
+
+  return resolvePackagedAsarPath();
+}
+
 export function resolvePackagedNodeEntrypointRunnerPath(): string {
-  return path.join(
+  const unpackedPath = path.join(
     process.resourcesPath,
     "app.asar.unpacked",
     "dist",
     "daemon",
     "node-entrypoint-runner.js",
   );
+  if (existsSync(unpackedPath)) return unpackedPath;
+
+  return path.join(resolvePackagedAsarPath(), "dist", "daemon", "node-entrypoint-runner.js");
 }
 
 export function resolveDaemonRunnerEntrypoint(): NodeEntrypointSpec {
@@ -43,7 +65,7 @@ export function resolveDaemonRunnerEntrypoint(): NodeEntrypointSpec {
       entryPath: assertPathExists({
         label: "Bundled daemon runner",
         filePath: path.join(
-          resolvePackagedAsarPath(),
+          resolvePackagedNodeEntrypointRoot(),
           "node_modules",
           "@getpaseo",
           "server",
@@ -75,6 +97,9 @@ export function resolveDaemonRunnerEntrypoint(): NodeEntrypointSpec {
 }
 
 export function resolveNodeExecPath(): string {
+  const bundledNode = resolvePackagedNodeRuntimePath();
+  if (bundledNode) return bundledNode;
+
   if (app.isPackaged && process.platform === "darwin") {
     const marker = ".app/Contents/MacOS/";
     const markerIndex = process.execPath.indexOf(marker);

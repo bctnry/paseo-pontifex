@@ -26,6 +26,10 @@ files:
   - "!node_modules/@getpaseo/*/test-results/**"
 asarUnpack:
   - dist/daemon/node-entrypoint-runner.js
+  # The daemon and CLI run on the bundled Node binary, which cannot read asar.
+  # Keep every runtime dependency in app.asar.unpacked so those processes can
+  # resolve the same package graph the Electron main process sees.
+  - node_modules/**/*
   - node_modules/@getpaseo/server/dist/server/terminal/shell-integration/**/*
 extraResources:
   # Preserve physical compiler inputs, including .d.ts files omitted from packaged node_modules.
@@ -47,6 +51,10 @@ mac:
   icon: assets/icon.icns
   hardenedRuntime: true
   notarize: true
+  # Standalone Node used by the daemon/CLI; it is not a framework and must be
+  # signed explicitly before notarization.
+  binaries:
+    - Contents/Resources/node
   entitlements: build/entitlements.mac.plist
   entitlementsInherit: build/entitlements.mac.inherit.plist
   extraResources:

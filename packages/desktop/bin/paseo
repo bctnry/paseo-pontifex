@@ -20,6 +20,23 @@ done
 SCRIPT_DIR=$(CDPATH= cd -- "$(dirname -- "$SCRIPT_PATH")" && pwd)
 RESOURCES_DIR=$(CDPATH= cd -- "${SCRIPT_DIR}/.." && pwd)
 
+APP_ROOT="${RESOURCES_DIR}/app.asar.unpacked"
+if [ ! -d "${APP_ROOT}" ]; then
+  APP_ROOT="${RESOURCES_DIR}/app.asar"
+fi
+RUNNER_PATH="${APP_ROOT}/dist/daemon/node-entrypoint-runner.js"
+if [ ! -f "${RUNNER_PATH}" ]; then
+  RUNNER_PATH="${RESOURCES_DIR}/app.asar.unpacked/dist/daemon/node-entrypoint-runner.js"
+fi
+CLI_ENTRYPOINT="${APP_ROOT}/node_modules/@getpaseo/cli/dist/index.js"
+BUNDLED_NODE="${RESOURCES_DIR}/node"
+
+# The daemon and CLI must run on the patched Node shipped with the app, not
+# Electron's embedded Node. Electron's Node lags the Node security releases.
+if [ -x "${BUNDLED_NODE}" ]; then
+  exec env PASEO_NODE_ENV=production PASEO_CLI="${SCRIPT_PATH}" "${BUNDLED_NODE}" --disable-warning=DEP0040 "${RUNNER_PATH}" node-script "${CLI_ENTRYPOINT}" "$@"
+fi
+
 MACOS_DIR="${RESOURCES_DIR}/../MacOS"
 MACOS_HELPER_EXECUTABLE="${RESOURCES_DIR}/../Frameworks/Paseo Helper.app/Contents/MacOS/Paseo Helper"
 
@@ -40,8 +57,5 @@ else
   echo "Bundled Paseo executable not found relative to ${RESOURCES_DIR}" >&2
   exit 1
 fi
-
-RUNNER_PATH="${RESOURCES_DIR}/app.asar.unpacked/dist/daemon/node-entrypoint-runner.js"
-CLI_ENTRYPOINT="${RESOURCES_DIR}/app.asar/node_modules/@getpaseo/cli/dist/index.js"
 
 exec env ELECTRON_RUN_AS_NODE=1 PASEO_NODE_ENV=production PASEO_CLI="${SCRIPT_PATH}" "${APP_EXECUTABLE}" --disable-warning=DEP0040 "${RUNNER_PATH}" node-script "${CLI_ENTRYPOINT}" "$@"

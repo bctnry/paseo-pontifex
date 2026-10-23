@@ -3,11 +3,8 @@ import { createRequire } from "node:module";
 import path from "node:path";
 import { app } from "electron";
 import type { NodeEntrypointSpec } from "../node-entrypoint-launcher.js";
-import {
-  assertPathExists,
-  findPackageRootFromResolvedPath,
-  resolvePackagedAsarPath,
-} from "../package-paths.js";
+import { assertPathExists, findPackageRootFromResolvedPath } from "../package-paths.js";
+import { resolvePackagedNodeEntrypointRoot } from "../runtime-paths.js";
 
 const CLI_PACKAGE_NAME = "@getpaseo/cli";
 const CLI_BIN_ENTRY = `${CLI_PACKAGE_NAME}/bin/paseo`;
@@ -28,7 +25,7 @@ export function resolveExternalCliEntrypoint(): NodeEntrypointSpec {
       entryPath: assertPathExists({
         label: "Bundled external CLI entrypoint",
         filePath: path.join(
-          resolvePackagedAsarPath(),
+          resolvePackagedNodeEntrypointRoot(),
           "node_modules",
           "@getpaseo",
           "cli",
@@ -63,7 +60,7 @@ export function resolvePassthroughCliEntrypoint(): string {
     return assertPathExists({
       label: "Bundled passthrough CLI entrypoint",
       filePath: path.join(
-        resolvePackagedAsarPath(),
+        resolvePackagedNodeEntrypointRoot(),
         "node_modules",
         "@getpaseo",
         "cli",

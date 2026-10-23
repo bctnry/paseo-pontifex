@@ -55,6 +55,26 @@ test("listed built-ins resolve to matching manifests and compile", async () => {
   }
 });
 
+test("resolves built-ins beside app.asar.unpacked for the standalone daemon", () => {
+  const resources = path.join(path.sep, "opt", "Paseo", "resources");
+  const moduleUrl = pathToFileURL(
+    path.join(
+      resources,
+      "app.asar.unpacked",
+      "node_modules",
+      "@getpaseo",
+      "server",
+      "dist",
+      "server",
+      "plugins",
+      "builtin",
+      "index.js",
+    ),
+  );
+
+  expect(resolveBuiltinPluginsRoot(moduleUrl)).toBe(path.join(resources, "builtin-plugins"));
+});
+
 test("listed client bundle is published while plugins are disabled; unlisted directory is inert", async () => {
   const root = await mkdtemp(path.join(os.tmpdir(), "paseo-builtin-fixture-"));
   roots.push(root);

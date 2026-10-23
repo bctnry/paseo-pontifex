@@ -25,6 +25,13 @@ export function resolveBuiltinPluginsRoot(moduleUrl: string | URL = import.meta.
     // esbuild runs outside Electron's filesystem shim and cannot read archive entries.
     return path.join(moduleDir.slice(0, archiveIndex), "builtin-plugins");
   }
+  const unpackedSegment = `${path.sep}app.asar.unpacked${path.sep}`;
+  const unpackedIndex = moduleDir.indexOf(unpackedSegment);
+  if (unpackedIndex !== -1) {
+    // The daemon and CLI run on standalone Node, which cannot read asar.
+    // electron-builder copies built-ins next to app.asar.unpacked.
+    return path.join(moduleDir.slice(0, unpackedIndex), "builtin-plugins");
+  }
   const candidates = [
     path.resolve(moduleDir, "..", "..", "..", "builtin-plugins"),
     path.resolve(moduleDir, "..", "..", "..", "..", "..", "..", "plugins"),

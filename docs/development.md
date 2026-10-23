@@ -5,6 +5,10 @@
 - Node.js (see `.tool-versions` for exact version)
 - npm workspaces (comes with Node)
 
+## Packaged Node runtime
+
+The desktop package ships a standalone Node binary as `resources/node` and runs the daemon and CLI with it. Electron's embedded Node lags Node security releases, so the packaged processes must not fall back to `process.execPath`. The runtime is downloaded by `packages/desktop/scripts/node-runtime.js` with pinned SHA-256 checksums, and `asarUnpack: node_modules/**/*` keeps the package graph readable to standalone Node. The Electron main process still uses Electron's embedded Node; only the daemon and CLI use the bundled runtime.
+
 ## Running the dev server
 
 ```bash

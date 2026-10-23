@@ -76,7 +76,7 @@
         {
           default = pkgs.mkShell {
             packages = [
-              pkgs.nodejs_22
+              pkgs.nodejs_24
               pkgs.python3
             ];
           };

@@ -4,6 +4,7 @@ const path = require("path");
 const { smokePackagedDesktopApp } = require("../e2e/packaged-app-smoke.js");
 
 const { installLinuxLauncher } = require("./linux-sandbox");
+const { installNodeRuntime } = require("./node-runtime");
 
 const EXECUTABLE_NAME = "Paseo";
 
@@ -75,13 +76,17 @@ function pruneSharpLibvips(nodeModules, platform, arch) {
   }
 }
 
-function pruneNativeModules(appOutDir, platform, arch) {
-  const resourcesDir =
-    platform === "darwin"
-      ? path.join(appOutDir, `${EXECUTABLE_NAME}.app`, "Contents", "Resources")
-      : path.join(appOutDir, "resources");
+function resolveResourcesDir(appOutDir, platform) {
+  return platform === "darwin"
+    ? path.join(appOutDir, `${EXECUTABLE_NAME}.app`, "Contents", "Resources")
+    : path.join(appOutDir, "resources");
+}
 
-  const nodeModules = path.join(resourcesDir, "app.asar.unpacked", "node_modules");
+function pruneNativeModules(appOutDir, platform, arch) {
+  const resourcesDir = resolveResourcesDir(appOutDir, platform);
+  const unpackedNodeModules = path.join(resourcesDir, "app.asar.unpacked", "node_modules");
+  const plainNodeModules = path.join(resourcesDir, "app", "node_modules");
+  const nodeModules = fs.existsSync(unpackedNodeModules) ? unpackedNodeModules : plainNodeModules;
   if (!fs.existsSync(nodeModules)) return;
 
   const before = dirSizeSync(nodeModules);
@@ -115,6 +120,11 @@ exports.default = async function afterPack(context) {
   const platform = context.electronPlatformName;
   const arch = ARCH_MAP[context.arch] || process.arch;
 
+  await installNodeRuntime({
+    platform,
+    arch,
+    resourcesDir: resolveResourcesDir(context.appOutDir, platform),
+  });
   pruneNativeModules(context.appOutDir, platform, arch);
 
   if (platform === "linux") {

@@ -105,6 +105,15 @@ describe("desktop packaging", () => {
     expect(config).toContain("!node_modules/@getpaseo/server/dist/server/web-ui/**");
   });
 
+  it("unpacks runtime dependencies for the bundled Node daemon", () => {
+    const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
+    const shim = readFileSync(join(packageRoot, "bin", "paseo"), "utf8");
+
+    expect(config).toContain("node_modules/**/*");
+    expect(shim).toContain('BUNDLED_NODE="${RESOURCES_DIR}/node"');
+    expect(shim).toContain("exec env PASEO_NODE_ENV=production");
+  });
+
   it("uses the server skill catalog without a duplicate desktop resource", () => {
     const config = readFileSync(join(packageRoot, "electron-builder.yml"), "utf8");
     const serverPackage = readFileSync(join(packageRoot, "..", "server", "package.json"), "utf8");
