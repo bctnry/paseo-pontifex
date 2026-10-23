@@ -39,6 +39,7 @@ interface UseAgentAutocompleteInput {
   onAutocompleteApplied?: () => void;
   onClientSlashCommand?: (command: ClientSlashCommand) => void;
   canExecuteClientSlashCommand?: boolean;
+  supportsFork?: boolean;
   supportsSideQuestion?: boolean;
   pluginClientSlashCommands?: readonly PluginClientSlashCommand[];
 }
@@ -197,6 +198,7 @@ interface BuildAutocompleteOptionsInput {
   commands: AgentSlashCommand[];
   pluginCommands: readonly PluginClientSlashCommand[];
   isDraftContext: boolean;
+  supportsFork?: boolean;
   supportsSideQuestion?: boolean;
   commandFilterQuery: string;
   activeSlashCommand: SlashCommandRange | null;
@@ -216,9 +218,11 @@ function buildCommandAutocompleteOptions(input: BuildAutocompleteOptionsInput) {
       command,
     }));
     const rootCommands: AvailableCommand[] = mergeSlashCommandSources({
-      builtIn: input.supportsSideQuestion
-        ? CLIENT_SLASH_COMMANDS
-        : CLIENT_SLASH_COMMANDS.filter((command) => command.kind !== "side-question"),
+      builtIn: CLIENT_SLASH_COMMANDS.filter(
+        (command) =>
+          (input.supportsSideQuestion || command.kind !== "side-question") &&
+          (input.supportsFork || command.kind !== "fork-agent"),
+      ),
       plugins: input.pluginCommands,
       provider: input.commands,
       onPluginCollision(command, winner) {
@@ -378,6 +382,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     onAutocompleteApplied,
     onClientSlashCommand,
     canExecuteClientSlashCommand,
+    supportsFork,
     supportsSideQuestion,
     pluginClientSlashCommands = [],
   } = input;
@@ -496,6 +501,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
         isDraftContext,
         isVisible,
         mode,
+        supportsFork,
         supportsSideQuestion,
         t,
       }),
@@ -509,6 +515,7 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
       isDraftContext,
       isVisible,
       mode,
+      supportsFork,
       supportsSideQuestion,
       t,
     ],

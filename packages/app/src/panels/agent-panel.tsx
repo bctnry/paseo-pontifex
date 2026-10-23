@@ -58,6 +58,7 @@ import {
 } from "@/hooks/use-agent-screen-state-machine";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import { useContainerWidthBelow } from "@/hooks/use-container-width";
+import { useForkAgent } from "@/hooks/use-fork-agent";
 import { reconcileMissingAgentStateWithPresentAgent } from "@/panels/agent-panel-load-state";
 import { TimelineSyncStatus } from "@/timeline/sync-status";
 import { usePaneContext, usePaneFocus } from "@/panels/pane-context";
@@ -1241,6 +1242,7 @@ const ChatAgentReadyContent = memo(function ChatAgentReadyContent({
         isSubmitLoading={false}
         agentInputDraft={agentInputDraft}
         editingSession={composerEditingSession}
+        toast={toastApi}
         onAttentionInputFocus={onAttentionInputFocus}
         onAttentionPromptSend={onAttentionPromptSend}
         onComposerHeightChange={handleComposerHeightChange}
@@ -1497,6 +1499,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
   isSubmitLoading,
   agentInputDraft,
   editingSession,
+  toast,
   onAttentionInputFocus,
   onAttentionPromptSend,
   onComposerHeightChange,
@@ -1511,6 +1514,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
   isSubmitLoading: boolean;
   agentInputDraft: AgentInputDraft;
   editingSession: ComposerEditingSession;
+  toast: ToastApi;
   onAttentionInputFocus: () => void;
   onAttentionPromptSend: () => void;
   onComposerHeightChange: (height: number) => void;
@@ -1535,6 +1539,7 @@ const AgentComposerSection = memo(function AgentComposerSection({
       isSubmitLoading={isSubmitLoading}
       agentInputDraft={agentInputDraft}
       editingSession={editingSession}
+      toast={toast}
       onAttentionInputFocus={onAttentionInputFocus}
       onAttentionPromptSend={onAttentionPromptSend}
       onComposerHeightChange={onComposerHeightChange}
@@ -1551,6 +1556,7 @@ function ActiveAgentComposer({
   isSubmitLoading,
   agentInputDraft,
   editingSession,
+  toast,
   onAttentionInputFocus,
   onAttentionPromptSend,
   onComposerHeightChange,
@@ -1563,6 +1569,7 @@ function ActiveAgentComposer({
   isSubmitLoading: boolean;
   agentInputDraft: AgentInputDraft;
   editingSession: ComposerEditingSession;
+  toast: ToastApi;
   onAttentionInputFocus: () => void;
   onAttentionPromptSend: () => void;
   onComposerHeightChange: (height: number) => void;
@@ -1577,6 +1584,7 @@ function ActiveAgentComposer({
   const openInSidePane = useSettings((settings) => settings.openInSidePane);
   const { workspaceId, tabId, retargetCurrentTab } = paneContext;
   const { archiveAgent } = useArchiveAgent();
+  const forkAgent = useForkAgent({ serverId, toast });
   const closeWorkspaceTab = useWorkspaceLayoutStore((state) => state.closeTab);
   const hideWorkspaceAgent = useWorkspaceLayoutStore((state) => state.hideAgent);
   const unpinWorkspaceAgent = useWorkspaceLayoutStore((state) => state.unpinAgent);
@@ -1610,6 +1618,13 @@ function ActiveAgentComposer({
         throw new Error("Agent not found");
       }
 
+      // A fork copies the timeline up to now into a new tab and leaves the
+      // source agent running, so it must not archive or hide this tab.
+      if (command.kind === "fork-agent") {
+        await forkAgent({ agentId, agent, workspaceId, target: "tab" });
+        return;
+      }
+
       const workspaceKey = buildWorkspaceTabPersistenceKey({ serverId, workspaceId });
       if (workspaceKey) {
         unpinWorkspaceAgent(workspaceKey, agentId);
@@ -1632,6 +1647,7 @@ function ActiveAgentComposer({
       agentId,
       archiveAgent,
       closeWorkspaceTab,
+      forkAgent,
       hideWorkspaceAgent,
       retargetCurrentTab,
       serverId,

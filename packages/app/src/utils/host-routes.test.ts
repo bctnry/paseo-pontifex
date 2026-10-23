@@ -8,6 +8,7 @@ import {
   buildOpenProjectRoute,
   resolveKnownHostRoute,
   buildSessionsRoute,
+  buildArchivedSessionsRoute,
   buildSettingsAddHostRoute,
   buildProjectSettingsRoute,
   buildProjectsSettingsRoute,
@@ -211,6 +212,10 @@ describe("projects settings routes", () => {
 describe("global routes", () => {
   it("buildSessionsRoute returns the all-host Sessions route", () => {
     expect(buildSessionsRoute()).toBe("/sessions");
+  });
+
+  it("buildArchivedSessionsRoute returns the all-host archived Sessions route", () => {
+    expect(buildArchivedSessionsRoute()).toBe("/archived");
   });
 
   it("buildNewWorkspaceRoute returns the all-host New Workspace route", () => {

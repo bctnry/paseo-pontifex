@@ -92,6 +92,7 @@ import { hasVisibleOrderChanged, mergeWithRemainder } from "@/utils/sidebar-reor
 import { confirmDialog } from "@/utils/confirm-dialog";
 import type { SidebarStateBucket } from "@/utils/sidebar-agent-state";
 import { SidebarStatusWorkspaceList } from "@/components/sidebar/sidebar-status-list";
+import { SidebarWorkspaceSessions } from "@/components/sidebar/sidebar-workspace-sessions";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import {
   SidebarWorkspaceContextMenu,
@@ -1662,23 +1663,26 @@ function ProjectBlock({
       },
     ) => {
       return (
-        <MemoWorkspaceRowItem
-          workspace={item}
-          workspaceEntry={workspaceEntriesByKey.get(item.workspaceKey) ?? null}
-          hostBadge={hostBadgeByServerId.get(item.serverId) ?? null}
-          shortcutNumber={shortcutIndexByWorkspaceKey.get(item.workspaceKey) ?? null}
-          showShortcutBadge={showShortcutBadges}
-          canCopyBranchName={project.projectKind === "git"}
-          canPin={supportsPinningByServerId.get(item.serverId) === true}
-          onToggleWorkspacePin={onToggleWorkspacePin}
-          isCreating={creatingWorkspaceIds.has(item.workspaceId)}
-          selectionEnabled={selectionEnabled}
-          activeWorkspaceSelection={activeWorkspaceSelection}
-          onWorkspacePress={onWorkspacePress}
-          drag={input?.drag}
-          isDragging={input?.isDragging}
-          dragHandleProps={input?.dragHandleProps}
-        />
+        <>
+          <MemoWorkspaceRowItem
+            workspace={item}
+            workspaceEntry={workspaceEntriesByKey.get(item.workspaceKey) ?? null}
+            hostBadge={hostBadgeByServerId.get(item.serverId) ?? null}
+            shortcutNumber={shortcutIndexByWorkspaceKey.get(item.workspaceKey) ?? null}
+            showShortcutBadge={showShortcutBadges}
+            canCopyBranchName={project.projectKind === "git"}
+            canPin={supportsPinningByServerId.get(item.serverId) === true}
+            onToggleWorkspacePin={onToggleWorkspacePin}
+            isCreating={creatingWorkspaceIds.has(item.workspaceId)}
+            selectionEnabled={selectionEnabled}
+            activeWorkspaceSelection={activeWorkspaceSelection}
+            onWorkspacePress={onWorkspacePress}
+            drag={input?.drag}
+            isDragging={input?.isDragging}
+            dragHandleProps={input?.dragHandleProps}
+          />
+          <SidebarWorkspaceSessions workspace={item} onWorkspacePress={onWorkspacePress} />
+        </>
       );
     },
     [
@@ -2386,27 +2390,30 @@ function ProjectModeList({
       dragHandleProps,
     }: DraggableRenderItemInfo<SidebarWorkspacePlacement>) => {
       return (
-        <MemoWorkspaceRowItem
-          workspace={workspace}
-          workspaceEntry={workspaceEntriesByKey.get(workspace.workspaceKey) ?? null}
-          hostBadge={hostBadgeByServerId.get(workspace.serverId) ?? null}
-          leadingProjectName={workspace.projectName}
-          leadingProjectIconDataUri={
-            projectIconByProjectViewKey.get(workspace.projectViewKey) ?? null
-          }
-          shortcutNumber={shortcutIndexByWorkspaceKey.get(workspace.workspaceKey) ?? null}
-          showShortcutBadge={showShortcutBadges}
-          canCopyBranchName={workspace.projectKind === "git"}
-          canPin={supportsPinningByServerId.get(workspace.serverId) === true}
-          onToggleWorkspacePin={onToggleWorkspacePin}
-          isCreating={creatingWorkspaceIds.has(workspace.workspaceId)}
-          selectionEnabled={selectionEnabled}
-          activeWorkspaceSelection={activeWorkspaceSelection}
-          onWorkspacePress={onWorkspacePress}
-          drag={drag}
-          isDragging={isActive}
-          dragHandleProps={dragHandleProps}
-        />
+        <>
+          <MemoWorkspaceRowItem
+            workspace={workspace}
+            workspaceEntry={workspaceEntriesByKey.get(workspace.workspaceKey) ?? null}
+            hostBadge={hostBadgeByServerId.get(workspace.serverId) ?? null}
+            leadingProjectName={workspace.projectName}
+            leadingProjectIconDataUri={
+              projectIconByProjectViewKey.get(workspace.projectViewKey) ?? null
+            }
+            shortcutNumber={shortcutIndexByWorkspaceKey.get(workspace.workspaceKey) ?? null}
+            showShortcutBadge={showShortcutBadges}
+            canCopyBranchName={workspace.projectKind === "git"}
+            canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+            onToggleWorkspacePin={onToggleWorkspacePin}
+            isCreating={creatingWorkspaceIds.has(workspace.workspaceId)}
+            selectionEnabled={selectionEnabled}
+            activeWorkspaceSelection={activeWorkspaceSelection}
+            onWorkspacePress={onWorkspacePress}
+            drag={drag}
+            isDragging={isActive}
+            dragHandleProps={dragHandleProps}
+          />
+          <SidebarWorkspaceSessions workspace={workspace} onWorkspacePress={onWorkspacePress} />
+        </>
       );
     },
     [

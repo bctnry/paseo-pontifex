@@ -183,6 +183,7 @@ export const en = {
     },
     clientCommands: {
       archiveAgent: "Archive the current agent",
+      forkAgent: "Fork this chat at the current point into a new tab",
       freshDraft: "Archive this agent and start a fresh draft",
       sideQuestion: "Ask a side question without adding it to the conversation",
     },
@@ -283,7 +284,9 @@ export const en = {
   },
   sessions: {
     title: "History",
+    archivedTitle: "Archived sessions",
     empty: "No sessions yet",
+    archivedEmpty: "No archived sessions",
     noMatches: "No sessions match",
     tooManyMatches: "Too many matches — narrow your search",
     hostLoadFailed: "{{host}}: Could not load history",
@@ -1257,6 +1260,7 @@ export const en = {
     },
     sections: {
       sessions: "History",
+      archived: "Archived",
       search: "Search",
       schedules: "Schedules",
       workspaces: "Workspaces",

@@ -1337,6 +1337,9 @@ function ComposerContentImpl({
     useSessionStore(
       (state) => state.sessions[serverId]?.serverInfo?.features?.sideQuestions === true,
     ) && agentState.supportsSideQuestions;
+  const supportsFork = useSessionStore(
+    (state) => state.sessions[serverId]?.serverInfo?.features?.agentForkContext === true,
+  );
   const forgeAutoAttachRef = useRef<ReturnType<typeof useComposerForgeAutoAttach>>(null);
   const [isForgeResolving, setIsForgeResolving] = useState(false);
   const forgeConfiguration = useMemo(
@@ -2429,6 +2432,7 @@ function ComposerContentImpl({
       draft: commandDraft,
       canExecuteClientSlashCommand: buildOutgoingAttachments(attachments).length === 0,
       onClientSlashCommand: handleAutocompleteClientSlashCommand,
+      supportsFork,
       supportsSideQuestion,
       pluginClientSlashCommands,
     }),
@@ -2440,6 +2444,7 @@ function ComposerContentImpl({
       buildOutgoingAttachments,
       attachments,
       handleAutocompleteClientSlashCommand,
+      supportsFork,
       supportsSideQuestion,
       pluginClientSlashCommands,
     ],

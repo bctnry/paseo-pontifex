@@ -1,7 +1,11 @@
 import type { Agent } from "@/stores/session-store";
 import type { WorkspaceDraftTabSetup } from "@/workspace-tabs/model";
 
-export type ClientSlashCommandKind = "archive-agent" | "replace-agent-with-draft" | "side-question";
+export type ClientSlashCommandKind =
+  | "archive-agent"
+  | "fork-agent"
+  | "replace-agent-with-draft"
+  | "side-question";
 export type ClientSlashCommandExecution = "immediate" | "insert";
 
 export interface ClientSlashCommand {
@@ -10,6 +14,7 @@ export interface ClientSlashCommand {
   description: string;
   descriptionKey:
     | "composer.clientCommands.archiveAgent"
+    | "composer.clientCommands.forkAgent"
     | "composer.clientCommands.freshDraft"
     | "composer.clientCommands.sideQuestion";
   argumentHint: string;
@@ -52,6 +57,15 @@ export const CLIENT_SLASH_COMMANDS: readonly ClientSlashCommand[] = [
     descriptionKey: "composer.clientCommands.freshDraft",
     argumentHint: "",
     kind: "replace-agent-with-draft",
+    execution: "immediate",
+  },
+  {
+    name: "fork",
+    aliases: [],
+    description: "Fork this chat at the current point into a new tab",
+    descriptionKey: "composer.clientCommands.forkAgent",
+    argumentHint: "",
+    kind: "fork-agent",
     execution: "immediate",
   },
 ];

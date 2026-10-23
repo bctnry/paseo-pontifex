@@ -1,5 +1,6 @@
 import { router } from "expo-router";
 import {
+  Archive,
   CalendarClock,
   FolderPlus,
   History,
@@ -17,7 +18,11 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useOpenNewWorkspace } from "@/hooks/use-open-new-workspace";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import type { Theme } from "@/styles/theme";
-import { buildSchedulesRoute, buildSessionsRoute } from "@/utils/host-routes";
+import {
+  buildArchivedSessionsRoute,
+  buildSchedulesRoute,
+  buildSessionsRoute,
+} from "@/utils/host-routes";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -40,6 +45,7 @@ const addProjectIcon = menuIcon(FolderPlus);
 const importSessionIcon = menuIcon(Import);
 const searchIcon = menuIcon(Search);
 const historyIcon = menuIcon(History);
+const archivedIcon = menuIcon(Archive);
 const schedulesIcon = menuIcon(CalendarClock);
 const refreshIcon = menuIcon(RefreshCw);
 const settingsIcon = menuIcon(Settings);
@@ -73,6 +79,7 @@ export function SidebarContextMenu({
   const hideSidebarKeys = useShortcutKeys("toggle-left-sidebar");
   const openSearch = useCallback(() => setCommandCenterOpen(true), [setCommandCenterOpen]);
   const openHistory = useCallback(() => router.push(buildSessionsRoute()), []);
+  const openArchived = useCallback(() => router.push(buildArchivedSessionsRoute()), []);
   const openSchedules = useCallback(() => router.push(buildSchedulesRoute()), []);
   const newWorkspaceShortcut = useMemo(
     () => (newWorkspaceKeys ? <Shortcut chord={newWorkspaceKeys} /> : null),
@@ -144,6 +151,13 @@ export function SidebarContextMenu({
           onSelect={openHistory}
         >
           {t("sidebar.sections.sessions")}
+        </ContextMenuItem>
+        <ContextMenuItem
+          testID="sidebar-context-archived"
+          leading={archivedIcon}
+          onSelect={openArchived}
+        >
+          {t("sidebar.sections.archived")}
         </ContextMenuItem>
         <ContextMenuItem
           testID="sidebar-context-schedules"

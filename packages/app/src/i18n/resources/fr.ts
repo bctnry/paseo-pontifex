@@ -190,6 +190,7 @@ export const fr: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "Archiver l’agent actuel",
+      forkAgent: "Forker cette conversation au point actuel dans un nouvel onglet",
       freshDraft: "Archiver cet agent et démarrer un nouveau brouillon",
       sideQuestion: "Poser une question annexe sans l’ajouter à la conversation",
     },
@@ -291,7 +292,9 @@ export const fr: TranslationResources = {
   },
   sessions: {
     title: "Historique",
+    archivedTitle: "Sessions archivées",
     empty: "Aucune session pour l’instant",
+    archivedEmpty: "Aucune session archivée",
     noMatches: "Aucune session correspondante",
     tooManyMatches: "Trop de résultats — affinez la recherche",
     hostLoadFailed: "{{host}} : impossible de charger l’historique",
@@ -1279,6 +1282,7 @@ export const fr: TranslationResources = {
     },
     sections: {
       sessions: "Historique",
+      archived: "Archivées",
       search: "Recherche",
       schedules: "Planifications",
       workspaces: "Espaces de travail",

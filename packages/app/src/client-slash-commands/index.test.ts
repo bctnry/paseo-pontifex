@@ -69,6 +69,7 @@ describe("resolveClientSlashCommand", () => {
       ["btw", [], "insert"],
       ["exit", ["quit", "q"], "immediate"],
       ["clear", ["new"], "immediate"],
+      ["fork", [], "immediate"],
     ]);
   });
 
@@ -91,6 +92,17 @@ describe("resolveClientSlashCommand", () => {
     });
     expect(resolveClientSlashCommand({ text: "/new", hasAttachments: false })).toMatchObject({
       command: { name: "clear", kind: "replace-agent-with-draft" },
+      args: "",
+    });
+  });
+
+  it("resolves /fork without arguments", () => {
+    expect(resolveClientSlashCommand({ text: "/fork", hasAttachments: false })).toMatchObject({
+      command: { name: "fork", kind: "fork-agent", execution: "immediate" },
+      args: "",
+    });
+    expect(resolveClientSlashCommand({ text: " /fork ", hasAttachments: false })).toMatchObject({
+      command: { name: "fork", kind: "fork-agent" },
       args: "",
     });
   });
@@ -118,6 +130,7 @@ describe("resolveClientSlashCommand", () => {
   it("leaves provider commands, arguments, ordinary messages, and attachment submits alone", () => {
     expect(resolveClientSlashCommand({ text: "/clear now", hasAttachments: false })).toBeNull();
     expect(resolveClientSlashCommand({ text: "/quit now", hasAttachments: false })).toBeNull();
+    expect(resolveClientSlashCommand({ text: "/fork now", hasAttachments: false })).toBeNull();
     expect(
       resolveClientSlashCommand({ text: "/provider-command", hasAttachments: false }),
     ).toBeNull();

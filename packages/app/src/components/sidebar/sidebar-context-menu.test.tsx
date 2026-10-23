@@ -28,6 +28,7 @@ vi.mock("lucide-react-native", async () => {
   const ReactModule = await import("react");
   const Icon = () => ReactModule.createElement("span");
   return {
+    Archive: Icon,
     CalendarClock: Icon,
     FolderPlus: Icon,
     History: Icon,
@@ -56,6 +57,7 @@ vi.mock("@/stores/keyboard-shortcuts-store", () => ({
 
 vi.mock("@/utils/host-routes", () => ({
   buildSessionsRoute: () => "/sessions",
+  buildArchivedSessionsRoute: () => "/archived",
   buildSchedulesRoute: () => "/schedules",
 }));
 
@@ -145,6 +147,7 @@ describe("SidebarContextMenu", () => {
       "sidebar-context-import-session",
       "sidebar-context-search",
       "sidebar-context-history",
+      "sidebar-context-archived",
       "sidebar-context-schedules",
       "sidebar-context-refresh",
       "sidebar-context-settings",
@@ -171,6 +174,9 @@ describe("SidebarContextMenu", () => {
 
     click("sidebar-context-history");
     expect(mocks.push).toHaveBeenCalledWith("/sessions");
+
+    click("sidebar-context-archived");
+    expect(mocks.push).toHaveBeenCalledWith("/archived");
 
     click("sidebar-context-schedules");
     expect(mocks.push).toHaveBeenCalledWith("/schedules");

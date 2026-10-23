@@ -1,4 +1,5 @@
 import {
+  Fragment,
   memo,
   useCallback,
   useMemo,
@@ -24,6 +25,7 @@ import { type SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list"
 import type { StatusBucket } from "@/hooks/sidebar-status-view-model";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import { SidebarFilterEmptyState } from "@/components/sidebar/empty-states";
+import { SidebarWorkspaceSessions } from "@/components/sidebar/sidebar-workspace-sessions";
 import type { HostBadgeModel } from "@/hosts/appearance";
 import { isWeb as platformIsWeb, isNative as platformIsNative } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
@@ -171,23 +173,26 @@ export function SidebarStatusWorkspaceList({
       isActive,
       dragHandleProps,
     }: DraggableRenderItemInfo<SidebarWorkspaceEntry>) => (
-      <StatusWorkspaceRow
-        workspace={workspace}
-        {...buildStatusRowProjectPresentation({
-          workspace,
-          projectIconByProjectViewKey,
-          hostBadgeByServerId,
-        })}
-        inStatusGroup={false}
-        shortcutNumber={statusShortcutIndex.get(workspace.workspaceKey) ?? null}
-        showShortcutBadge={showShortcutBadges}
-        canPin={supportsPinningByServerId.get(workspace.serverId) === true}
-        onToggleWorkspacePin={onToggleWorkspacePin}
-        onWorkspacePress={onWorkspacePress}
-        drag={drag}
-        isDragging={isActive}
-        dragHandleProps={dragHandleProps}
-      />
+      <>
+        <StatusWorkspaceRow
+          workspace={workspace}
+          {...buildStatusRowProjectPresentation({
+            workspace,
+            projectIconByProjectViewKey,
+            hostBadgeByServerId,
+          })}
+          inStatusGroup={false}
+          shortcutNumber={statusShortcutIndex.get(workspace.workspaceKey) ?? null}
+          showShortcutBadge={showShortcutBadges}
+          canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+          onToggleWorkspacePin={onToggleWorkspacePin}
+          onWorkspacePress={onWorkspacePress}
+          drag={drag}
+          isDragging={isActive}
+          dragHandleProps={dragHandleProps}
+        />
+        <SidebarWorkspaceSessions workspace={workspace} onWorkspacePress={onWorkspacePress} />
+      </>
     ),
     [
       hostBadgeByServerId,
@@ -356,20 +361,22 @@ function StatusGroupRows({
           testID={`sidebar-status-group-rows-${group.key}`}
         >
           {visibleWorkspaces.map((workspace) => (
-            <StatusWorkspaceRow
-              key={workspace.workspaceKey}
-              workspace={workspace}
-              {...buildStatusRowProjectPresentation({
-                workspace,
-                projectIconByProjectViewKey,
-                hostBadgeByServerId,
-              })}
-              shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
-              showShortcutBadge={showShortcutBadges}
-              canPin={supportsPinningByServerId.get(workspace.serverId) === true}
-              onToggleWorkspacePin={onToggleWorkspacePin}
-              onWorkspacePress={onWorkspacePress}
-            />
+            <Fragment key={workspace.workspaceKey}>
+              <StatusWorkspaceRow
+                workspace={workspace}
+                {...buildStatusRowProjectPresentation({
+                  workspace,
+                  projectIconByProjectViewKey,
+                  hostBadgeByServerId,
+                })}
+                shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
+                showShortcutBadge={showShortcutBadges}
+                canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+                onToggleWorkspacePin={onToggleWorkspacePin}
+                onWorkspacePress={onWorkspacePress}
+              />
+              <SidebarWorkspaceSessions workspace={workspace} onWorkspacePress={onWorkspacePress} />
+            </Fragment>
           ))}
           {canToggleWorkspaces ? (
             <SidebarGroupToggleRow

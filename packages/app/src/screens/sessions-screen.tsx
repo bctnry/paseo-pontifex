@@ -54,23 +54,85 @@ function resolveEmptyText(input: {
   t: TFunction;
   isSearching: boolean;
   isAllHosts: boolean;
+  archivedOnly: boolean;
 }): string {
   if (input.isSearching) return input.t("sessions.noMatches");
+  if (input.archivedOnly) return input.t("sessions.archivedEmpty");
   if (input.isAllHosts) return input.t("sessions.empty");
   return "No sessions for this host";
 }
 
-export function SessionsScreen() {
+function SessionsEmptyState({
+  message,
+  isSearching,
+  hasMore,
+  isLoadingMore,
+  showImport,
+  backLabel,
+  clearSearchLabel,
+  loadMoreLabel,
+  loadingLabel,
+  importLabel,
+  onClearSearch,
+  onBack,
+  onLoadMore,
+  onImport,
+}: {
+  message: string;
+  isSearching: boolean;
+  hasMore: boolean;
+  isLoadingMore: boolean;
+  showImport: boolean;
+  backLabel: string;
+  clearSearchLabel: string;
+  loadMoreLabel: string;
+  loadingLabel: string;
+  importLabel: string;
+  onClearSearch: () => void;
+  onBack: () => void;
+  onLoadMore: () => void;
+  onImport: () => void;
+}) {
+  return (
+    <View style={styles.emptyContainer} testID="sessions-empty">
+      <Text style={styles.emptyText}>{message}</Text>
+      {isSearching ? (
+        <Button variant="ghost" onPress={onClearSearch}>
+          {clearSearchLabel}
+        </Button>
+      ) : (
+        <Button variant="ghost" leftIcon={ChevronLeft} onPress={onBack}>
+          {backLabel}
+        </Button>
+      )}
+      {hasMore ? (
+        <Button variant="ghost" onPress={onLoadMore} disabled={isLoadingMore}>
+          {isLoadingMore ? loadingLabel : loadMoreLabel}
+        </Button>
+      ) : null}
+      {showImport ? (
+        <Button variant="ghost" leftIcon={Import} onPress={onImport}>
+          {importLabel}
+        </Button>
+      ) : null}
+    </View>
+  );
+}
+
+export type SessionsScreenVariant = "all" | "archived";
+
+export function SessionsScreen({ variant = "all" }: { variant?: SessionsScreenVariant }) {
   const isFocused = useIsFocused();
 
   if (!isFocused) {
     return <View style={styles.container} />;
   }
 
-  return <SessionsScreenContent />;
+  return <SessionsScreenContent variant={variant} />;
 }
 
-function SessionsScreenContent() {
+function SessionsScreenContent({ variant }: { variant: SessionsScreenVariant }) {
+  const isArchivedOnly = variant === "archived";
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const importSession = useImportSession();
@@ -96,6 +158,15 @@ function SessionsScreenContent() {
   });
   const isSearching = isSearchSupported && search.length > 0;
 
+  // The history endpoint returns archived sessions alongside active ones (archiving bumps
+  // `updatedAt`, so they land near the top of the activity sort). The archived screen is the
+  // same list with everything else removed, rather than a second query shape the daemon
+  // would have to learn.
+  const visibleAgents = useMemo(
+    () => (isArchivedOnly ? agents.filter((agent) => agent.archivedAt !== null) : agents),
+    [agents, isArchivedOnly],
+  );
+
   useEffect(() => {
     if (
       selectedHost !== ALL_HOSTS_OPTION_ID &&
@@ -117,6 +188,7 @@ function SessionsScreenContent() {
     t,
     isSearching,
     isAllHosts: selectedHost === ALL_HOSTS_OPTION_ID,
+    archivedOnly: isArchivedOnly,
   });
   const showHostFilter = hosts.length > 1;
   const showFilterRow = showHostFilter || isSearchSupported;
@@ -152,7 +224,7 @@ function SessionsScreenContent() {
 
   return (
     <View style={styles.container}>
-      <MenuHeader title={t("sessions.title")} />
+      <MenuHeader title={t(isArchivedOnly ? "sessions.archivedTitle" : "sessions.title")} />
       {showFilterRow ? (
         <View style={styles.filterContainer}>
           {isSearchSupported ? (
@@ -190,26 +262,27 @@ function SessionsScreenContent() {
           </Button>
         </View>
       ) : null}
-      {!isInitialLoad && !showLoadError && agents.length === 0 ? (
-        <View style={styles.emptyContainer} testID="sessions-empty">
-          <Text style={styles.emptyText}>{emptyText}</Text>
-          {isSearching ? (
-            <Button variant="ghost" onPress={handleClearSearch}>
-              {t("sessions.actions.clearSearch")}
-            </Button>
-          ) : (
-            <Button variant="ghost" leftIcon={ChevronLeft} onPress={handleBack}>
-              Back
-            </Button>
-          )}
-          <Button variant="ghost" leftIcon={Import} onPress={importSession.open}>
-            {t("importSession.title")}
-          </Button>
-        </View>
+      {!isInitialLoad && !showLoadError && visibleAgents.length === 0 ? (
+        <SessionsEmptyState
+          message={emptyText}
+          isSearching={isSearching}
+          hasMore={hasMore}
+          isLoadingMore={isLoadingMore}
+          showImport={!isArchivedOnly}
+          backLabel={t("common.back")}
+          clearSearchLabel={t("sessions.actions.clearSearch")}
+          loadMoreLabel={t("sessions.actions.loadMore")}
+          loadingLabel={t("common.loading")}
+          importLabel={t("importSession.title")}
+          onClearSearch={handleClearSearch}
+          onBack={handleBack}
+          onLoadMore={loadMore}
+          onImport={importSession.open}
+        />
       ) : null}
-      {!isInitialLoad && !showLoadError && agents.length > 0 ? (
+      {!isInitialLoad && !showLoadError && visibleAgents.length > 0 ? (
         <AgentList
-          agents={agents}
+          agents={visibleAgents}
           showCheckoutInfo={false}
           isRefreshing={isManualRefresh}
           onRefresh={handleRefresh}

@@ -3,6 +3,7 @@ import { Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { TFunction } from "i18next";
 import {
+  Archive,
   ArrowDown,
   ArrowUp,
   Blocks,
@@ -42,6 +43,7 @@ const moveDownIcon = <ThemedArrowDown size={ICON_SIZE.sm} uniProps={mutedColorMa
 const BUILTIN_ICONS: Record<BuiltinSidebarItemId, LucideIcon> = {
   "new-workspace": Plus,
   history: History,
+  archived: Archive,
   search: Search,
   schedules: CalendarClock,
   usage: Gauge,

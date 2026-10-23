@@ -1,5 +1,5 @@
 import { router, usePathname } from "expo-router";
-import { CalendarClock, History, Plus, Search } from "lucide-react-native";
+import { Archive, CalendarClock, History, Plus, Search } from "lucide-react-native";
 import { memo, useCallback, useMemo, useRef, type ComponentType, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { View, type StyleProp, type ViewStyle } from "react-native";
@@ -15,7 +15,11 @@ import {
 } from "@/sidebar-nav/model";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
 import { useKeyboardShortcutsStore } from "@/stores/keyboard-shortcuts-store";
-import { buildSchedulesRoute, buildSessionsRoute } from "@/utils/host-routes";
+import {
+  buildArchivedSessionsRoute,
+  buildSchedulesRoute,
+  buildSessionsRoute,
+} from "@/utils/host-routes";
 
 interface SidebarNavRowProps {
   onBeforeNavigate?: () => void;
@@ -115,6 +119,26 @@ function SidebarHistoryRow({ onBeforeNavigate }: SidebarNavRowProps) {
   );
 }
 
+function SidebarArchivedRow({ onBeforeNavigate }: SidebarNavRowProps) {
+  const { t } = useTranslation();
+  const pathname = usePathname();
+  const handlePress = useCallback(() => {
+    onBeforeNavigate?.();
+    router.push(buildArchivedSessionsRoute());
+  }, [onBeforeNavigate]);
+
+  return (
+    <SidebarHeaderRow
+      icon={Archive}
+      label={t(builtinSidebarNavLabelKey("archived"))}
+      onPress={handlePress}
+      isActive={pathname.includes("/archived")}
+      testID="sidebar-archived"
+      variant="compact"
+    />
+  );
+}
+
 function SidebarSearchRow({ onBeforeNavigate }: SidebarNavRowProps) {
   const { t } = useTranslation();
   const shortcutKeys = useShortcutKeys(builtinSidebarNavShortcutAction("search"));
@@ -159,6 +183,7 @@ function SidebarSchedulesRow({ onBeforeNavigate }: SidebarNavRowProps) {
 const BUILTIN_ROWS: Record<BuiltinSidebarNavId, ComponentType<SidebarNavRowProps>> = {
   "new-workspace": SidebarNewWorkspaceRow,
   history: SidebarHistoryRow,
+  archived: SidebarArchivedRow,
   search: SidebarSearchRow,
   schedules: SidebarSchedulesRow,
 };

@@ -189,6 +189,7 @@ export const es: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "Archivar el agente actual",
+      forkAgent: "Bifurcar este chat en el punto actual en una pestaña nueva",
       freshDraft: "Archive este agente y comience un nuevo borrador",
       sideQuestion: "Hacer una pregunta secundaria sin añadirla a la conversación",
     },
@@ -292,7 +293,9 @@ export const es: TranslationResources = {
   },
   sessions: {
     title: "Historial",
+    archivedTitle: "Sesiones archivadas",
     empty: "Aún no hay sesiones",
+    archivedEmpty: "No hay sesiones archivadas",
     noMatches: "No hay sesiones que coincidan",
     tooManyMatches: "Demasiadas coincidencias: acota la búsqueda",
     hostLoadFailed: "{{host}}: No se pudo cargar el historial",
@@ -1286,6 +1289,7 @@ export const es: TranslationResources = {
     },
     sections: {
       sessions: "Historial",
+      archived: "Archivadas",
       search: "Buscar",
       schedules: "Horarios",
       workspaces: "Espacios de trabajo",

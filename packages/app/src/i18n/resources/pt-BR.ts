@@ -188,6 +188,7 @@ export const ptBR: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "Arquivar o agente atual",
+      forkAgent: "Bifurcar esta conversa no ponto atual em uma nova aba",
       freshDraft: "Arquivar este agente e iniciar um novo rascunho",
       sideQuestion: "Fazer uma pergunta paralela sem adicioná-la à conversa",
     },
@@ -290,7 +291,9 @@ export const ptBR: TranslationResources = {
   },
   sessions: {
     title: "Histórico de agentes",
+    archivedTitle: "Sessões arquivadas",
     empty: "Nenhuma sessão ainda",
+    archivedEmpty: "Nenhuma sessão arquivada",
     noMatches: "Nenhuma sessão corresponde",
     tooManyMatches: "Muitos resultados — refine a busca",
     hostLoadFailed: "{{host}}: Não foi possível carregar o histórico",
@@ -1275,6 +1278,7 @@ export const ptBR: TranslationResources = {
     },
     sections: {
       sessions: "Histórico",
+      archived: "Arquivadas",
       search: "Buscar",
       schedules: "Agendamentos",
       workspaces: "Espaços de trabalho",

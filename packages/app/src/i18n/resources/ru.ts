@@ -189,6 +189,7 @@ export const ru: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "Архивировать текущего агента",
+      forkAgent: "Создать форк этого чата на текущем месте в новой вкладке",
       freshDraft: "Архивировать этого агента и создать новый черновик",
       sideQuestion: "Задать побочный вопрос, не добавляя его в разговор",
     },
@@ -290,7 +291,9 @@ export const ru: TranslationResources = {
   },
   sessions: {
     title: "История",
+    archivedTitle: "Архивные сессии",
     empty: "Сессий пока нет",
+    archivedEmpty: "Нет архивных сессий",
     noMatches: "Подходящих сессий не найдено",
     tooManyMatches: "Слишком много совпадений — уточните запрос",
     hostLoadFailed: "{{host}}: не удалось загрузить историю",
@@ -1267,6 +1270,7 @@ export const ru: TranslationResources = {
     },
     sections: {
       sessions: "История",
+      archived: "В архиве",
       search: "Поиск",
       schedules: "Расписания",
       workspaces: "Рабочие пространства",

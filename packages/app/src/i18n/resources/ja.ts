@@ -189,6 +189,7 @@ export const ja: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "現在のエージェントをアーカイブ",
+      forkAgent: "現在の位置でこのチャットを新しいタブにフォーク",
       freshDraft: "このエージェントをアーカイブして新しい下書きを開始",
       sideQuestion: "会話に追加せずに補足の質問をする",
     },
@@ -291,7 +292,9 @@ export const ja: TranslationResources = {
   },
   sessions: {
     title: "履歴",
+    archivedTitle: "アーカイブ済みのセッション",
     empty: "セッションがまだありません",
+    archivedEmpty: "アーカイブ済みのセッションはありません",
     noMatches: "一致するセッションはありません",
     tooManyMatches: "一致が多すぎます — 検索条件を絞ってください",
     hostLoadFailed: "{{host}}: 履歴を読み込めませんでした",
@@ -1263,6 +1266,7 @@ export const ja: TranslationResources = {
     },
     sections: {
       sessions: "履歴",
+      archived: "アーカイブ済み",
       search: "検索",
       schedules: "スケジュール",
       workspaces: "ワークスペース",

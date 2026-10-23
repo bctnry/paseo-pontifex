@@ -187,6 +187,7 @@ export const ko: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "현재 에이전트 보관",
+      forkAgent: "현재 지점에서 이 채팅을 새 탭으로 분기",
       freshDraft: "이 에이전트를 보관하고 새 초안을 시작합니다",
       sideQuestion: "대화에 추가하지 않고 곁가지 질문을 합니다",
     },
@@ -287,7 +288,9 @@ export const ko: TranslationResources = {
   },
   sessions: {
     title: "기록",
+    archivedTitle: "보관된 세션",
     empty: "아직 세션이 없습니다",
+    archivedEmpty: "보관된 세션이 없습니다",
     noMatches: "일치하는 세션이 없습니다",
     tooManyMatches: "일치 항목이 너무 많습니다 — 검색 범위를 좁히세요",
     hostLoadFailed: "{{host}}: 기록을 불러오지 못했습니다",
@@ -1256,6 +1259,7 @@ export const ko: TranslationResources = {
     },
     sections: {
       sessions: "기록",
+      archived: "보관됨",
       search: "검색",
       schedules: "일정",
       workspaces: "워크스페이스",

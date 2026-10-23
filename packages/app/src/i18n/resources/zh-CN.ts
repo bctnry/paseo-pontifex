@@ -187,6 +187,7 @@ export const zhCN: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "归档当前 Agent",
+      forkAgent: "在当前对话位置分叉到新标签页",
       freshDraft: "归档此 Agent 并开始新的草稿",
       sideQuestion: "在不加入对话的情况下询问一个旁支问题",
     },
@@ -286,7 +287,9 @@ export const zhCN: TranslationResources = {
   },
   sessions: {
     title: "历史",
+    archivedTitle: "已归档会话",
     empty: "还没有会话",
+    archivedEmpty: "没有已归档会话",
     noMatches: "没有匹配的会话",
     tooManyMatches: "匹配过多 — 请缩小搜索范围",
     hostLoadFailed: "{{host}}：无法加载历史",
@@ -1241,6 +1244,7 @@ export const zhCN: TranslationResources = {
     },
     sections: {
       sessions: "历史",
+      archived: "已归档",
       search: "搜索",
       schedules: "计划",
       workspaces: "工作区",

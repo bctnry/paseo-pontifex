@@ -187,6 +187,7 @@ export const ar: TranslationResources = {
     },
     clientCommands: {
       archiveAgent: "أرشفة الوكيل الحالي",
+      forkAgent: "فرّع هذه المحادثة من النقطة الحالية في تبويب جديد",
       freshDraft: "أرشفة هذا الوكيل وابدأ مسودة جديدة",
       sideQuestion: "اطرح سؤالًا جانبيًا دون إضافته إلى المحادثة",
     },
@@ -286,7 +287,9 @@ export const ar: TranslationResources = {
   },
   sessions: {
     title: "السجل",
+    archivedTitle: "الجلسات المؤرشفة",
     empty: "لا توجد جلسات بعد",
+    archivedEmpty: "لا توجد جلسات مؤرشفة",
     noMatches: "لا توجد جلسات مطابقة",
     tooManyMatches: "نتائج كثيرة جدًا — ضيّق نطاق البحث",
     hostLoadFailed: "{{host}}: تعذر تحميل السجل",
@@ -1249,6 +1252,7 @@ export const ar: TranslationResources = {
     },
     sections: {
       sessions: "السجل",
+      archived: "المؤرشفة",
       search: "بحث",
       schedules: "الجداول",
       workspaces: "مساحات العمل",

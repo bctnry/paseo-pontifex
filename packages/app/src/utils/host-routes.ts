@@ -424,6 +424,10 @@ export function buildSessionsRoute() {
   return "/sessions" as const;
 }
 
+export function buildArchivedSessionsRoute() {
+  return "/archived" as const;
+}
+
 export function buildSchedulesRoute() {
   return "/schedules" as const;
 }
