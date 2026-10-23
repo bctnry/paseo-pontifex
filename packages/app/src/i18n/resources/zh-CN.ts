@@ -1250,6 +1250,18 @@ export const zhCN: TranslationResources = {
       workspaces: "工作区",
       projects: "项目",
     },
+    selection: {
+      select: "选择",
+      deselect: "取消选择",
+      cancel: "清除选择",
+      count: "已选择 {{count}} 项",
+      archiveSelected: "归档所选（{{count}}）",
+      archiveChat: "归档会话",
+      archiveTitle: "归档 {{count}} 项？",
+      archiveMessage: "这会停止所选会话并将所选项目从侧边栏移除。",
+      archived: "已归档 {{count}} 项",
+      archiveFailed: "无法归档 {{count}} 项",
+    },
     worktreeSetup: {
       title: "设置 worktree scripts",
       description: "添加 setup 命令，让新的 worktree 自动安装依赖并完成准备。",

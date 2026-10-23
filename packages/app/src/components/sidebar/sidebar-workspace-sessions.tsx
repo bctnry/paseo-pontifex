@@ -1,20 +1,35 @@
 import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View, type PressableStateCallbackType } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
+import { Archive } from "lucide-react-native";
 import { AgentStatusDot } from "@/components/agent-status-dot";
-import { PressHighlight } from "@/components/ui/press-highlight";
+import {
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+} from "@/components/ui/context-menu";
+import { useArchiveAgent } from "@/hooks/use-archive-agent";
 import type { SidebarWorkspacePlacement } from "@/hooks/use-sidebar-workspaces-list";
+import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
+import { useToast } from "@/contexts/toast-context";
 import {
   navigateToWorkspace,
   useActiveWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { useSessionStore } from "@/stores/session-store";
+import { agentSelectionKey, useSidebarSelectionStore } from "@/stores/sidebar-selection-store";
 import { density } from "@/styles/density";
+import type { Theme } from "@/styles/theme";
 import {
   selectWorkspaceSessionRows,
   type SidebarWorkspaceSessionRow,
 } from "@/components/sidebar/workspace-sessions";
+
+const ThemedArchive = withUnistyles(Archive);
+const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
+const archiveLeadingIcon = <ThemedArchive size={14} uniProps={mutedIconMapping} />;
 
 /**
  * The extra rows a workspace earns once it holds more than one chat session. A workspace with
@@ -65,6 +80,7 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
         <SidebarWorkspaceSessionRowView
           key={row.id}
           row={row}
+          serverId={workspace.serverId}
           workspaceKey={workspace.workspaceKey}
           selected={isWorkspaceActive && focusedAgentId === row.id}
           fallbackTitle={t("agentList.fallbackTitle")}
@@ -77,55 +93,122 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
 
 const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowView({
   row,
+  serverId,
   workspaceKey,
   selected,
   fallbackTitle,
   onPress,
 }: {
   row: SidebarWorkspaceSessionRow;
+  serverId: string;
   workspaceKey: string;
   selected: boolean;
   fallbackTitle: string;
   onPress: (agentId: string) => void;
 }) {
+  const { t } = useTranslation();
+  const toast = useToast();
+  const { archiveAgent } = useArchiveAgent();
+  const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
+  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
+  const isMultiSelected = useSidebarSelectionStore((state) =>
+    state.selected.has(agentSelectionKey(serverId, row.id)),
+  );
+  const selectedCount = useSidebarSelectionStore((state) => state.selected.size);
+  const startSelection = useSidebarSelectionStore((state) => state.startSelection);
+  const toggleSelection = useSidebarSelectionStore((state) => state.toggle);
+  const isRowSelected = selected || isMultiSelected;
+
   const rowStyle = useCallback(
     ({ hovered = false, pressed }: PressableStateCallbackType) => [
       styles.row,
-      selected && styles.rowSelected,
-      hovered && !selected && !pressed && styles.rowHovered,
+      isRowSelected && styles.rowSelected,
+      hovered && !isRowSelected && !pressed && styles.rowHovered,
       pressed && styles.rowPressed,
     ],
-    [selected],
+    [isRowSelected],
   );
   const titleStyle = useMemo(
-    () => [styles.title, selected ? styles.titleSelected : null],
-    [selected],
+    () => [styles.title, isRowSelected ? styles.titleSelected : null],
+    [isRowSelected],
   );
-  const handlePress = useCallback(() => onPress(row.id), [onPress, row.id]);
-  const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const handlePress = useCallback(() => {
+    if (isSelectionMode) {
+      toggleSelection({ kind: "agent", serverId, agentId: row.id });
+      return;
+    }
+    onPress(row.id);
+  }, [isSelectionMode, onPress, row.id, serverId, toggleSelection]);
+  const handleSelect = useCallback(() => {
+    const selection = { kind: "agent" as const, serverId, agentId: row.id };
+    if (isSelectionMode) {
+      toggleSelection(selection);
+    } else {
+      startSelection(selection);
+    }
+  }, [isSelectionMode, row.id, serverId, startSelection, toggleSelection]);
+  const handleArchiveChat = useCallback(() => {
+    void archiveAgent({ serverId, agentId: row.id }).catch((error) => {
+      toast.error(
+        error instanceof Error ? error.message : t("sidebar.selection.archiveFailed", { count: 1 }),
+      );
+    });
+  }, [archiveAgent, row.id, serverId, t, toast]);
+  const accessibilityState = useMemo(() => ({ selected: isRowSelected }), [isRowSelected]);
 
   return (
-    <PressHighlight
-      accessibilityRole="button"
-      accessibilityState={accessibilityState}
-      accessibilityLabel={row.title ?? fallbackTitle}
-      highlightStyle={styles.rowPressed}
-      onPress={handlePress}
-      style={rowStyle}
-      testID={`sidebar-workspace-session-${workspaceKey}-${row.id}`}
-    >
-      <View style={styles.statusSlot}>
-        <AgentStatusDot
-          status={row.status}
-          requiresAttention={row.requiresAttention}
-          attentionReason={row.attentionReason}
-          pendingPermissionCount={row.pendingPermissionCount}
-        />
-      </View>
-      <Text style={titleStyle} numberOfLines={1}>
-        {row.title ?? fallbackTitle}
-      </Text>
-    </PressHighlight>
+    <ContextMenu>
+      <ContextMenuTrigger
+        accessibilityRole="button"
+        accessibilityState={accessibilityState}
+        accessibilityLabel={row.title ?? fallbackTitle}
+        highlightStyle={styles.rowPressed}
+        onPress={handlePress}
+        style={rowStyle}
+        testID={`sidebar-workspace-session-${workspaceKey}-${row.id}`}
+      >
+        <View style={styles.statusSlot}>
+          <AgentStatusDot
+            status={row.status}
+            requiresAttention={row.requiresAttention}
+            attentionReason={row.attentionReason}
+            pendingPermissionCount={row.pendingPermissionCount}
+          />
+        </View>
+        <Text style={titleStyle} numberOfLines={1}>
+          {row.title ?? fallbackTitle}
+        </Text>
+      </ContextMenuTrigger>
+      <ContextMenuContent
+        align="start"
+        width={240}
+        testID={`sidebar-workspace-session-menu-${workspaceKey}-${row.id}`}
+      >
+        {selectedCount > 0 ? (
+          <ContextMenuItem
+            disabled={isArchiving}
+            leading={archiveLeadingIcon}
+            onSelect={archiveSelected}
+            testID={`sidebar-workspace-session-archive-selected-${workspaceKey}-${row.id}`}
+          >
+            {t("sidebar.selection.archiveSelected", { count: selectedCount })}
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem
+          leading={archiveLeadingIcon}
+          onSelect={handleArchiveChat}
+          testID={`sidebar-workspace-session-archive-${workspaceKey}-${row.id}`}
+        >
+          {t("sidebar.selection.archiveChat")}
+        </ContextMenuItem>
+        <ContextMenuItem
+          onSelect={handleSelect}
+          testID={`sidebar-workspace-session-select-${workspaceKey}-${row.id}`}
+        >
+          {isMultiSelected ? t("sidebar.selection.deselect") : t("sidebar.selection.select")}
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 });
 

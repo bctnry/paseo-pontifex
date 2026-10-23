@@ -69,6 +69,7 @@ import {
   type SidebarWorkspacePlacement,
 } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
+import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sidebar-selection-store";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
 import {
@@ -1106,6 +1107,10 @@ function WorkspaceRowInner({
   reserveIdleStatusIndicatorSpace = true,
 }: WorkspaceRowInnerProps) {
   const isCompact = useIsCompactFormFactor();
+  const isMultiSelected = useSidebarSelectionStore((state) =>
+    state.selected.has(workspaceSelectionKey(workspace.serverId, workspace.workspaceId)),
+  );
+  const isRowSelected = selected || isMultiSelected;
   const [isPressed, setIsPressed] = useState(false);
   const isTouchPlatform = platformIsNative || isCompact;
   const interaction = useLongPressDragInteraction({
@@ -1138,7 +1143,7 @@ function WorkspaceRowInner({
     interaction.handlePressOut();
   }, [interaction]);
 
-  const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const accessibilityState = useMemo(() => ({ selected: isRowSelected }), [isRowSelected]);
 
   return (
     <SidebarWorkspaceRowFrame workspace={workspace} isDragging={isDragging}>
@@ -1148,10 +1153,15 @@ function WorkspaceRowInner({
         const workspaceRowStyle = getProjectWorkspaceRowStyle({
           isDragging,
           isPressed,
-          selected,
+          selected: isRowSelected,
           isHovered,
         });
-        const backdrop = getSidebarRowBackdrop({ isDragging, isPressed, selected, isHovered });
+        const backdrop = getSidebarRowBackdrop({
+          isDragging,
+          isPressed,
+          selected: isRowSelected,
+          isHovered,
+        });
         return (
           <View
             {...dragAttributes}
@@ -1181,7 +1191,7 @@ function WorkspaceRowInner({
               onTogglePin={onTogglePin}
               openInFileManagerPath={workspace.workspaceDirectory}
               disabled={isArchiving}
-              aria-selected={selected}
+              aria-selected={isRowSelected}
               accessibilityRole="button"
               accessibilityState={accessibilityState}
               style={workspaceRowStyle}
@@ -1434,13 +1444,30 @@ function WorkspaceRowItem({
   isDragging = false,
   dragHandleProps,
 }: WorkspaceRowItemProps) {
+  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
+  const toggleSelection = useSidebarSelectionStore((state) => state.toggle);
+
   const handlePress = useCallback(() => {
     if (!workspace.serverId) {
       return;
     }
+    if (isSelectionMode) {
+      toggleSelection({
+        kind: "workspace",
+        serverId: workspace.serverId,
+        workspaceId: workspace.workspaceId,
+      });
+      return;
+    }
     onWorkspacePress?.();
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
-  }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
+  }, [
+    isSelectionMode,
+    onWorkspacePress,
+    toggleSelection,
+    workspace.serverId,
+    workspace.workspaceId,
+  ]);
 
   return (
     <WorkspaceRow

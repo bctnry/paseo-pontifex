@@ -1284,6 +1284,18 @@ export const ptBR: TranslationResources = {
       workspaces: "Espaços de trabalho",
       projects: "Projetos",
     },
+    selection: {
+      select: "Selecionar",
+      deselect: "Desmarcar",
+      cancel: "Limpar seleção",
+      count: "{{count}} selecionados",
+      archiveSelected: "Arquivar selecionados ({{count}})",
+      archiveChat: "Arquivar conversa",
+      archiveTitle: "Arquivar {{count}} itens?",
+      archiveMessage: "Isso interrompe as conversas selecionadas e as remove da barra lateral.",
+      archived: "{{count}} itens arquivados",
+      archiveFailed: "Não foi possível arquivar {{count}} itens",
+    },
     worktreeSetup: {
       title: "Configurar scripts de worktree",
       description:

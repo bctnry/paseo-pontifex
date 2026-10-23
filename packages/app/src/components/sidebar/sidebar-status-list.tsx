@@ -82,6 +82,7 @@ import type { ToggleSidebarWorkspacePin } from "@/hooks/use-sidebar-workspace-pi
 import { DraggableList, type DraggableRenderItemInfo } from "@/components/draggable-list";
 import type { DraggableListDragHandleProps } from "@/components/draggable-list.types";
 import { useLongPressDragInteraction } from "@/components/sidebar/use-long-press-drag-interaction";
+import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sidebar-selection-store";
 
 // Themed icon wrappers
 const mutedGroupIconProps = densityIconProps("sm", (theme) => ({
@@ -539,15 +540,31 @@ const StatusWorkspaceRow = memo(function StatusWorkspaceRow({
   dragHandleProps?: DraggableListDragHandleProps;
 }) {
   const activeWorkspaceSelection = useActiveWorkspaceSelection();
+  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
+  const toggleSelection = useSidebarSelectionStore((state) => state.toggle);
   const selected =
     activeWorkspaceSelection?.serverId === workspace.serverId &&
     activeWorkspaceSelection?.workspaceId === workspace.workspaceId;
 
   const handlePress = useCallback(() => {
     if (!workspace.serverId) return;
+    if (isSelectionMode) {
+      toggleSelection({
+        kind: "workspace",
+        serverId: workspace.serverId,
+        workspaceId: workspace.workspaceId,
+      });
+      return;
+    }
     onWorkspacePress?.();
     navigateToWorkspace({ serverId: workspace.serverId, workspaceId: workspace.workspaceId });
-  }, [onWorkspacePress, workspace.serverId, workspace.workspaceId]);
+  }, [
+    isSelectionMode,
+    onWorkspacePress,
+    toggleSelection,
+    workspace.serverId,
+    workspace.workspaceId,
+  ]);
 
   return (
     <StatusWorkspaceRowWithMenu
@@ -801,6 +818,10 @@ function StatusWorkspaceRowInnerContent({
   dragInteraction?: ReturnType<typeof useLongPressDragInteraction>;
 }) {
   const isCompact = useIsCompactFormFactor();
+  const isMultiSelected = useSidebarSelectionStore((state) =>
+    state.selected.has(workspaceSelectionKey(workspace.serverId, workspace.workspaceId)),
+  );
+  const isRowSelected = selected || isMultiSelected;
   const isTouchPlatform = platformIsNative || isCompact;
   const [isPressed, setIsPressed] = useState(false);
   const trailing = useSidebarWorkspaceTrailing();
@@ -814,7 +835,7 @@ function StatusWorkspaceRowInnerContent({
   const isDesktop = !isTouchPlatform;
   const serviceSummary = isDesktop ? selectWorkspaceServiceSummary(workspace.scripts) : null;
 
-  const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const accessibilityState = useMemo(() => ({ selected: isRowSelected }), [isRowSelected]);
   const didLongPressRef = dragInteraction?.didLongPressRef;
   const startDragPress = dragInteraction?.handlePressIn;
   const moveDragPress = dragInteraction?.handleTouchMove;
@@ -858,12 +879,17 @@ function StatusWorkspaceRowInnerContent({
         });
         const workspaceRowStyle = getStatusWorkspaceRowStyle({
           isPressed,
-          selected,
+          selected: isRowSelected,
           isHovered,
           inStatusGroup,
           isDragging,
         });
-        const backdrop = getSidebarRowBackdrop({ isDragging, isPressed, selected, isHovered });
+        const backdrop = getSidebarRowBackdrop({
+          isDragging,
+          isPressed,
+          selected: isRowSelected,
+          isHovered,
+        });
         return (
           <View
             {...dragAttributes}

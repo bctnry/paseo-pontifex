@@ -1276,6 +1276,18 @@ export const ru: TranslationResources = {
       workspaces: "Рабочие пространства",
       projects: "Проекты",
     },
+    selection: {
+      select: "Выбрать",
+      deselect: "Снять выбор",
+      cancel: "Очистить выбор",
+      count: "Выбрано: {{count}}",
+      archiveSelected: "Архивировать выбранное ({{count}})",
+      archiveChat: "Архивировать чат",
+      archiveTitle: "Архивировать {{count}} элементов?",
+      archiveMessage: "Выбранные чаты будут остановлены и удалены из боковой панели.",
+      archived: "Архивировано: {{count}}",
+      archiveFailed: "Не удалось архивировать: {{count}}",
+    },
     worktreeSetup: {
       title: "Настроить скрипты worktree",
       description:

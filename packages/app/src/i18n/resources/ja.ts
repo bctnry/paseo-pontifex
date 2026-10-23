@@ -1272,6 +1272,18 @@ export const ja: TranslationResources = {
       workspaces: "ワークスペース",
       projects: "プロジェクト",
     },
+    selection: {
+      select: "選択",
+      deselect: "選択解除",
+      cancel: "選択をクリア",
+      count: "{{count}} 件選択中",
+      archiveSelected: "選択項目をアーカイブ（{{count}}）",
+      archiveChat: "チャットをアーカイブ",
+      archiveTitle: "{{count}} 件をアーカイブしますか？",
+      archiveMessage: "選択したチャットを停止し、サイドバーから削除します。",
+      archived: "{{count}} 件をアーカイブしました",
+      archiveFailed: "{{count}} 件をアーカイブできませんでした",
+    },
     worktreeSetup: {
       title: "ワークツリースクリプトを設定",
       description:

@@ -1295,6 +1295,18 @@ export const es: TranslationResources = {
       workspaces: "Espacios de trabajo",
       projects: "Proyectos",
     },
+    selection: {
+      select: "Seleccionar",
+      deselect: "Anular selección",
+      cancel: "Borrar selección",
+      count: "{{count}} seleccionados",
+      archiveSelected: "Archivar seleccionados ({{count}})",
+      archiveChat: "Archivar chat",
+      archiveTitle: "¿Archivar {{count}} elementos?",
+      archiveMessage: "Esto detiene los chats seleccionados y los quita de la barra lateral.",
+      archived: "{{count}} elementos archivados",
+      archiveFailed: "No se pudieron archivar {{count}} elementos",
+    },
     worktreeSetup: {
       title: "Configurar secuencias de comandos del árbol de trabajo",
       description:

@@ -1,10 +1,13 @@
 import { router } from "expo-router";
 import {
+  Archive,
   CircleGauge,
   FolderPlus,
   GitBranch,
+  ListChecks,
   Server,
   Settings,
+  X,
   type LucideIcon,
 } from "lucide-react-native";
 import { useTranslation } from "react-i18next";
@@ -65,6 +68,8 @@ import { useHosts } from "@/runtime/host-runtime";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { builtinSidebarNavLabelKey } from "@/sidebar-nav/model";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
+import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
+import { useSidebarSelectionStore } from "@/stores/sidebar-selection-store";
 import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
@@ -854,47 +859,101 @@ function WorkspacesSectionHeader({
 }) {
   const { t } = useTranslation();
   const isProjectGrouping = groupMode === "project";
+  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
+  const selectedCount = useSidebarSelectionStore((state) => state.selected.size);
+  const startSelection = useSidebarSelectionStore((state) => state.startSelection);
+  const stopSelection = useSidebarSelectionStore((state) => state.stopSelection);
+  const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
+  const handleStartSelection = useCallback(() => startSelection(), [startSelection]);
+
+  useEffect(() => {
+    if (!isSelectionMode || typeof document === "undefined") {
+      return;
+    }
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        stopSelection();
+      }
+    };
+    document.addEventListener("keydown", handleKeyDown);
+    return () => document.removeEventListener("keydown", handleKeyDown);
+  }, [isSelectionMode, stopSelection]);
 
   return (
     <SidebarSectionHeader
       title={t(isProjectGrouping ? "sidebar.sections.projects" : "sidebar.sections.workspaces")}
     >
-      {isProjectGrouping ? (
-        <SectionHeaderIconButton
-          label={t("sidebar.actions.addProject")}
-          onPress={onAddProject}
-          testID="sidebar-add-project-header"
-        />
-      ) : null}
-      <Tooltip delayDuration={300}>
-        <TooltipTrigger asChild>
-          <View>
-            <SidebarDisplayPreferencesMenu />
-          </View>
-        </TooltipTrigger>
-        <TooltipContent side="bottom" align="center" offset={8}>
-          <IconTooltipContent label={t("sidebar.display.trigger")} />
-        </TooltipContent>
-      </Tooltip>
+      {isSelectionMode ? (
+        <>
+          <Text style={styles.selectionCount}>
+            {t("sidebar.selection.count", { count: selectedCount })}
+          </Text>
+          <SectionHeaderIconButton
+            icon={Archive}
+            label={t("sidebar.selection.archiveSelected", { count: selectedCount })}
+            onPress={archiveSelected}
+            testID="sidebar-archive-selected"
+            disabled={selectedCount === 0 || isArchiving}
+          />
+          <SectionHeaderIconButton
+            icon={X}
+            label={t("sidebar.selection.cancel")}
+            onPress={stopSelection}
+            testID="sidebar-clear-selection"
+          />
+        </>
+      ) : (
+        <>
+          {isProjectGrouping ? (
+            <SectionHeaderIconButton
+              icon={FolderPlus}
+              label={t("sidebar.actions.addProject")}
+              onPress={onAddProject}
+              testID="sidebar-add-project-header"
+            />
+          ) : null}
+          <SectionHeaderIconButton
+            icon={ListChecks}
+            label={t("sidebar.selection.select")}
+            onPress={handleStartSelection}
+            testID="sidebar-start-selection"
+          />
+          <Tooltip delayDuration={300}>
+            <TooltipTrigger asChild>
+              <View>
+                <SidebarDisplayPreferencesMenu />
+              </View>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" align="center" offset={8}>
+              <IconTooltipContent label={t("sidebar.display.trigger")} />
+            </TooltipContent>
+          </Tooltip>
+        </>
+      )}
     </SidebarSectionHeader>
   );
 }
 
 function SectionHeaderIconButton({
+  icon: Icon,
   label,
   onPress,
   testID,
+  disabled = false,
 }: {
+  icon: LucideIcon;
   label: string;
   onPress: () => void;
   testID: string;
+  disabled?: boolean;
 }) {
   const actionStyle = useCallback(
     ({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
       styles.sectionHeaderAction,
-      hovered && styles.sectionHeaderActionHovered,
+      hovered && !disabled && styles.sectionHeaderActionHovered,
+      disabled && styles.sectionHeaderActionDisabled,
     ],
-    [],
+    [disabled],
   );
 
   return (
@@ -903,15 +962,16 @@ function SectionHeaderIconButton({
         <Pressable
           accessibilityRole="button"
           accessibilityLabel={label}
+          disabled={disabled}
           onPress={onPress}
           style={actionStyle}
           testID={testID}
         >
           {({ hovered }) => (
             <DensityIcon
-              icon={FolderPlus}
+              icon={Icon}
               size="sm"
-              color={hovered ? "foreground" : "foregroundMuted"}
+              color={hovered && !disabled ? "foreground" : "foregroundMuted"}
             />
           )}
         </Pressable>
@@ -1027,6 +1087,14 @@ const styles = StyleSheet.create((theme) => ({
   },
   sectionHeaderActionHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
+  },
+  sectionHeaderActionDisabled: {
+    opacity: theme.opacity[50],
+  },
+  selectionCount: {
+    color: theme.colors.foregroundMuted,
+    fontSize: theme.fontSize.sm,
+    fontWeight: theme.fontWeight.medium,
   },
   tooltipRow: {
     flexDirection: "row",

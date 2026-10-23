@@ -1265,6 +1265,18 @@ export const ko: TranslationResources = {
       workspaces: "워크스페이스",
       projects: "프로젝트",
     },
+    selection: {
+      select: "선택",
+      deselect: "선택 해제",
+      cancel: "선택 지우기",
+      count: "{{count}}개 선택됨",
+      archiveSelected: "선택 항목 보관 ({{count}})",
+      archiveChat: "채팅 보관",
+      archiveTitle: "{{count}}개 항목을 보관할까요?",
+      archiveMessage: "선택한 채팅을 중지하고 사이드바에서 제거합니다.",
+      archived: "{{count}}개 항목을 보관했습니다",
+      archiveFailed: "{{count}}개 항목을 보관하지 못했습니다",
+    },
     worktreeSetup: {
       title: "워크트리 스크립트 설정",
       description:

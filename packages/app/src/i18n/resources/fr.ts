@@ -1288,6 +1288,19 @@ export const fr: TranslationResources = {
       workspaces: "Espaces de travail",
       projects: "Projets",
     },
+    selection: {
+      select: "Sélectionner",
+      deselect: "Désélectionner",
+      cancel: "Effacer la sélection",
+      count: "{{count}} sélectionné(s)",
+      archiveSelected: "Archiver la sélection ({{count}})",
+      archiveChat: "Archiver la conversation",
+      archiveTitle: "Archiver {{count}} éléments ?",
+      archiveMessage:
+        "Cela arrête les conversations sélectionnées et les retire de la barre latérale.",
+      archived: "{{count}} éléments archivés",
+      archiveFailed: "Impossible d’archiver {{count}} éléments",
+    },
     worktreeSetup: {
       title: "Configurer les scripts de worktree",
       description:

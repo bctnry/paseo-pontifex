@@ -1,4 +1,10 @@
-import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
+import {
+  useCallback,
+  useMemo,
+  type ComponentProps,
+  type PropsWithChildren,
+  type ReactNode,
+} from "react";
 import { useTranslation } from "react-i18next";
 import { type PressableStateCallbackType, type ViewStyle } from "react-native";
 import { withUnistyles } from "react-native-unistyles";
@@ -45,6 +51,8 @@ import {
   WORKSPACE_LABEL_PAGE_ID,
   type WorkspaceLabelTarget,
 } from "@/workspace-labels/picker";
+import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sidebar-selection-store";
+import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -148,6 +156,16 @@ function SidebarWorkspaceMenuItems({
   openInFileManagerPath,
 }: SidebarWorkspaceMenuItemsProps & { surface: MenuSurface }): ReactNode {
   const { t } = useTranslation();
+  const selectionKey =
+    serverId && workspaceId ? workspaceSelectionKey(serverId, workspaceId) : null;
+  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
+  const isSelected = useSidebarSelectionStore((state) =>
+    selectionKey ? state.selected.has(selectionKey) : false,
+  );
+  const selectedCount = useSidebarSelectionStore((state) => state.selected.size);
+  const startSelection = useSidebarSelectionStore((state) => state.startSelection);
+  const toggleSelection = useSidebarSelectionStore((state) => state.toggle);
+  const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
   const archiveTrailing = useMemo(
     () => (archiveShortcutKeys ? <Shortcut chord={archiveShortcutKeys} /> : null),
     [archiveShortcutKeys],
@@ -156,9 +174,40 @@ function SidebarWorkspaceMenuItems({
     () => <ThemedTag size={14} uniProps={foregroundMutedColorMapping} />,
     [],
   );
+  const handleSelect = useCallback(() => {
+    if (!serverId || !workspaceId) {
+      return;
+    }
+    const selection = { kind: "workspace" as const, serverId, workspaceId };
+    if (isSelectionMode) {
+      toggleSelection(selection);
+    } else {
+      startSelection(selection);
+    }
+  }, [isSelectionMode, serverId, startSelection, toggleSelection, workspaceId]);
 
   return (
     <>
+      {serverId && workspaceId ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-select-${workspaceKey}`}
+          onSelect={handleSelect}
+        >
+          {isSelected ? t("sidebar.selection.deselect") : t("sidebar.selection.select")}
+        </WorkspaceMenuItem>
+      ) : null}
+      {selectedCount > 0 ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-archive-selected-${workspaceKey}`}
+          leading={archiveLeadingIcon}
+          disabled={isArchiving}
+          onSelect={archiveSelected}
+        >
+          {t("sidebar.selection.archiveSelected", { count: selectedCount })}
+        </WorkspaceMenuItem>
+      ) : null}
       {onCopyPath ? (
         <WorkspaceMenuItem
           surface={surface}

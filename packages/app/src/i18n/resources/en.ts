@@ -1266,6 +1266,18 @@ export const en = {
       workspaces: "Workspaces",
       projects: "Projects",
     },
+    selection: {
+      select: "Select",
+      deselect: "Deselect",
+      cancel: "Clear selection",
+      count: "{{count}} selected",
+      archiveSelected: "Archive selected ({{count}})",
+      archiveChat: "Archive chat",
+      archiveTitle: "Archive {{count}} items?",
+      archiveMessage: "This stops the selected chats and removes the selection from the sidebar.",
+      archived: "Archived {{count}} items",
+      archiveFailed: "Could not archive {{count}} items",
+    },
     worktreeSetup: {
       title: "Set up worktree scripts",
       description:

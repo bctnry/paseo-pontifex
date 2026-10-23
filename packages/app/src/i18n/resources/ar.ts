@@ -1258,6 +1258,18 @@ export const ar: TranslationResources = {
       workspaces: "مساحات العمل",
       projects: "المشاريع",
     },
+    selection: {
+      select: "تحديد",
+      deselect: "إلغاء التحديد",
+      cancel: "مسح التحديد",
+      count: "تم تحديد {{count}}",
+      archiveSelected: "أرشفة المحدد ({{count}})",
+      archiveChat: "أرشفة المحادثة",
+      archiveTitle: "أرشفة {{count}} عناصر؟",
+      archiveMessage: "سيؤدي هذا إلى إيقاف المحادثات المحددة وإزالتها من الشريط الجانبي.",
+      archived: "تمت أرشفة {{count}} عناصر",
+      archiveFailed: "تعذر أرشفة {{count}} عناصر",
+    },
     worktreeSetup: {
       title: "إعداد البرامج النصية لشجرة العمل",
       description:
