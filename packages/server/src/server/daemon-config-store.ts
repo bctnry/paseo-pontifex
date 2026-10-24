@@ -23,6 +23,7 @@ interface SupportedMutableConfigPatch {
     publicEndpoint?: string;
     useTls?: boolean;
     publicUseTls?: boolean;
+    requireProtectedSecurity?: boolean;
   };
   app?: { baseUrl?: string };
   mcp?: { injectIntoAgents?: boolean };
@@ -181,6 +182,7 @@ const RELOADABLE_PATHS = [
   "daemon.relay.publicEndpoint",
   "daemon.relay.useTls",
   "daemon.relay.publicUseTls",
+  "daemon.relay.requireProtectedSecurity",
   "daemon.mcp.enabled",
   "daemon.mcp.injectIntoAgents",
   "daemon.browserTools.enabled",
@@ -208,6 +210,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["daemon.relay.publicEndpoint", "relay.publicEndpoint"],
   ["daemon.relay.useTls", "relay.useTls"],
   ["daemon.relay.publicUseTls", "relay.publicUseTls"],
+  ["daemon.relay.requireProtectedSecurity", "relay.requireProtectedSecurity"],
   ["daemon.mcp.enabled", "mcp.enabled"],
   ["daemon.mcp.injectIntoAgents", "mcp.injectIntoAgents"],
   ["daemon.browserTools.enabled", "browserTools.enabled"],
@@ -278,6 +281,9 @@ function pickRelayAndAppPatch(
     if (patch.relay.useTls !== undefined) relay.useTls = patch.relay.useTls;
     if (patch.relay.publicUseTls !== undefined) {
       relay.publicUseTls = patch.relay.publicUseTls;
+    }
+    if (patch.relay.requireProtectedSecurity !== undefined) {
+      relay.requireProtectedSecurity = patch.relay.requireProtectedSecurity;
     }
     if (Object.keys(relay).length > 0) next.relay = relay;
   }
@@ -688,6 +694,9 @@ function mergeRelayPatch(
       : {}),
     ...(patch.relay?.useTls !== undefined ? { useTls: patch.relay.useTls } : {}),
     ...(patch.relay?.publicUseTls !== undefined ? { publicUseTls: patch.relay.publicUseTls } : {}),
+    ...(patch.relay?.requireProtectedSecurity !== undefined
+      ? { requireProtectedSecurity: patch.relay.requireProtectedSecurity }
+      : {}),
   };
   return Object.keys(relayPatch).length > 0 ? { ...relay, ...relayPatch } : relay;
 }
