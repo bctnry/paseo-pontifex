@@ -27,6 +27,7 @@ import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { useTranslation } from "react-i18next";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
+import * as Haptics from "expo-haptics";
 import { useDictation } from "@/hooks/use-dictation";
 import { hasFinePointer } from "@/hooks/use-fine-pointer";
 import { DictationOverlay } from "@/components/dictation-controls";
@@ -57,7 +58,7 @@ import { formatShortcut, type ShortcutKey } from "@/utils/format-shortcut";
 import { getShortcutOs } from "@/utils/shortcut-platform";
 import type { MessageInputKeyboardActionKind } from "@/keyboard/actions";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
-import { isWeb } from "@/constants/platform";
+import { isNative, isWeb } from "@/constants/platform";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useComposerKeyboardScope } from "@/composer/keyboard-scope";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -77,6 +78,7 @@ const ComposerTextInput = withUnistyles(EditingTextInput, (theme) => ({
 }));
 import {
   resolveSendTooltipLabel,
+  resolveSubmitAccessibilityHint,
   resolveSubmitAccessibilityLabel,
   resolveVoiceAccessibilityLabel,
   resolveVoiceTooltipText,
@@ -84,6 +86,7 @@ import {
 import {
   applyDictationTranscript,
   computeCanStartDictation,
+  resolveAlternateSendAction,
   resolveComposerSurfacePresentation,
   resolveComposerSurfaceText,
   resolveRetainedSelection,
@@ -111,6 +114,8 @@ export interface ComposerInputSnapshot {
 
 export interface ComposerKeyPressEvent {
   key: string;
+  /** Shift, Alt, Ctrl, or Meta was held. */
+  hasModifier: boolean;
   preventDefault: () => void;
   input: ComposerInputSnapshot;
 }
@@ -211,6 +216,7 @@ type WebTextInputKeyPressEvent = NativeSyntheticEvent<
     metaKey?: boolean;
     ctrlKey?: boolean;
     shiftKey?: boolean;
+    altKey?: boolean;
     // Web-only: present on DOM KeyboardEvent during IME composition (CJK input).
     isComposing?: boolean;
     keyCode?: number;
@@ -397,8 +403,6 @@ interface DesktopKeyPressContext {
   onKeyPressCallback: ((event: ComposerKeyPressEvent) => boolean) | undefined;
   input: ComposerKeyPressEvent["input"];
   submitOnEnter: boolean;
-  isAgentRunning: boolean;
-  onQueue: ((payload: MessagePayload) => void) | undefined;
   isSubmitDisabled: boolean;
   isSubmitLoading: boolean;
   disabled: boolean;
@@ -412,30 +416,28 @@ function handleDesktopKeyPressImpl(
 ): void {
   if (isImeComposingKeyboardEvent(event.nativeEvent)) return;
 
+  const { shiftKey, metaKey, ctrlKey, altKey } = event.nativeEvent;
+
   if (ctx.onKeyPressCallback) {
     const handled = ctx.onKeyPressCallback({
       key: event.nativeEvent.key,
+      hasModifier: Boolean(shiftKey || metaKey || ctrlKey || altKey),
       preventDefault: () => event.preventDefault(),
       input: ctx.input,
     });
     if (handled) return;
   }
 
-  const { shiftKey, metaKey, ctrlKey } = event.nativeEvent;
-
   if (event.nativeEvent.key !== "Enter") return;
   if (!ctx.submitOnEnter) return;
   if (shiftKey) return;
 
-  if ((metaKey || ctrlKey) && ctx.isAgentRunning && ctx.onQueue) {
-    if (ctx.isSubmitDisabled || ctx.isSubmitLoading || ctx.disabled) return;
-    event.preventDefault();
+  if (ctx.isSubmitDisabled || ctx.isSubmitLoading || ctx.disabled) return;
+  event.preventDefault();
+  if (metaKey || ctrlKey) {
     ctx.handleAlternateSendAction();
     return;
   }
-
-  if (ctx.isSubmitDisabled || ctx.isSubmitLoading || ctx.disabled) return;
-  event.preventDefault();
   ctx.handleDefaultSendAction();
 }
 
@@ -768,8 +770,10 @@ function SendButtonTooltip({
   canPressLoadingButton,
   onSubmitLoadingPress,
   onDefaultSendAction,
+  onLongPressSend,
   isSendButtonDisabled,
   submitAccessibilityLabel,
+  submitAccessibilityHint,
   sendButtonCombinedStyle,
   isSubmitLoading,
   submitIcon,
@@ -783,8 +787,10 @@ function SendButtonTooltip({
   canPressLoadingButton: boolean;
   onSubmitLoadingPress: (() => void) | undefined;
   onDefaultSendAction: () => void;
+  onLongPressSend: () => void;
   isSendButtonDisabled: boolean;
   submitAccessibilityLabel: string;
+  submitAccessibilityHint: string | undefined;
   sendButtonCombinedStyle: React.ComponentProps<typeof TooltipTrigger>["style"];
   isSubmitLoading: boolean;
   submitIcon: "arrow" | "return";
@@ -799,8 +805,10 @@ function SendButtonTooltip({
     <Tooltip delayDuration={0} enabledOnDesktop enabledOnMobile={false}>
       <TooltipTrigger
         onPress={canPressLoadingButton ? onSubmitLoadingPress : onDefaultSendAction}
+        onLongPress={canPressLoadingButton ? undefined : onLongPressSend}
         disabled={isSendButtonDisabled}
         accessibilityLabel={submitAccessibilityLabel}
+        accessibilityHint={submitAccessibilityHint}
         accessibilityRole="button"
         testID={submitButtonTestID}
         style={sendButtonCombinedStyle}
@@ -1705,6 +1713,19 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       });
     }, [defaultSendBehavior, isAgentRunning, handleSendMessage, handleQueueMessage, onQueue]);
 
+    const alternateSendAction = resolveAlternateSendAction({
+      defaultSendBehavior,
+      isAgentRunning,
+      onQueue,
+    });
+
+    const handleLongPressSend = useCallback(() => {
+      if (alternateSendAction && isNative) {
+        void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium).catch(() => {});
+      }
+      handleAlternateSendAction();
+    }, [alternateSendAction, handleAlternateSendAction]);
+
     usePasteImagesEffect({
       textarea: webTextArea,
       isConnected,
@@ -1738,8 +1759,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
             selectionRef.current,
           ),
           submitOnEnter: shouldSubmitOnEnter,
-          isAgentRunning,
-          onQueue,
           isSubmitDisabled,
           isSubmitLoading,
           disabled,
@@ -1751,8 +1770,6 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         shouldHandleWebKeyPress,
         onKeyPressCallback,
         shouldSubmitOnEnter,
-        isAgentRunning,
-        onQueue,
         isSubmitDisabled,
         isSubmitLoading,
         disabled,
@@ -1790,6 +1807,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
       defaultActionQueues,
       defaultSendBehavior,
       isAgentRunning,
+      t,
+    });
+    const submitAccessibilityHint = resolveSubmitAccessibilityHint({
+      canPressLoadingButton,
+      alternateSendAction,
       t,
     });
 
@@ -1952,8 +1974,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
           canPressLoadingButton={canPressLoadingButton}
           onSubmitLoadingPress={onSubmitLoadingPress}
           onDefaultSendAction={handleDefaultSendAction}
+          onLongPressSend={handleLongPressSend}
           isSendButtonDisabled={isPresentedSendDisabled}
           submitAccessibilityLabel={submitAccessibilityLabel}
+          submitAccessibilityHint={submitAccessibilityHint}
           sendButtonCombinedStyle={sendButtonCombinedStyle}
           isSubmitLoading={isSubmitLoading}
           submitIcon={submitIcon}
@@ -1971,8 +1995,10 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
         canPressLoadingButton,
         onSubmitLoadingPress,
         handleDefaultSendAction,
+        handleLongPressSend,
         isPresentedSendDisabled,
         submitAccessibilityLabel,
+        submitAccessibilityHint,
         sendButtonCombinedStyle,
         isSubmitLoading,
         submitIcon,

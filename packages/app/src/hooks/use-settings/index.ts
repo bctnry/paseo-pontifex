@@ -42,6 +42,7 @@ import {
   saveAppSettings as saveAppSettingsPure,
   type AppSettings,
   type AppSettingsUpdate,
+  type ChatDisplay,
   type OpenInSidePanePreferences,
   type PullRequestOpenLocation,
   type DesktopSettingsBridge,
@@ -85,6 +86,7 @@ export {
 export type {
   AppSettings,
   AppSettingsUpdate,
+  ChatDisplay,
   AppLanguage,
   OpenInSidePanePreferences,
   PullRequestOpenLocation,
