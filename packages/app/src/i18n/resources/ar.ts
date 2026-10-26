@@ -1179,9 +1179,12 @@ export const ar: TranslationResources = {
       heading: "العرض",
       sort: {
         label: "الترتيب",
+        current: "الترتيب الحالي",
         created: "تاريخ الإنشاء",
         manual: "يدوي",
         lastPrompt: "آخر طلب",
+        lastFinished: "آخر انتهاء",
+        name: "الاسم",
         updateHost: "حدّث المضيفين لترتيب مساحات العمل",
       },
       grouping: {
@@ -1264,6 +1267,17 @@ export const ar: TranslationResources = {
       schedules: "الجداول",
       workspaces: "مساحات العمل",
       projects: "المشاريع",
+    },
+    search: {
+      trigger: "بحث في المشاريع",
+      close: "إغلاق البحث",
+      clear: "مسح البحث",
+      placeholder: "ابحث في المشاريع ومساحات العمل",
+      empty: "لا توجد مشاريع أو مساحات عمل مطابقة",
+      workspaceCount: "{{count}} مساحات عمل",
+    },
+    sessions: {
+      newTab: "تبويب جديد",
     },
     selection: {
       select: "تحديد",
@@ -1366,6 +1380,16 @@ export const ar: TranslationResources = {
   },
   newWorkspace: {
     title: "مساحة عمل جديدة",
+    explorer: {
+      title: "المستكشف",
+      open: "فتح المستكشف",
+      close: "إغلاق المستكشف",
+      closePreview: "إغلاق المعاينة",
+      binary: "لا يمكن معاينة هذا الملف",
+      tooLarge: "الملف كبير جدًا للمعاينة",
+      readFailed: "تعذر قراءة هذا الملف",
+      disconnected: "المضيف غير متصل",
+    },
     create: "يخلق",
     isolation: {
       local: "محلي",
@@ -2542,6 +2566,18 @@ export const ar: TranslationResources = {
         },
         moveUp: "نقل لأعلى",
         moveDown: "نقل لأسفل",
+        behavior: {
+          title: "السلوك",
+          description: "كيف تتفاعل قائمة المشاريع أثناء استخدامها",
+        },
+        typeToSearch: {
+          title: "الكتابة للبحث",
+          description: "ابدأ الكتابة والمؤشر فوق قائمة المشاريع للبحث في المشاريع ومساحات العمل",
+        },
+        showNewTabs: {
+          title: "إظهار التبويبات الجديدة",
+          description: "إظهار التبويبات الجديدة ومسودات الدردشة تحت مساحة العمل قبل أن تصبح جلسة",
+        },
       },
       fonts: {
         title: "الخطوط",

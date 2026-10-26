@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import { selectWorkspaceSessionRows } from "./workspace-sessions";
+import type { WorkspaceTab } from "@/workspace-tabs/model";
+import {
+  selectFocusedTabIds,
+  selectWorkspaceSessionRows,
+  selectWorkspaceTabRows,
+} from "./workspace-sessions";
 
 const WORKSPACE_ID = "workspace-1";
 const BASE_TIME = new Date("2026-10-23T10:00:00.000Z");
@@ -137,5 +142,75 @@ describe("selectWorkspaceSessionRows", () => {
       pendingPermissionCount: 1,
     });
     expect(rows[1]).toMatchObject({ id: "settled", status: "idle" });
+  });
+});
+
+function tab(input: {
+  id: string;
+  createdAt: number;
+  target: WorkspaceTab["target"];
+}): WorkspaceTab {
+  return {
+    tabId: input.id,
+    target: input.target,
+    createdAt: input.createdAt,
+  };
+}
+
+describe("selectWorkspaceTabRows", () => {
+  it("keeps new-tab and draft rows only", () => {
+    const tabs = [
+      tab({ id: "draft", createdAt: 1, target: { kind: "draft", draftId: "draft-1" } }),
+      tab({ id: "new", createdAt: 2, target: { kind: "new_tab" } }),
+      tab({ id: "agent", createdAt: 3, target: { kind: "agent", agentId: "agent-1" } }),
+    ];
+    expect(selectWorkspaceTabRows({ tabs }).map((row) => row.id)).toEqual(["draft", "new"]);
+  });
+
+  it("can be turned off", () => {
+    const tabs = [tab({ id: "draft", createdAt: 1, target: { kind: "draft", draftId: "d" } })];
+    expect(selectWorkspaceTabRows({ tabs, enabled: false })).toEqual([]);
+  });
+
+  it("marks the focused tab as selected", () => {
+    const tabs = [
+      tab({ id: "draft-a", createdAt: 1, target: { kind: "draft", draftId: "a" } }),
+      tab({ id: "draft-b", createdAt: 2, target: { kind: "draft", draftId: "b" } }),
+    ];
+    const rows = selectWorkspaceTabRows({
+      tabs,
+      focusedTabIds: new Set(["draft-b"]),
+    });
+    expect(rows.map((row) => [row.id, row.selected])).toEqual([
+      ["draft-a", false],
+      ["draft-b", true],
+    ]);
+  });
+});
+
+describe("selectFocusedTabIds", () => {
+  it("collects the focused tab from each pane", () => {
+    const focused = selectFocusedTabIds({
+      focusedPaneId: "pane-a",
+      root: {
+        kind: "group",
+        group: {
+          id: "group",
+          direction: "horizontal",
+          sizes: [1, 1],
+          children: [
+            {
+              kind: "pane",
+              pane: { id: "pane-a", tabIds: ["a", "b"], focusedTabId: "b" },
+            },
+            {
+              kind: "pane",
+              pane: { id: "pane-b", tabIds: ["c"], focusedTabId: "c" },
+            },
+          ],
+        },
+      },
+    });
+    expect([...focused]).toEqual(["b", "c"]);
   });
 });

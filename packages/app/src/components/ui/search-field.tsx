@@ -25,6 +25,8 @@ export interface SearchFieldProps {
   /** Falls back to `placeholder`, which already names the field. */
   accessibilityLabel?: string;
   clearAccessibilityLabel: string;
+  /** Focus the input as soon as it mounts. */
+  autoFocus?: boolean;
   testID?: string;
   clearTestID?: string;
 }
@@ -42,6 +44,7 @@ export function SearchField({
   placeholder,
   accessibilityLabel,
   clearAccessibilityLabel,
+  autoFocus = false,
   testID,
   clearTestID,
 }: SearchFieldProps): ReactElement {
@@ -62,6 +65,7 @@ export function SearchField({
         ref={inputRef}
         initialValue={value}
         onChangeText={onChangeText}
+        autoFocus={autoFocus}
         onFocus={handleFocus}
         onBlur={handleBlur}
         placeholder={placeholder}

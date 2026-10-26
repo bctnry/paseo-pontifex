@@ -1187,9 +1187,12 @@ export const en = {
       heading: "Display",
       sort: {
         label: "Sort",
+        current: "Current order",
         created: "Created",
         manual: "Manual",
         lastPrompt: "Last prompt",
+        lastFinished: "Last finished",
+        name: "Name",
         updateHost: "Update hosts to sort workspaces",
       },
       grouping: {
@@ -1272,6 +1275,17 @@ export const en = {
       schedules: "Schedules",
       workspaces: "Workspaces",
       projects: "Projects",
+    },
+    search: {
+      trigger: "Search projects",
+      close: "Close search",
+      clear: "Clear search",
+      placeholder: "Search projects and workspaces",
+      empty: "No matching projects or workspaces",
+      workspaceCount: "{{count}} workspaces",
+    },
+    sessions: {
+      newTab: "New tab",
     },
     selection: {
       select: "Select",
@@ -1374,6 +1388,16 @@ export const en = {
   },
   newWorkspace: {
     title: "New workspace",
+    explorer: {
+      title: "Explorer",
+      open: "Open Explorer",
+      close: "Close Explorer",
+      closePreview: "Close preview",
+      binary: "This file can't be previewed",
+      tooLarge: "This file is too large to preview",
+      readFailed: "Couldn't read this file",
+      disconnected: "Host is not connected",
+    },
     create: "Create",
     isolation: {
       local: "Local",
@@ -2633,6 +2657,20 @@ export const en = {
         },
         moveUp: "Move up",
         moveDown: "Move down",
+        behavior: {
+          title: "Behavior",
+          description: "How the project list responds while you use it",
+        },
+        typeToSearch: {
+          title: "Type to search",
+          description:
+            "Start typing while the pointer is over the project list to search projects and workspaces",
+        },
+        showNewTabs: {
+          title: "Show new tabs",
+          description:
+            "Show open new-tab and draft-chat tabs under their workspace, before they become a session",
+        },
       },
       fonts: {
         title: "Fonts",

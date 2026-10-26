@@ -294,6 +294,17 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
     openManager,
   ]);
 
+  const sortLabel =
+    preferences.workspaceSort === "created"
+      ? t("sidebar.display.sort.current")
+      : t(`sidebar.display.sort.${preferences.workspaceSort}`);
+  const sortValue =
+    workspaceSortSupported ||
+    preferences.workspaceSort === "manual" ||
+    preferences.workspaceSort === "name"
+      ? sortLabel
+      : undefined;
+
   return (
     <>
       <MenuRoot compactMode="sheet">
@@ -320,14 +331,7 @@ export function SidebarDisplayPreferencesMenu(): ReactElement {
             {t("sidebar.display.grouping.label")}
           </MenuSubTrigger>
           {preferences.grouping === "project" ? (
-            <MenuSubTrigger
-              id="sort"
-              value={
-                workspaceSortSupported || preferences.workspaceSort === "manual"
-                  ? t(`sidebar.display.sort.${preferences.workspaceSort}`)
-                  : undefined
-              }
-            >
+            <MenuSubTrigger id="sort" value={sortValue}>
               {t("sidebar.display.sort.label")}
             </MenuSubTrigger>
           ) : null}
@@ -408,16 +412,30 @@ function SortPage({
   const { setWorkspaceSort } = preferences;
   const selectManual = useCallback(() => setWorkspaceSort("manual"), [setWorkspaceSort]);
   const selectCreated = useCallback(() => setWorkspaceSort("created"), [setWorkspaceSort]);
+  const selectName = useCallback(() => setWorkspaceSort("name"), [setWorkspaceSort]);
+  const selectLastFinished = useCallback(
+    () => setWorkspaceSort("lastFinished"),
+    [setWorkspaceSort],
+  );
   const selectLastPrompt = useCallback(() => setWorkspaceSort("lastPrompt"), [setWorkspaceSort]);
   return (
     <>
       <MenuItem selected={preferences.workspaceSort === "manual"} onSelect={selectManual}>
         {t("sidebar.display.sort.manual")}
       </MenuItem>
+      <MenuItem selected={preferences.workspaceSort === "name"} onSelect={selectName}>
+        {t("sidebar.display.sort.name")}
+      </MenuItem>
       {automaticSortSupported ? (
         <>
           <MenuItem selected={preferences.workspaceSort === "created"} onSelect={selectCreated}>
-            {t("sidebar.display.sort.created")}
+            {t("sidebar.display.sort.current")}
+          </MenuItem>
+          <MenuItem
+            selected={preferences.workspaceSort === "lastFinished"}
+            onSelect={selectLastFinished}
+          >
+            {t("sidebar.display.sort.lastFinished")}
           </MenuItem>
           <MenuItem
             selected={preferences.workspaceSort === "lastPrompt"}

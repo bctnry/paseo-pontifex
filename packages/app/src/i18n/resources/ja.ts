@@ -1192,9 +1192,12 @@ export const ja: TranslationResources = {
       heading: "表示",
       sort: {
         label: "並び順",
+        current: "現在の順序",
         created: "作成日時",
         manual: "手動",
         lastPrompt: "最後のプロンプト",
+        lastFinished: "最終完了",
+        name: "名前",
         updateHost: "ワークスペースを並べ替えるにはホストを更新してください",
       },
       grouping: {
@@ -1278,6 +1281,17 @@ export const ja: TranslationResources = {
       schedules: "スケジュール",
       workspaces: "ワークスペース",
       projects: "プロジェクト",
+    },
+    search: {
+      trigger: "プロジェクトを検索",
+      close: "検索を閉じる",
+      clear: "検索をクリア",
+      placeholder: "プロジェクトとワークスペースを検索",
+      empty: "一致するプロジェクトやワークスペースはありません",
+      workspaceCount: "{{count}} 個のワークスペース",
+    },
+    sessions: {
+      newTab: "新しいタブ",
     },
     selection: {
       select: "選択",
@@ -1380,6 +1394,16 @@ export const ja: TranslationResources = {
   },
   newWorkspace: {
     title: "新しいワークスペース",
+    explorer: {
+      title: "エクスプローラー",
+      open: "エクスプローラーを開く",
+      close: "エクスプローラーを閉じる",
+      closePreview: "プレビューを閉じる",
+      binary: "このファイルはプレビューできません",
+      tooLarge: "ファイルが大きすぎてプレビューできません",
+      readFailed: "ファイルを読み込めませんでした",
+      disconnected: "ホストが接続されていません",
+    },
     create: "作成",
     isolation: {
       local: "ローカル",
@@ -2528,6 +2552,20 @@ export const ja: TranslationResources = {
         },
         moveUp: "上に移動",
         moveDown: "下に移動",
+        behavior: {
+          title: "動作",
+          description: "プロジェクト一覧の操作中の動作",
+        },
+        typeToSearch: {
+          title: "入力して検索",
+          description:
+            "ポインターをプロジェクト一覧に合わせて入力すると、プロジェクトとワークスペースを検索します",
+        },
+        showNewTabs: {
+          title: "新しいタブを表示",
+          description:
+            "セッションになる前の新しいタブと下書きチャットをワークスペースの下に表示します",
+        },
       },
       fonts: {
         title: "フォント",

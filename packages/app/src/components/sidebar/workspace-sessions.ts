@@ -1,5 +1,8 @@
 import { isWorkspaceRootAgent } from "@/subagents/policies";
 import type { Agent } from "@/stores/session-store";
+import type { WorkspaceLayout } from "@/stores/workspace-layout-actions";
+import { collectAllPanes } from "@/stores/workspace-layout-actions";
+import type { WorkspaceTab, WorkspaceTabTarget } from "@/workspace-tabs/model";
 import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
 
 /**
@@ -7,6 +10,7 @@ import { normalizeWorkspaceOpaqueId } from "@/utils/workspace-identity";
  * survive, so a stream tick that does not touch the agent directory cannot repaint the list.
  */
 export interface SidebarWorkspaceSessionRow {
+  kind: "agent";
   id: string;
   title: string | null;
   status: Agent["status"];
@@ -16,7 +20,21 @@ export interface SidebarWorkspaceSessionRow {
   createdAt: Date;
 }
 
+/** A new-tab or draft-chat tab that has no agent yet. */
+export interface SidebarWorkspaceTabRow {
+  kind: "tab";
+  id: string;
+  title: string;
+  tabKind: "new_tab" | "draft";
+  target: WorkspaceTabTarget;
+  createdAt: Date;
+  selected: boolean;
+}
+
+export type SidebarWorkspaceSessionEntry = SidebarWorkspaceSessionRow | SidebarWorkspaceTabRow;
+
 const EMPTY_SESSIONS: SidebarWorkspaceSessionRow[] = [];
+const EMPTY_TABS: SidebarWorkspaceTabRow[] = [];
 
 /**
  * `agent.status` can trail the turn: a provider reports the turn open before it flips the
@@ -58,6 +76,7 @@ export function selectWorkspaceSessionRows(input: {
       continue;
     }
     rows.push({
+      kind: "agent",
       id: agent.id,
       title: agent.title,
       status: effectiveStatus(agent),
@@ -68,11 +87,61 @@ export function selectWorkspaceSessionRows(input: {
     });
   }
 
-  if (rows.length <= 1) {
-    return rows.length === 1 ? rows : EMPTY_SESSIONS;
-  }
-
   return rows.sort(
+    (left, right) =>
+      left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id),
+  );
+}
+
+/**
+ * Open tabs that are still waiting for an agent: the New tab launcher and a draft chat. A tab
+ * whose agent exists is already represented by the agent row, so it is not repeated here.
+ */
+export function selectWorkspaceTabRows(input: {
+  tabs: readonly WorkspaceTab[] | undefined;
+  focusedTabIds?: ReadonlySet<string>;
+  enabled?: boolean;
+}): SidebarWorkspaceTabRow[] {
+  if (input.enabled === false || !input.tabs || input.tabs.length === 0) {
+    return EMPTY_TABS;
+  }
+  const rows: SidebarWorkspaceTabRow[] = [];
+  for (const tab of input.tabs) {
+    if (tab.target.kind !== "new_tab" && tab.target.kind !== "draft") continue;
+    rows.push({
+      kind: "tab",
+      id: tab.tabId,
+      title: tab.target.kind === "new_tab" ? "new_tab" : "draft",
+      tabKind: tab.target.kind,
+      target: tab.target,
+      createdAt: new Date(tab.createdAt),
+      selected: input.focusedTabIds?.has(tab.tabId) === true,
+    });
+  }
+  if (rows.length <= 1) {
+    return rows.length === 1 ? rows : EMPTY_TABS;
+  }
+  return rows.sort(
+    (left, right) =>
+      left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id),
+  );
+}
+
+export function selectFocusedTabIds(layout: WorkspaceLayout | undefined): Set<string> {
+  const focused = new Set<string>();
+  if (!layout) return focused;
+  for (const pane of collectAllPanes(layout.root)) {
+    if (pane.focusedTabId) focused.add(pane.focusedTabId);
+  }
+  return focused;
+}
+
+/** Agent rows and waiting-tab rows in the one order the list shows them. */
+export function mergeWorkspaceSessionEntries(
+  agents: readonly SidebarWorkspaceSessionRow[],
+  tabs: readonly SidebarWorkspaceTabRow[],
+): SidebarWorkspaceSessionEntry[] {
+  return [...agents, ...tabs].sort(
     (left, right) =>
       left.createdAt.getTime() - right.createdAt.getTime() || left.id.localeCompare(right.id),
   );

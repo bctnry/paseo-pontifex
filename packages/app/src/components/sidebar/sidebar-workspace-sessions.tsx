@@ -2,8 +2,9 @@ import { memo, useCallback, useMemo } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Archive } from "lucide-react-native";
+import { Archive, Plus, SquarePen } from "lucide-react-native";
 import { AgentStatusDot } from "@/components/agent-status-dot";
+import { PressHighlight } from "@/components/ui/press-highlight";
 import {
   ContextMenu,
   ContextMenuContent,
@@ -11,6 +12,7 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
+import { useAppSettings } from "@/hooks/use-settings";
 import type { SidebarWorkspacePlacement } from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
 import { useToast } from "@/contexts/toast-context";
@@ -19,22 +21,31 @@ import {
   useActiveWorkspaceSelection,
 } from "@/stores/navigation-active-workspace-store";
 import { useSessionStore } from "@/stores/session-store";
+import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
+import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { agentSelectionKey, useSidebarSelectionStore } from "@/stores/sidebar-selection-store";
 import { density } from "@/styles/density";
 import type { Theme } from "@/styles/theme";
 import {
+  mergeWorkspaceSessionEntries,
+  selectFocusedTabIds,
   selectWorkspaceSessionRows,
+  selectWorkspaceTabRows,
+  type SidebarWorkspaceSessionEntry,
   type SidebarWorkspaceSessionRow,
+  type SidebarWorkspaceTabRow,
 } from "@/components/sidebar/workspace-sessions";
 
 const ThemedArchive = withUnistyles(Archive);
 const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const archiveLeadingIcon = <ThemedArchive size={14} uniProps={mutedIconMapping} />;
+const ThemedSquarePen = withUnistyles(SquarePen);
+const ThemedPlus = withUnistyles(Plus);
 
 /**
- * The extra rows a workspace earns once it holds more than one chat session. A workspace with
- * a single session keeps its one row: the workspace row already opens that session, and a
- * child row repeating it would just be an indent with no choice behind it.
+ * The extra rows a workspace earns once it holds more than one chat session, or any waiting
+ * new-tab/draft tab. A workspace with a single agent keeps its one row: the workspace row already
+ * opens that session, and a child row repeating it would just be an indent with no choice behind it.
  */
 export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
   workspace,
@@ -48,25 +59,44 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
   const focusedAgentId = useSessionStore(
     (state) => state.sessions[workspace.serverId]?.focusedAgentId ?? null,
   );
+  const layout = useWorkspaceLayoutStore(
+    (state) => state.layoutByWorkspace[workspace.workspaceKey],
+  );
+  const showNewTabs = useAppSettings().settings.sidebarShowNewTabs;
   const activeSelection = useActiveWorkspaceSelection();
-  const rows = useMemo(
+  const agentRows = useMemo(
     () => selectWorkspaceSessionRows({ agents, workspaceId: workspace.workspaceId }),
     [agents, workspace.workspaceId],
   );
+  const tabRows = useMemo(
+    () =>
+      selectWorkspaceTabRows({
+        tabs: layout ? collectAllTabs(layout.root) : undefined,
+        focusedTabIds: selectFocusedTabIds(layout),
+        enabled: showNewTabs,
+      }),
+    [layout, showNewTabs],
+  );
+  const rows = useMemo(
+    () => mergeWorkspaceSessionEntries(agentRows, tabRows),
+    [agentRows, tabRows],
+  );
 
   const handlePress = useCallback(
-    (agentId: string) => {
+    (row: SidebarWorkspaceSessionEntry) => {
       onWorkspacePress?.();
       navigateToWorkspace({
         serverId: workspace.serverId,
         workspaceId: workspace.workspaceId,
-        target: { kind: "agent", agentId },
+        target: row.kind === "agent" ? { kind: "agent", agentId: row.id } : row.target,
       });
     },
     [onWorkspacePress, workspace.serverId, workspace.workspaceId],
   );
 
-  if (rows.length <= 1) {
+  // A workspace with one agent and nothing else already opens that agent from its own row.
+  // A waiting tab is a choice the workspace row cannot make for you, so it earns a child row.
+  if (rows.length === 0 || (rows.length === 1 && tabRows.length === 0)) {
     return null;
   }
 
@@ -76,17 +106,28 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
 
   return (
     <View style={styles.container} testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}>
-      {rows.map((row) => (
-        <SidebarWorkspaceSessionRowView
-          key={row.id}
-          row={row}
-          serverId={workspace.serverId}
-          workspaceKey={workspace.workspaceKey}
-          selected={isWorkspaceActive && focusedAgentId === row.id}
-          fallbackTitle={t("agentList.fallbackTitle")}
-          onPress={handlePress}
-        />
-      ))}
+      {rows.map((row) =>
+        row.kind === "agent" ? (
+          <SidebarWorkspaceSessionRowView
+            key={row.id}
+            row={row}
+            serverId={workspace.serverId}
+            workspaceKey={workspace.workspaceKey}
+            selected={isWorkspaceActive && focusedAgentId === row.id}
+            fallbackTitle={t("agentList.fallbackTitle")}
+            onPress={handlePress}
+          />
+        ) : (
+          <SidebarWorkspaceTabRowView
+            key={row.id}
+            row={row}
+            selected={isWorkspaceActive && row.selected}
+            fallbackTitle={t("agentList.fallbackTitle")}
+            newTabLabel={t("sidebar.sessions.newTab")}
+            onPress={handlePress}
+          />
+        ),
+      )}
     </View>
   );
 });
@@ -104,7 +145,7 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
   workspaceKey: string;
   selected: boolean;
   fallbackTitle: string;
-  onPress: (agentId: string) => void;
+  onPress: (row: SidebarWorkspaceSessionEntry) => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
@@ -137,8 +178,8 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
       toggleSelection({ kind: "agent", serverId, agentId: row.id });
       return;
     }
-    onPress(row.id);
-  }, [isSelectionMode, onPress, row.id, serverId, toggleSelection]);
+    onPress(row);
+  }, [isSelectionMode, onPress, row, serverId, toggleSelection]);
   const handleSelect = useCallback(() => {
     const selection = { kind: "agent" as const, serverId, agentId: row.id };
     if (isSelectionMode) {
@@ -209,6 +250,58 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
         </ContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+  );
+});
+
+const SidebarWorkspaceTabRowView = memo(function SidebarWorkspaceTabRowView({
+  row,
+  selected,
+  fallbackTitle,
+  newTabLabel,
+  onPress,
+}: {
+  row: SidebarWorkspaceTabRow;
+  selected: boolean;
+  fallbackTitle: string;
+  newTabLabel: string;
+  onPress: (row: SidebarWorkspaceSessionEntry) => void;
+}) {
+  const handlePress = useCallback(() => onPress(row), [onPress, row]);
+  const rowStyle = useCallback(
+    ({ hovered = false, pressed }: PressableStateCallbackType) => [
+      styles.row,
+      selected && styles.rowSelected,
+      hovered && !selected && !pressed && styles.rowHovered,
+      pressed && styles.rowPressed,
+    ],
+    [selected],
+  );
+  const titleStyle = useMemo(
+    () => [styles.title, selected ? styles.titleSelected : null],
+    [selected],
+  );
+  const accessibilityState = useMemo(() => ({ selected }), [selected]);
+  const title = row.tabKind === "new_tab" ? newTabLabel : fallbackTitle;
+  return (
+    <PressHighlight
+      accessibilityRole="button"
+      accessibilityState={accessibilityState}
+      accessibilityLabel={title}
+      onPress={handlePress}
+      style={rowStyle}
+      testID={`sidebar-workspace-tab-${row.id}`}
+    >
+      <View style={styles.statusSlot}>
+        {row.tabKind === "new_tab" ? (
+          <ThemedPlus size={12} uniProps={mutedIconMapping} />
+        ) : (
+          <ThemedSquarePen size={12} uniProps={mutedIconMapping} />
+        )}
+      </View>
+      <Text style={titleStyle} numberOfLines={1}>
+        {title}
+      </Text>
+    </PressHighlight>
   );
 });
 

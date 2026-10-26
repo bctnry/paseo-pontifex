@@ -1205,9 +1205,12 @@ export const ptBR: TranslationResources = {
       heading: "Exibição",
       sort: {
         label: "Ordenação",
+        current: "Ordem atual",
         created: "Criação",
         manual: "Manual",
         lastPrompt: "Último prompt",
+        lastFinished: "Última conclusão",
+        name: "Nome",
         updateHost: "Atualize os hosts para ordenar os espaços de trabalho",
       },
       grouping: {
@@ -1290,6 +1293,17 @@ export const ptBR: TranslationResources = {
       schedules: "Agendamentos",
       workspaces: "Espaços de trabalho",
       projects: "Projetos",
+    },
+    search: {
+      trigger: "Pesquisar projetos",
+      close: "Fechar pesquisa",
+      clear: "Limpar pesquisa",
+      placeholder: "Pesquisar projetos e espaços de trabalho",
+      empty: "Nenhum projeto ou espaço de trabalho correspondente",
+      workspaceCount: "{{count}} espaços de trabalho",
+    },
+    sessions: {
+      newTab: "Nova aba",
     },
     selection: {
       select: "Selecionar",
@@ -1392,6 +1406,16 @@ export const ptBR: TranslationResources = {
   },
   newWorkspace: {
     title: "Novo workspace",
+    explorer: {
+      title: "Explorador",
+      open: "Abrir explorador",
+      close: "Fechar explorador",
+      closePreview: "Fechar visualização",
+      binary: "Este arquivo não pode ser visualizado",
+      tooLarge: "O arquivo é grande demais para visualizar",
+      readFailed: "Não foi possível ler este arquivo",
+      disconnected: "O host não está conectado",
+    },
     create: "Criar",
     isolation: {
       local: "Local",
@@ -2544,6 +2568,20 @@ export const ptBR: TranslationResources = {
         },
         moveUp: "Mover para cima",
         moveDown: "Mover para baixo",
+        behavior: {
+          title: "Comportamento",
+          description: "Como a lista de projetos responde enquanto você a usa",
+        },
+        typeToSearch: {
+          title: "Digitar para pesquisar",
+          description:
+            "Comece a digitar com o ponteiro sobre a lista de projetos para pesquisar projetos e espaços de trabalho",
+        },
+        showNewTabs: {
+          title: "Mostrar novas abas",
+          description:
+            "Mostrar novas abas e rascunhos de chat sob seu espaço de trabalho antes de virarem sessão",
+        },
       },
       fonts: {
         title: "Fontes",

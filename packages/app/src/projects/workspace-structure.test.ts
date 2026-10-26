@@ -224,3 +224,57 @@ test("time ties use workspace identity so renaming cannot move Created rows", ()
     buildWorkspaceStructureProjects({ sessions, workspaceSort: "created" })[0].workspaceKeys,
   ).toEqual(["h:a", "h:b"]);
 });
+
+test("sorts by name and by the last status change", () => {
+  const early = {
+    ...workspace("early", "p", "/p"),
+    name: "Z",
+    createdAt: new Date("2026-01-01"),
+    statusEnteredAt: new Date("2026-06-01"),
+  };
+  const late = {
+    ...workspace("late", "p", "/p"),
+    name: "A",
+    createdAt: new Date("2026-02-01"),
+    statusEnteredAt: new Date("2026-07-01"),
+  };
+  const sessions = [
+    {
+      serverId: "h",
+      projects: [project({ id: "p", key: "p", root: "/p" })],
+      workspaces: [early, late],
+    },
+  ];
+  expect(
+    buildWorkspaceStructureProjects({ sessions, workspaceSort: "name" })[0].workspaceKeys,
+  ).toEqual(["h:late", "h:early"]);
+  expect(
+    buildWorkspaceStructureProjects({ sessions, workspaceSort: "lastFinished" })[0].workspaceKeys,
+  ).toEqual(["h:late", "h:early"]);
+});
+
+test("last finished orders projects by their most recently changed workspace", () => {
+  const older = {
+    ...workspace("older", "a", "/a"),
+    statusEnteredAt: new Date("2026-06-01"),
+  };
+  const newer = {
+    ...workspace("newer", "b", "/b"),
+    statusEnteredAt: new Date("2026-07-01"),
+  };
+  const sessions = [
+    {
+      serverId: "h",
+      projects: [
+        project({ id: "a", key: "a", root: "/a", name: "Alpha" }),
+        project({ id: "b", key: "b", root: "/b", name: "Beta" }),
+      ],
+      workspaces: [older, newer],
+    },
+  ];
+  expect(
+    buildWorkspaceStructureProjects({ sessions, workspaceSort: "lastFinished" }).map(
+      (item) => item.viewKey,
+    ),
+  ).toEqual(["b", "a"]);
+});

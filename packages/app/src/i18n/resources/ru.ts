@@ -1196,9 +1196,12 @@ export const ru: TranslationResources = {
       heading: "Отображение",
       sort: {
         label: "Сортировка",
+        current: "Текущий порядок",
         created: "Дата создания",
         manual: "Вручную",
         lastPrompt: "Последний запрос",
+        lastFinished: "Последнее завершение",
+        name: "Имя",
         updateHost: "Обновите хосты для сортировки рабочих пространств",
       },
       grouping: {
@@ -1282,6 +1285,17 @@ export const ru: TranslationResources = {
       schedules: "Расписания",
       workspaces: "Рабочие пространства",
       projects: "Проекты",
+    },
+    search: {
+      trigger: "Поиск проектов",
+      close: "Закрыть поиск",
+      clear: "Очистить поиск",
+      placeholder: "Поиск проектов и рабочих пространств",
+      empty: "Нет подходящих проектов или рабочих пространств",
+      workspaceCount: "Рабочих пространств: {{count}}",
+    },
+    sessions: {
+      newTab: "Новая вкладка",
     },
     selection: {
       select: "Выбрать",
@@ -1384,6 +1398,16 @@ export const ru: TranslationResources = {
   },
   newWorkspace: {
     title: "Новое рабочее пространство",
+    explorer: {
+      title: "Проводник",
+      open: "Открыть проводник",
+      close: "Закрыть проводник",
+      closePreview: "Закрыть просмотр",
+      binary: "Этот файл нельзя просмотреть",
+      tooLarge: "Файл слишком велик для просмотра",
+      readFailed: "Не удалось прочитать файл",
+      disconnected: "Хост не подключён",
+    },
     create: "Создать",
     isolation: {
       local: "Локально",
@@ -2548,6 +2572,20 @@ export const ru: TranslationResources = {
         },
         moveUp: "Переместить вверх",
         moveDown: "Переместить вниз",
+        behavior: {
+          title: "Поведение",
+          description: "Как список проектов реагирует во время работы",
+        },
+        typeToSearch: {
+          title: "Ввод для поиска",
+          description:
+            "Начните печатать, когда указатель находится над списком проектов, чтобы искать проекты и рабочие пространства",
+        },
+        showNewTabs: {
+          title: "Показывать новые вкладки",
+          description:
+            "Показывать новые вкладки и черновики чатов под их рабочим пространством до создания сессии",
+        },
       },
       fonts: {
         title: "Шрифты",

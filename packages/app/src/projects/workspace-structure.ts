@@ -30,7 +30,7 @@ interface WorkspaceStructureSession {
   workspaces: Iterable<WorkspaceDescriptor>;
 }
 
-export type WorkspaceSort = "manual" | "created" | "lastPrompt";
+export type WorkspaceSort = "manual" | "created" | "lastPrompt" | "lastFinished" | "name";
 
 interface WorkspaceSortItem {
   workspaceName: string;
@@ -101,24 +101,36 @@ export function buildWorkspaceStructureProjects(input: {
   }
 
   return Array.from(byProject.values())
-    .map((draft) => ({
-      viewKey: draft.viewKey,
-      projectKey: draft.projectKey,
-      projectName: draft.projectName,
-      projectKind: draft.projectKind,
-      iconWorkingDir: draft.iconWorkingDir,
-      hosts: Array.from(draft.hosts.values()),
-      workspaceKeys: draft.workspaces
-        .sort(input.workspaceSort ? compareWorkspaceTimes : compareWorkspaceStructureItems)
-        .map((workspace) => workspace.workspaceKey),
-    }))
-    .sort(
-      (left, right) =>
+    .map((draft) => {
+      const workspaces = draft.workspaces.sort(
+        input.workspaceSort && input.workspaceSort !== "name"
+          ? compareWorkspaceTimes
+          : compareWorkspaceStructureItems,
+      );
+      return {
+        viewKey: draft.viewKey,
+        projectKey: draft.projectKey,
+        projectName: draft.projectName,
+        projectKind: draft.projectKind,
+        iconWorkingDir: draft.iconWorkingDir,
+        hosts: Array.from(draft.hosts.values()),
+        workspaceKeys: workspaces.map((workspace) => workspace.workspaceKey),
+        sortTime: workspaces.reduce((latest, workspace) => Math.max(latest, workspace.sortTime), 0),
+      };
+    })
+    .sort((left, right) => {
+      if (input.workspaceSort === "lastFinished") {
+        const byTime = right.sortTime - left.sortTime;
+        if (byTime !== 0) return byTime;
+      }
+      return (
         left.projectName.localeCompare(right.projectName, undefined, {
           numeric: true,
           sensitivity: "base",
-        }) || left.viewKey.localeCompare(right.viewKey),
-    );
+        }) || left.viewKey.localeCompare(right.viewKey)
+      );
+    })
+    .map(({ sortTime: _sortTime, ...project }) => project);
 }
 
 export function createProjectViewKey(
@@ -218,11 +230,15 @@ function workspaceSortTime(
   workspace: WorkspaceDescriptor,
   sort: WorkspaceSort | undefined,
 ): number {
-  if (!sort) return 0;
-  const time =
-    sort === "lastPrompt"
-      ? (workspace.lastUserMessageAt ?? workspace.createdAt)
-      : workspace.createdAt;
+  if (!sort || sort === "name") return 0;
+  let time: Date | null | undefined;
+  if (sort === "lastPrompt") {
+    time = workspace.lastUserMessageAt ?? workspace.createdAt;
+  } else if (sort === "lastFinished") {
+    time = workspace.statusEnteredAt ?? workspace.lastUserMessageAt ?? workspace.createdAt;
+  } else {
+    time = workspace.createdAt;
+  }
   return time?.getTime() ?? 0;
 }
 

@@ -414,6 +414,8 @@ interface FileExplorerPaneProps {
   serverId: string;
   workspaceId?: string | null;
   workspaceRoot: string;
+  /** Browsing only: hide create, rename, duplicate, and delete affordances. */
+  readOnly?: boolean;
   onOpenFile?: (filePath: string) => void;
   onOpenFileToSide?: (filePath: string) => void;
   onAddToChat?: (path: string) => void;
@@ -423,6 +425,7 @@ export function FileExplorerPane({
   serverId,
   workspaceId,
   workspaceRoot,
+  readOnly = false,
   onOpenFile,
   onOpenFileToSide,
   onAddToChat,
@@ -476,6 +479,8 @@ export function FileExplorerPane({
   const fsEntryDuplicateEnabled = useSessionStore(
     (state) => state.sessions[serverId]?.serverInfo?.features?.fsEntryDuplicate === true,
   );
+  const canEditEntries = fsEntryOpsEnabled && !readOnly;
+  const canDuplicateEntries = fsEntryDuplicateEnabled && !readOnly;
   const [pendingEdit, setPendingEdit] = useState<ExplorerPendingEdit | null>(null);
   const downloadFile = useFileDownload({
     serverId,
@@ -1002,18 +1007,18 @@ export function FileExplorerPane({
           onDownloadEntry={handleDownloadEntry}
           onAddToChat={onAddToChat}
           onOpenFileToSide={onOpenFileToSide}
-          onNewEntry={fsEntryOpsEnabled ? handleNewEntry : undefined}
+          onNewEntry={canEditEntries ? handleNewEntry : undefined}
           onCollapseDirectory={handleCollapseDirectory}
-          onRenameEntry={fsEntryOpsEnabled ? handleRenameEntry : undefined}
-          onDuplicateEntry={fsEntryDuplicateEnabled ? handleDuplicateEntry : undefined}
-          onDeleteEntry={fsEntryOpsEnabled ? handleDeleteEntry : undefined}
+          onRenameEntry={canEditEntries ? handleRenameEntry : undefined}
+          onDuplicateEntry={canDuplicateEntries ? handleDuplicateEntry : undefined}
+          onDeleteEntry={canEditEntries ? handleDeleteEntry : undefined}
         />
       );
     },
     [
       expandedPaths,
-      fsEntryDuplicateEnabled,
-      fsEntryOpsEnabled,
+      canDuplicateEntries,
+      canEditEntries,
       handleCollapseDirectory,
       handleCopyPath,
       handleCopyRelativePath,
@@ -1079,7 +1084,7 @@ export function FileExplorerPane({
         showInitialLoading={showInitialLoading}
         showBackFromError={showBackFromError}
         listRows={listRows}
-        onNewEntryAtRoot={fsEntryOpsEnabled ? handleNewEntry : undefined}
+        onNewEntryAtRoot={canEditEntries ? handleNewEntry : undefined}
         currentSortLabel={currentSortLabel}
         isRefreshFetching={isRefreshFetching}
         treeListRef={treeListRef}

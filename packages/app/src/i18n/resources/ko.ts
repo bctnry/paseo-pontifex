@@ -1186,9 +1186,12 @@ export const ko: TranslationResources = {
       heading: "표시",
       sort: {
         label: "정렬",
+        current: "현재 순서",
         created: "생성일",
         manual: "수동",
         lastPrompt: "마지막 프롬프트",
+        lastFinished: "마지막 완료",
+        name: "이름",
         updateHost: "작업 공간을 정렬하려면 호스트를 업데이트하세요",
       },
       grouping: {
@@ -1271,6 +1274,17 @@ export const ko: TranslationResources = {
       schedules: "일정",
       workspaces: "워크스페이스",
       projects: "프로젝트",
+    },
+    search: {
+      trigger: "프로젝트 검색",
+      close: "검색 닫기",
+      clear: "검색 지우기",
+      placeholder: "프로젝트 및 워크스페이스 검색",
+      empty: "일치하는 프로젝트나 워크스페이스가 없습니다",
+      workspaceCount: "워크스페이스 {{count}}개",
+    },
+    sessions: {
+      newTab: "새 탭",
     },
     selection: {
       select: "선택",
@@ -1373,6 +1387,16 @@ export const ko: TranslationResources = {
   },
   newWorkspace: {
     title: "새 워크스페이스",
+    explorer: {
+      title: "탐색기",
+      open: "탐색기 열기",
+      close: "탐색기 닫기",
+      closePreview: "미리보기 닫기",
+      binary: "이 파일은 미리 볼 수 없습니다",
+      tooLarge: "파일이 너무 커서 미리 볼 수 없습니다",
+      readFailed: "파일을 읽을 수 없습니다",
+      disconnected: "호스트가 연결되어 있지 않습니다",
+    },
     create: "생성",
     isolation: {
       local: "로컬",
@@ -2517,6 +2541,19 @@ export const ko: TranslationResources = {
         },
         moveUp: "위로 이동",
         moveDown: "아래로 이동",
+        behavior: {
+          title: "동작",
+          description: "프로젝트 목록을 사용하는 동안의 반응 방식",
+        },
+        typeToSearch: {
+          title: "입력하여 검색",
+          description:
+            "포인터를 프로젝트 목록 위에 두고 입력하면 프로젝트와 워크스페이스를 검색합니다",
+        },
+        showNewTabs: {
+          title: "새 탭 표시",
+          description: "세션이 되기 전의 새 탭과 임시 채팅을 워크스페이스 아래에 표시합니다",
+        },
       },
       fonts: {
         title: "글꼴",

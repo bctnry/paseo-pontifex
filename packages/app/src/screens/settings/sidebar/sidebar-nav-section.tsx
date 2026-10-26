@@ -29,6 +29,8 @@ import {
 } from "@/sidebar-nav/model";
 import { pluginIconComponent } from "@/plugins/icons";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
+import { useAppSettings } from "@/hooks/use-settings";
+import { isWeb } from "@/constants/platform";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
 
@@ -189,7 +191,85 @@ export function SidebarNavSection(): ReactElement {
     <>
       <SidebarItemsCard section="header" />
       <SidebarItemsCard section="footer" />
+      <SidebarBehaviorCard />
     </>
+  );
+}
+
+function SidebarBehaviorCard(): ReactElement {
+  const { t } = useTranslation();
+  const { settings, updateSettings } = useAppSettings();
+  const toggleTypeToSearch = useCallback(
+    (value: boolean) => {
+      void updateSettings({ sidebarTypeToSearch: value });
+    },
+    [updateSettings],
+  );
+  const toggleShowNewTabs = useCallback(
+    (value: boolean) => {
+      void updateSettings({ sidebarShowNewTabs: value });
+    },
+    [updateSettings],
+  );
+
+  return (
+    <SettingsSection
+      title={t("settings.appearance.sidebar.behavior.title")}
+      info={t("settings.appearance.sidebar.behavior.description")}
+      testID="sidebar-behavior-section"
+    >
+      <View style={settingsStyles.card}>
+        {isWeb ? (
+          <PreferenceSwitchRow
+            title={t("settings.appearance.sidebar.typeToSearch.title")}
+            hint={t("settings.appearance.sidebar.typeToSearch.description")}
+            value={settings.sidebarTypeToSearch}
+            onValueChange={toggleTypeToSearch}
+            testID="sidebar-type-to-search-toggle"
+            isFirst
+          />
+        ) : null}
+        <PreferenceSwitchRow
+          title={t("settings.appearance.sidebar.showNewTabs.title")}
+          hint={t("settings.appearance.sidebar.showNewTabs.description")}
+          value={settings.sidebarShowNewTabs}
+          onValueChange={toggleShowNewTabs}
+          testID="sidebar-show-new-tabs-toggle"
+          isFirst={!isWeb}
+        />
+      </View>
+    </SettingsSection>
+  );
+}
+
+function PreferenceSwitchRow({
+  title,
+  hint,
+  value,
+  onValueChange,
+  testID,
+  isFirst,
+}: {
+  title: string;
+  hint: string;
+  value: boolean;
+  onValueChange: (value: boolean) => void;
+  testID: string;
+  isFirst: boolean;
+}): ReactElement {
+  return (
+    <View style={[settingsStyles.row, !isFirst && settingsStyles.rowBorder]}>
+      <View style={settingsStyles.rowContent}>
+        <Text style={settingsStyles.rowTitle}>{title}</Text>
+        <Text style={settingsStyles.rowHint}>{hint}</Text>
+      </View>
+      <Switch
+        value={value}
+        onValueChange={onValueChange}
+        accessibilityLabel={title}
+        testID={testID}
+      />
+    </View>
   );
 }
 

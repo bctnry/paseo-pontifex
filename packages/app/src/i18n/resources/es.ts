@@ -1216,9 +1216,12 @@ export const es: TranslationResources = {
       heading: "Visualización",
       sort: {
         label: "Orden",
+        current: "Orden actual",
         created: "Creación",
         manual: "Manual",
         lastPrompt: "Último prompt",
+        lastFinished: "Última finalización",
+        name: "Nombre",
         updateHost: "Actualiza los hosts para ordenar los espacios de trabajo",
       },
       grouping: {
@@ -1301,6 +1304,17 @@ export const es: TranslationResources = {
       schedules: "Horarios",
       workspaces: "Espacios de trabajo",
       projects: "Proyectos",
+    },
+    search: {
+      trigger: "Buscar proyectos",
+      close: "Cerrar búsqueda",
+      clear: "Limpiar búsqueda",
+      placeholder: "Buscar proyectos y espacios de trabajo",
+      empty: "No hay proyectos ni espacios de trabajo coincidentes",
+      workspaceCount: "{{count}} espacios de trabajo",
+    },
+    sessions: {
+      newTab: "Nueva pestaña",
     },
     selection: {
       select: "Seleccionar",
@@ -1403,6 +1417,16 @@ export const es: TranslationResources = {
   },
   newWorkspace: {
     title: "Nuevo espacio de trabajo",
+    explorer: {
+      title: "Explorador",
+      open: "Abrir explorador",
+      close: "Cerrar explorador",
+      closePreview: "Cerrar vista previa",
+      binary: "Este archivo no se puede previsualizar",
+      tooLarge: "El archivo es demasiado grande para previsualizarlo",
+      readFailed: "No se pudo leer este archivo",
+      disconnected: "El host no está conectado",
+    },
     create: "Crear",
     isolation: {
       local: "Local",
@@ -2564,6 +2588,20 @@ export const es: TranslationResources = {
         },
         moveUp: "Mover hacia arriba",
         moveDown: "Mover hacia abajo",
+        behavior: {
+          title: "Comportamiento",
+          description: "Cómo responde la lista de proyectos mientras la usas",
+        },
+        typeToSearch: {
+          title: "Escribir para buscar",
+          description:
+            "Empieza a escribir con el puntero sobre la lista de proyectos para buscar proyectos y espacios de trabajo",
+        },
+        showNewTabs: {
+          title: "Mostrar pestañas nuevas",
+          description:
+            "Muestra las pestañas nuevas y de chat en borrador bajo su espacio de trabajo antes de que se conviertan en sesión",
+        },
       },
       fonts: {
         title: "Fuentes",

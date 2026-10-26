@@ -1208,9 +1208,12 @@ export const fr: TranslationResources = {
       heading: "Affichage",
       sort: {
         label: "Tri",
+        current: "Ordre actuel",
         created: "Création",
         manual: "Manuel",
         lastPrompt: "Dernier prompt",
+        lastFinished: "Dernière fin",
+        name: "Nom",
         updateHost: "Mettez les hôtes à jour pour trier les espaces de travail",
       },
       grouping: {
@@ -1294,6 +1297,17 @@ export const fr: TranslationResources = {
       schedules: "Planifications",
       workspaces: "Espaces de travail",
       projects: "Projets",
+    },
+    search: {
+      trigger: "Rechercher des projets",
+      close: "Fermer la recherche",
+      clear: "Effacer la recherche",
+      placeholder: "Rechercher des projets et des espaces de travail",
+      empty: "Aucun projet ou espace de travail correspondant",
+      workspaceCount: "{{count}} espaces de travail",
+    },
+    sessions: {
+      newTab: "Nouvel onglet",
     },
     selection: {
       select: "Sélectionner",
@@ -1397,6 +1411,16 @@ export const fr: TranslationResources = {
   },
   newWorkspace: {
     title: "Nouvel espace de travail",
+    explorer: {
+      title: "Explorateur",
+      open: "Ouvrir l'explorateur",
+      close: "Fermer l'explorateur",
+      closePreview: "Fermer l'aperçu",
+      binary: "Ce fichier ne peut pas être prévisualisé",
+      tooLarge: "Le fichier est trop volumineux pour être prévisualisé",
+      readFailed: "Impossible de lire ce fichier",
+      disconnected: "L'hôte n'est pas connecté",
+    },
     create: "Créer",
     isolation: {
       local: "Local",
@@ -2562,6 +2586,20 @@ export const fr: TranslationResources = {
         },
         moveUp: "Monter",
         moveDown: "Descendre",
+        behavior: {
+          title: "Comportement",
+          description: "Comment la liste des projets réagit pendant que vous l'utilisez",
+        },
+        typeToSearch: {
+          title: "Saisir pour rechercher",
+          description:
+            "Commencez à saisir avec le pointeur sur la liste des projets pour rechercher des projets et des espaces de travail",
+        },
+        showNewTabs: {
+          title: "Afficher les nouveaux onglets",
+          description:
+            "Afficher les nouveaux onglets et les brouillons de chat sous leur espace de travail avant qu'ils ne deviennent une session",
+        },
       },
       fonts: {
         title: "Polices",

@@ -1171,9 +1171,12 @@ export const zhCN: TranslationResources = {
       heading: "显示",
       sort: {
         label: "排序",
+        current: "当前顺序",
         created: "创建时间",
         manual: "手动",
         lastPrompt: "最近提示词",
+        lastFinished: "最后完成",
+        name: "名称",
         updateHost: "请更新主机以排序工作区",
       },
       grouping: {
@@ -1256,6 +1259,17 @@ export const zhCN: TranslationResources = {
       schedules: "计划",
       workspaces: "工作区",
       projects: "项目",
+    },
+    search: {
+      trigger: "搜索项目",
+      close: "关闭搜索",
+      clear: "清除搜索",
+      placeholder: "搜索项目和空间",
+      empty: "没有匹配的项目或工作区",
+      workspaceCount: "{{count}} 个工作区",
+    },
+    sessions: {
+      newTab: "新标签页",
     },
     selection: {
       select: "选择",
@@ -1355,6 +1369,16 @@ export const zhCN: TranslationResources = {
   },
   newWorkspace: {
     title: "新建 workspace",
+    explorer: {
+      title: "资源管理器",
+      open: "打开资源管理器",
+      close: "关闭资源管理器",
+      closePreview: "关闭预览",
+      binary: "无法预览此文件",
+      tooLarge: "文件太大，无法预览",
+      readFailed: "无法读取此文件",
+      disconnected: "主机未连接",
+    },
     create: "创建",
     isolation: {
       local: "本地",
@@ -2480,6 +2504,18 @@ export const zhCN: TranslationResources = {
         },
         moveUp: "上移",
         moveDown: "下移",
+        behavior: {
+          title: "行为",
+          description: "使用项目列表时的交互方式",
+        },
+        typeToSearch: {
+          title: "输入即搜索",
+          description: "指针在项目列表上方时直接输入，即可搜索项目和工作区",
+        },
+        showNewTabs: {
+          title: "显示新标签页",
+          description: "在会话建立前，在工作区下方显示新标签页和草稿聊天",
+        },
       },
       fonts: {
         title: "字体",

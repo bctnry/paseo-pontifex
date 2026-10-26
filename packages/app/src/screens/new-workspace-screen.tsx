@@ -8,9 +8,9 @@ import { getHostRuntimeStore } from "@/runtime/host-runtime";
 import { useCallback, useEffect, useMemo, useReducer, useRef, useState } from "react";
 import type { ReactNode } from "react";
 import { useTranslation } from "react-i18next";
+import { StyleSheet } from "react-native-unistyles";
 import { router } from "expo-router";
 import { Text, View } from "react-native";
-import { StyleSheet } from "react-native-unistyles";
 import { createNameId } from "mnemonic-id";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Composer } from "@/composer";
@@ -118,6 +118,7 @@ import {
 } from "./workspace/terminals/state";
 import { captureWorkspaceDraftCleanup } from "./new-workspace/background-handoff";
 import { useNewWorkspaceScreenPresence } from "./new-workspace/screen-presence";
+import { NewWorkspaceExplorerToggle, useNewWorkspaceExplorerLayer } from "./new-workspace/explorer";
 
 function useIsNewWorkspaceDraftHandoffActive(input: {
   draftId: string | undefined;
@@ -975,6 +976,10 @@ export function NewWorkspaceScreen({
     lastActiveProject,
     allowAllProjects: supportsWorkspaceMultiplicity,
   });
+  const explorerLayer = useNewWorkspaceExplorerLayer({
+    serverId: selectedServerId,
+    rootPath: selectedSourceDirectory,
+  });
   const projectIconTargets = useMemo(
     () => buildNewWorkspaceProjectIconTargets(projects, selectedServerId),
     [projects, selectedServerId],
@@ -1591,10 +1596,14 @@ export function NewWorkspaceScreen({
         title={t("newWorkspace.title")}
         formStack={formStack}
         onImportSession={importSession.open}
+        explorer={explorerLayer.explorer}
+        explorerOpen={explorerLayer.isOpen}
+        onToggleExplorer={explorerLayer.toggle}
       >
         {composer}
         {errorMessage ? <Text style={styles.errorText}>{errorMessage}</Text> : null}
       </NewWorkspaceLayout>
+      {explorerLayer.preview}
       {importSession.sheet}
     </FileDropZone>
   );
@@ -1627,6 +1636,9 @@ function NewWorkspaceLayout({
   title,
   formStack,
   onImportSession,
+  explorer,
+  explorerOpen,
+  onToggleExplorer,
   children,
 }: {
   isCompact: boolean;
@@ -1635,10 +1647,27 @@ function NewWorkspaceLayout({
   title: string;
   formStack: ReactNode;
   onImportSession: () => void;
+  explorer?: ReactNode;
+  explorerOpen: boolean;
+  onToggleExplorer?: () => void;
   children: ReactNode;
 }) {
   // In the header on compact layouts, under the composer otherwise.
-  const importSessionButton = <ImportSessionButton compact={isCompact} onPress={onImportSession} />;
+  const importSessionButton = useMemo(
+    () => <ImportSessionButton compact={isCompact} onPress={onImportSession} />,
+    [isCompact, onImportSession],
+  );
+  const headerActions = useMemo(
+    () => (
+      <View style={styles.headerActions}>
+        {onToggleExplorer ? (
+          <NewWorkspaceExplorerToggle onPress={onToggleExplorer} active={explorerOpen} />
+        ) : null}
+        {isCompact ? importSessionButton : null}
+      </View>
+    ),
+    [explorerOpen, importSessionButton, isCompact, onToggleExplorer],
+  );
   // Compact has no title: the fields name themselves. The free space above pushes them down onto
   // the composer, where the thumb is.
   const setupFields = isCompact ? (
@@ -1656,9 +1685,7 @@ function NewWorkspaceLayout({
   );
   return (
     <>
-      {fullscreen ? null : (
-        <MenuHeader borderless rightContent={isCompact ? importSessionButton : undefined} />
-      )}
+      {fullscreen ? null : <MenuHeader borderless rightContent={headerActions} />}
       <View style={styles.content}>
         <TitlebarDragRegion />
         <ComposerDock centered={!isCompact} fullscreen={fullscreen}>
@@ -1668,6 +1695,14 @@ function NewWorkspaceLayout({
             {isCompact || fullscreen ? null : importSessionButton}
           </>
         </ComposerDock>
+        {explorerOpen && explorer ? (
+          <View
+            style={[styles.explorerPanel, isCompact && styles.explorerPanelCompact]}
+            testID="new-workspace-explorer-panel"
+          >
+            {explorer}
+          </View>
+        ) : null}
       </View>
     </>
   );
@@ -1678,6 +1713,27 @@ const styles = StyleSheet.create((theme) => ({
     flex: 1,
     backgroundColor: theme.colors.surface0,
     userSelect: "none",
+  },
+  headerActions: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: theme.spacing[1],
+  },
+  explorerPanel: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+    width: 300,
+    maxWidth: "80%",
+    zIndex: 2,
+    borderRightWidth: 1,
+    borderRightColor: theme.colors.border,
+    ...theme.shadow.md,
+  },
+  explorerPanelCompact: {
+    width: "88%",
+    maxWidth: "100%",
   },
   content: {
     position: "relative",

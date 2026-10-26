@@ -1,10 +1,12 @@
 import { router } from "expo-router";
 import {
   Archive,
+  ArrowUpDown,
   CircleGauge,
   FolderPlus,
   GitBranch,
   ListChecks,
+  Search,
   Server,
   Settings,
   X,
@@ -38,6 +40,12 @@ import {
 } from "@/components/sidebar-resize-handle-layout";
 import { HostPicker } from "@/components/hosts/host-picker";
 import { SidebarDisplayPreferencesMenu } from "@/components/sidebar/display-preferences/menu";
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
 import { SidebarContextMenu } from "@/components/sidebar/sidebar-context-menu";
 import { SidebarSeparator } from "@/components/sidebar/sidebar-separator";
 import { SidebarNavRows } from "@/components/sidebar/sidebar-nav-rows";
@@ -64,6 +72,7 @@ import { RetainedPanelActivity } from "@/components/retained-panel";
 import type { SidebarWorkspaceGroup } from "@/components/sidebar/sidebar-labels";
 import type { SidebarProjectIconTarget } from "@/utils/sidebar-project-row-model";
 import { type SidebarGroupMode, useSidebarViewStore } from "@/stores/sidebar-view-store";
+import { useSidebarSearchStore } from "@/stores/sidebar-search-store";
 import { useHosts } from "@/runtime/host-runtime";
 import { PluginSidebarItem } from "@/plugins/sidebar-items";
 import { builtinSidebarNavLabelKey } from "@/sidebar-nav/model";
@@ -864,8 +873,10 @@ function WorkspacesSectionHeader({
   const selectedCount = useSidebarSelectionStore((state) => state.selected.size);
   const startSelection = useSidebarSelectionStore((state) => state.startSelection);
   const stopSelection = useSidebarSelectionStore((state) => state.stopSelection);
+  const openSearch = useSidebarSearchStore((state) => state.open);
   const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
   const handleStartSelection = useCallback(() => startSelection(), [startSelection]);
+  const handleOpenSearch = useCallback(() => openSearch(), [openSearch]);
 
   useEffect(() => {
     if (!isSelectionMode || typeof document === "undefined") {
@@ -914,6 +925,13 @@ function WorkspacesSectionHeader({
             />
           ) : null}
           <SectionHeaderIconButton
+            icon={Search}
+            label={t("sidebar.search.trigger")}
+            onPress={handleOpenSearch}
+            testID="sidebar-search-trigger"
+          />
+          {isProjectGrouping ? <SidebarSortMenu /> : null}
+          <SectionHeaderIconButton
             icon={ListChecks}
             label={t("sidebar.selection.select")}
             onPress={handleStartSelection}
@@ -934,6 +952,73 @@ function WorkspacesSectionHeader({
     </SidebarSectionHeader>
   );
 }
+
+function SidebarSortMenu() {
+  const { t } = useTranslation();
+  const { workspaceSortSupported } = useSidebarModel();
+  const workspaceSort = useSidebarViewStore((state) => state.workspaceSort);
+  const setWorkspaceSort = useSidebarViewStore((state) => state.setWorkspaceSort);
+  const options = workspaceSortSupported
+    ? SIDEBAR_SORT_OPTIONS
+    : SIDEBAR_SORT_OPTIONS.filter((option) => option.value !== "lastFinished");
+  const triggerStyle = useCallback(
+    ({ hovered = false }: PressableStateCallbackType & { hovered?: boolean }) => [
+      styles.sectionHeaderAction,
+      hovered && styles.sectionHeaderActionHovered,
+    ],
+    [],
+  );
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger
+        accessibilityRole="button"
+        accessibilityLabel={t("sidebar.display.sort.label")}
+        style={triggerStyle}
+        testID="sidebar-sort-trigger"
+      >
+        <DensityIcon icon={ArrowUpDown} size="sm" color="foregroundMuted" />
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" width={200} testID="sidebar-sort-menu">
+        {options.map((option) => (
+          <SidebarSortOption
+            key={option.value}
+            option={option}
+            selected={workspaceSort === option.value}
+            onSelect={setWorkspaceSort}
+          />
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function SidebarSortOption({
+  option,
+  selected,
+  onSelect,
+}: {
+  option: (typeof SIDEBAR_SORT_OPTIONS)[number];
+  selected: boolean;
+  onSelect: (value: (typeof SIDEBAR_SORT_OPTIONS)[number]["value"]) => void;
+}) {
+  const { t } = useTranslation();
+  const handleSelect = useCallback(() => onSelect(option.value), [onSelect, option.value]);
+  return (
+    <DropdownMenuItem
+      selected={selected}
+      onSelect={handleSelect}
+      testID={`sidebar-sort-${option.value}`}
+    >
+      {t(option.labelKey)}
+    </DropdownMenuItem>
+  );
+}
+
+const SIDEBAR_SORT_OPTIONS = [
+  { value: "created", labelKey: "sidebar.display.sort.current" },
+  { value: "name", labelKey: "sidebar.display.sort.name" },
+  { value: "lastFinished", labelKey: "sidebar.display.sort.lastFinished" },
+] as const;
 
 function SectionHeaderIconButton({
   icon: Icon,

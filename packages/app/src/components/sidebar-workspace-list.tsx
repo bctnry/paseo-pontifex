@@ -71,6 +71,10 @@ import {
 import { useSidebarOrderStore } from "@/stores/sidebar-order-store";
 import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sidebar-selection-store";
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
+import { useSidebarSearchStore } from "@/stores/sidebar-search-store";
+import { useSidebarTypeToSearch } from "@/hooks/use-sidebar-type-to-search";
+import { useAppSettings } from "@/hooks/use-settings";
+import { SidebarSearchView } from "@/components/sidebar/sidebar-search-view";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
 import {
   ContextMenu,
@@ -2014,6 +2018,13 @@ export function SidebarWorkspaceList({
   const pathname = usePathname();
   const hosts = useHosts();
   const rowItems = useSidebarRowItems();
+  const searchOpen = useSidebarSearchStore((state) => state.isOpen);
+  const openSearch = useSidebarSearchStore((state) => state.open);
+  const typeToSearchEnabled = useAppSettings().settings.sidebarTypeToSearch;
+  const typeToSearch = useSidebarTypeToSearch({
+    enabled: typeToSearchEnabled && !searchOpen,
+    onStart: openSearch,
+  });
   // Host badge visibility is a lattice, not three competing switches: this gate is the global
   // "off", `shouldShowSidebarHostLabels` is the automatic "there is only one host so it says
   // nothing", and each host's own `badgeDisplay` decides name vs icon vs hidden. Turning the
@@ -2111,7 +2122,11 @@ export function SidebarWorkspaceList({
       />
     );
 
-  return content;
+  return (
+    <View style={styles.searchHost} {...typeToSearch.hoverProps}>
+      {searchOpen ? <SidebarSearchView onWorkspacePress={onWorkspacePress} /> : content}
+    </View>
+  );
 }
 
 /**
@@ -2608,6 +2623,10 @@ function ProjectModeList({
 const styles = StyleSheet.create((theme) => ({
   container: {
     flex: 1,
+  },
+  searchHost: {
+    flex: 1,
+    minHeight: 0,
   },
   list: {
     flex: 1,
