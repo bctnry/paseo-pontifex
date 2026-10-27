@@ -1,6 +1,6 @@
 import { useWorkspace, useFileUrl, type PluginFilePanelProps } from "@getpaseo/plugin/client";
 import { useCallback, useState } from "react";
-import { ScrollView, Text, View } from "react-native";
+import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { ZoomableImage } from "@/components/zoomable-viewport/image";
 import { useSessionStore } from "@/stores/session-store";
@@ -32,18 +32,16 @@ function MarkdownPreview({ text, params, workspaceId, host }: TextFilePreviewPro
   const [rendered, setRendered] = useState(false);
   const handleLayout = useCallback(() => setRendered(true), []);
   return (
-    <View style={styles.container}>
-      <ScrollView style={styles.container} showsVerticalScrollIndicator>
-        <View onLayout={handleLayout}>
-          <FileMarkdownPreview
-            source={text}
-            filePath={params.path}
-            workspaceRoot={workspaceRoot ?? ""}
-            client={client}
-            serverId={host.id}
-          />
-        </View>
-      </ScrollView>
+    <View style={styles.container} onLayout={handleLayout}>
+      {/* The preview owns its document scroll so the outline stays put and its jump targets
+          are the scroll container's children, not a nested scroll view. */}
+      <FileMarkdownPreview
+        source={text}
+        filePath={params.path}
+        workspaceRoot={workspaceRoot ?? ""}
+        client={client}
+        serverId={host.id}
+      />
       {rendered ? null : <FilePanelLoading />}
     </View>
   );
