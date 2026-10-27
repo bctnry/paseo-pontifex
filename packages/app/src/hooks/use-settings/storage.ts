@@ -34,6 +34,8 @@ import { migrateAppSettings } from "./migrations";
 export { APP_SETTINGS_KEY } from "./keys";
 export const APP_SETTINGS_QUERY_KEY = ["app-settings"];
 
+export type SendShortcut = "enter" | "mod-enter";
+
 export type SendBehavior = ActiveTurnBehavior | "queue";
 export type ReleaseChannel = "stable" | "beta";
 export type ServiceUrlBehavior = "ask" | "in-app" | "external";
@@ -123,6 +125,7 @@ export interface AppSettings {
   editorKeybindings: EditorKeybindings;
   /** Readline/Emacs navigation and editing keys in the chat composer (web/desktop). */
   composerEmacsKeybindings: boolean;
+  sendShortcut: SendShortcut;
   filePanelAssociations: Record<string, string>;
   /** Desktop-only preferences for implicit opens into the ordinary side pane. */
   openInSidePane: OpenInSidePanePreferences;
@@ -186,6 +189,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   markdownOutlineDepth: DEFAULT_MARKDOWN_OUTLINE_DEPTH,
   editorKeybindings: "default",
   composerEmacsKeybindings: false,
+  sendShortcut: "enter",
   filePanelAssociations: {},
   openInSidePane: DEFAULT_OPEN_IN_SIDE_PANE_PREFERENCES,
   pullRequestOpenLocation: "explorer",
@@ -304,6 +308,7 @@ const StoredAppSettingsSchema = z
     composerEmacsKeybindings: z.boolean().catch(false),
     // COMPAT(vimKeybindings): replaced by editorKeybindings in v0.12, remove after 2027-10-17.
     vimKeybindings: z.boolean().optional().catch(undefined),
+    sendShortcut: z.enum(["enter", "mod-enter"]).catch("enter"),
     filePanelAssociations: z.record(z.string(), z.string()).catch({}),
     openInSidePane: z
       .object({

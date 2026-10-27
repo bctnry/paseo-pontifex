@@ -2879,7 +2879,7 @@ const x = 1;
       execFileSync("git", ["worktree", "add", workspaceDir, "contributor/old-change"], {
         cwd: repoDir,
       });
-      writePaseoWorktreeMetadata(workspaceDir, {
+      await writePaseoWorktreeMetadata(workspaceDir, {
         baseRefName: "main",
         changeRequestLookupTarget: {
           headRef: "old-change",
@@ -2919,7 +2919,7 @@ const x = 1;
     const workspaceDir = join(paseoHome, "worktrees", "repo", "renamed-by-agent");
     mkdirSync(join(paseoHome, "worktrees", "repo"), { recursive: true });
     execFileSync("git", ["worktree", "add", workspaceDir, "placeholder"], { cwd: repoDir });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "placeholder",
@@ -2956,7 +2956,7 @@ const x = 1;
     const workspaceDir = join(paseoHome, "worktrees", "repo", "pinned-worktree");
     mkdirSync(join(paseoHome, "worktrees", "repo"), { recursive: true });
     execFileSync("git", ["worktree", "add", workspaceDir, "feature/pinned"], { cwd: repoDir });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "feature/pinned",
@@ -2995,7 +2995,7 @@ const x = 1;
     execFileSync("git", ["worktree", "add", workspaceDir, "contributor/old-change-1"], {
       cwd: repoDir,
     });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "old-change",
@@ -3017,7 +3017,7 @@ const x = 1;
     execFileSync("git", ["worktree", "add", workspaceDir, "contributor/old-change"], {
       cwd: repoDir,
     });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "old-change",
@@ -3082,7 +3082,7 @@ const x = 1;
     execFileSync("git", ["worktree", "add", workspaceDir, "mixedowner/old-change"], {
       cwd: repoDir,
     });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "old-change",
@@ -3134,7 +3134,7 @@ const x = 1;
     execFileSync("git", ["worktree", "add", workspaceDir, "feature/gitlab-mr"], {
       cwd: repoDir,
     });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "feature/gitlab-mr",
@@ -3148,7 +3148,9 @@ const x = 1;
     const forge = createGitHubServiceRecordingPullRequestTargets({ requestedTargets });
 
     await renameCurrentBranch(workspaceCwd, "feature/renamed");
-    expect(readPaseoWorktreeMetadata(workspaceDir)?.changeRequestLookupTarget).toMatchObject({
+    expect(
+      (await readPaseoWorktreeMetadata(workspaceDir))?.changeRequestLookupTarget,
+    ).toMatchObject({
       localBranchName: "feature/renamed",
     });
     const renamedFacts = await getCheckoutSnapshotFacts(workspaceDir, { paseoHome });
@@ -3184,7 +3186,7 @@ const x = 1;
     execFileSync("git", ["worktree", "add", workspaceDir, "feature/placeholder"], {
       cwd: repoDir,
     });
-    writePaseoWorktreeMetadata(workspaceDir, {
+    await writePaseoWorktreeMetadata(workspaceDir, {
       baseRefName: "main",
       changeRequestLookupTarget: {
         headRef: "feature/placeholder",
@@ -3194,7 +3196,7 @@ const x = 1;
 
     await renameCurrentBranch(workspaceDir, "feature/generated");
 
-    expect(readPaseoWorktreeMetadata(workspaceDir)?.changeRequestLookupTarget).toEqual({
+    expect((await readPaseoWorktreeMetadata(workspaceDir))?.changeRequestLookupTarget).toEqual({
       headRef: "feature/generated",
       localBranchName: "feature/generated",
     });
@@ -4035,7 +4037,7 @@ const x = 1;
       cwd: worktree.worktreePath,
     });
 
-    const metadataPath = getPaseoWorktreeMetadataPath(worktree.worktreePath);
+    const metadataPath = await getPaseoWorktreeMetadataPath(worktree.worktreePath);
     rmSync(metadataPath, { force: true });
 
     const baseDiff = await getCheckoutDiff(worktree.worktreePath, { mode: "base" }, { paseoHome });
@@ -4054,7 +4056,7 @@ const x = 1;
       paseoHome,
     });
 
-    const metadataPath = getPaseoWorktreeMetadataPath(worktree.worktreePath);
+    const metadataPath = await getPaseoWorktreeMetadataPath(worktree.worktreePath);
     rmSync(metadataPath, { force: true });
 
     const status = await getCheckoutStatus(worktree.worktreePath, { paseoHome });
