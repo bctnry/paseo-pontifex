@@ -1,3 +1,4 @@
+import { findMountedWindowStart } from "@/agent-stream/history-window";
 import { z } from "zod";
 import {
   AgentStatusSchema,
@@ -766,10 +767,12 @@ function serializeTimeline(timeline: CachedTimeline): StoredTimeline | null {
   const canonicalItems = timeline.items.filter(
     (item) => item.kind !== "user_message" || !isUnreconciledLocalUserMessage(item),
   );
-  // The row only keeps the newest window. Slice before serializing so a long
-  // loaded tail does not pay to map items that are about to be discarded.
+  const start = findMountedWindowStart({
+    items: canonicalItems,
+    minMountedCount: MAX_TIMELINE_ITEMS,
+  });
   const items = canonicalItems
-    .slice(-MAX_TIMELINE_ITEMS)
+    .slice(start)
     .map(serializeTimelineItem)
     .filter((item) => item !== null);
   const range = timeline.range;
@@ -802,6 +805,34 @@ function rowKey(key: Pick<ReplicaRowKey, "kind" | "id">): string {
 
 function pendingRowKey(key: ReplicaRowKey): string {
   return `${key.serverId}\u0000${rowKey(key)}`;
+}
+
+// Budget accounting runs over every stored row of a touched host on each persist. Rows are
+// immutable once stored, so their size is computed once. The count itself avoids the JS Buffer
+// polyfill, which materialises the whole byte array just to measure it.
+const rowBytesCache = new WeakMap<ReplicaRow, number>();
+
+function utf8ByteLength(text: string): number {
+  let bytes = 0;
+  for (let index = 0; index < text.length; index += 1) {
+    const code = text.charCodeAt(index);
+    if (code < 0x80) bytes += 1;
+    else if (code < 0x800) bytes += 2;
+    else if (code >= 0xd800 && code <= 0xdbff) {
+      bytes += 4;
+      index += 1;
+    } else bytes += 3;
+  }
+  return bytes;
+}
+
+function rowBytes(row: ReplicaRow): number {
+  let bytes = rowBytesCache.get(row);
+  if (bytes === undefined) {
+    bytes = utf8ByteLength(row.payload);
+    rowBytesCache.set(row, bytes);
+  }
+  return bytes;
 }
 
 function parseJsonPayload(payload: string): unknown {
@@ -887,6 +918,7 @@ function matchesReplicaRead(read: ReplicaRead, row: ReplicaRowKey): boolean {
 export class ReplicaCache {
   private readonly activeServerIds = new Set<string>();
   private readonly activeReads = new Set<ReplicaRead>();
+  private readonly storedRows = new Map<string, Map<string, ReplicaRow>>();
   private readonly hostBytes = new Map<string, number>();
   private readonly hostWriteOrder = new Map<string, true>();
   private pendingUpserts = new Map<string, StructuredReplicaUpsert>();
@@ -898,8 +930,7 @@ export class ReplicaCache {
   private persistTimer: ReturnType<typeof setTimeout> | null = null;
   private writeQueue: Promise<void> = Promise.resolve();
   private preparePromise: Promise<void> | null = null;
-  private hostSummariesPromise: Promise<void> | null = null;
-  private inFlightChanges: PendingReplicaChanges | null = null;
+  private storedIndexPromise: Promise<void> | null = null;
 
   constructor(
     private readonly rowStore: ReplicaRowStore,
@@ -1004,14 +1035,14 @@ export class ReplicaCache {
     try {
       await this.prepareStore();
       while (this.activeServerIds.has(serverId)) {
-        // A read may only answer from rows the store already holds. Persist only when the
-        // requested rows themselves changed; another agent's stream or another host's write
-        // must not delay a cache hit. A store that rejects the write fails the read closed
-        // instead of retrying on every pass.
+        // A read may only answer from rows the store already holds, so it waits for this host's
+        // accepted commits to land. A store that rejects them will keep rejecting them: fail closed
+        // rather than re-attempt the write on every pass. A write rejected for another host leaves
+        // this host's stored rows readable.
         const read: ReplicaRead = { serverId, kinds, ids, invalidated: false };
         this.activeReads.add(read);
         try {
-          if ((await this.prepareRead(read)) === "miss") return [];
+          if (!(await this.syncPending()) && this.hasPendingHostChanges(serverId)) return [];
           if (read.invalidated || this.hasPendingReadChanges(read)) continue;
           const rows = await this.rowStore.read(serverId, kinds, ids);
           if (
@@ -1037,7 +1068,7 @@ export class ReplicaCache {
       const changes = { upserts: [], deletes: [row] } satisfies ReplicaRowChanges;
       await this.queueOperation(async () => {
         await this.rowStore.apply(changes);
-        await this.refreshHostSummaries();
+        this.applyStoredChanges(changes);
       });
       return;
     }
@@ -1071,7 +1102,7 @@ export class ReplicaCache {
     };
     await this.queueOperation(async () => {
       await this.rowStore.apply(changes);
-      await this.refreshHostSummaries();
+      this.applyStoredChanges(changes);
     });
   }
 
@@ -1097,7 +1128,7 @@ export class ReplicaCache {
     };
     await this.queueOperation(async () => {
       await this.rowStore.apply(changes);
-      await this.refreshHostSummaries();
+      this.applyStoredChanges(changes);
     });
   }
 
@@ -1187,14 +1218,24 @@ export class ReplicaCache {
   reconcileServerId(oldServerId: string, newServerId: string): void {
     this.invalidateHostReads(oldServerId);
     this.invalidateHostReads(newServerId);
-    this.renamePendingHostChanges(oldServerId, newServerId);
-    if (this.activeServerIds.delete(oldServerId)) this.activeServerIds.add(newServerId);
-    this.queueOperation(async () => {
-      await this.rowStore.renameHost(oldServerId, newServerId);
-      await this.refreshHostSummaries();
+    const rows = this.storedRows.get(oldServerId);
+    if (rows) {
+      const newRows = this.storedRows.get(newServerId) ?? new Map<string, ReplicaRow>();
+      this.totalBytes -=
+        (this.hostBytes.get(oldServerId) ?? 0) + (this.hostBytes.get(newServerId) ?? 0);
+      this.storedRows.delete(oldServerId);
+      for (const [key, row] of rows) newRows.set(key, { ...row, serverId: newServerId });
+      this.storedRows.set(newServerId, newRows);
+      const bytes = [...newRows.values()].reduce((sum, row) => sum + rowBytes(row), 0);
+      this.hostBytes.delete(oldServerId);
+      this.hostBytes.set(newServerId, bytes);
+      this.totalBytes += bytes;
       this.hostWriteOrder.delete(oldServerId);
       this.touchHost(newServerId);
-    });
+    }
+    this.renamePendingHostChanges(oldServerId, newServerId);
+    if (this.activeServerIds.delete(oldServerId)) this.activeServerIds.add(newServerId);
+    this.queueOperation(() => this.rowStore.renameHost(oldServerId, newServerId));
   }
 
   async flush(): Promise<void> {
@@ -1222,28 +1263,15 @@ export class ReplicaCache {
       .catch(() => undefined)
       .then(async () => {
         const pending = this.drainPendingChanges();
-        this.inFlightChanges = pending;
-        this.invalidateReadsForChanges(pending);
         try {
           await this.prepareStore();
-          await this.ensureHostSummaries();
+          await this.ensureStoredIndex();
           const changes = this.materializePendingChanges(pending);
-          if (
-            changes.upserts.length > 0 ||
-            changes.deletes.length > 0 ||
-            (changes.replaceKinds?.length ?? 0) > 0
-          ) {
-            await this.rowStore.apply(changes);
-            await this.refreshHostSummaries();
-            const touchedServerIds = new Set<string>();
-            for (const key of changes.deletes) touchedServerIds.add(key.serverId);
-            for (const row of changes.upserts) touchedServerIds.add(row.serverId);
-            for (const replacement of changes.replaceKinds ?? []) {
-              touchedServerIds.add(replacement.serverId);
-            }
-            for (const serverId of touchedServerIds) this.touchHost(serverId);
+          const { changes: boundedChanges, evicted } = await this.fitChangesToBudget(changes);
+          if (boundedChanges.upserts.length > 0 || boundedChanges.deletes.length > 0) {
+            await this.rowStore.apply(boundedChanges);
+            this.applyStoredChanges(boundedChanges);
           }
-          const evicted = await this.evictToBudget();
           for (const serverId of pending.baselines) {
             if (!evicted.has(serverId)) this.invalidatedHosts.delete(serverId);
           }
@@ -1251,8 +1279,6 @@ export class ReplicaCache {
           this.restorePendingChanges(pending);
           if (this.hasPendingChanges()) this.schedulePersist();
           return false;
-        } finally {
-          if (this.inFlightChanges === pending) this.inFlightChanges = null;
         }
         return true;
       });
@@ -1288,17 +1314,6 @@ export class ReplicaCache {
     );
   }
 
-  private async prepareRead(read: ReplicaRead): Promise<"ok" | "miss"> {
-    if (this.hasInFlightReadChanges(read)) {
-      await this.writeQueue.catch(() => undefined);
-    }
-    if (this.hasPendingReadChanges(read)) {
-      const persisted = await this.persist();
-      if (!persisted && this.hasPendingReadChanges(read)) return "miss";
-    }
-    return "ok";
-  }
-
   private hasPendingReadChanges(read: ReplicaRead): boolean {
     if (
       this.pendingBaselines.has(read.serverId) &&
@@ -1306,41 +1321,10 @@ export class ReplicaCache {
     ) {
       return true;
     }
-    if (
+    return (
       [...this.pendingUpserts.values()].some((row) => matchesReplicaRead(read, row)) ||
       [...this.pendingDeletes.values()].some((row) => matchesReplicaRead(read, row))
-    ) {
-      return true;
-    }
-    return this.hasInFlightReadChanges(read);
-  }
-
-  private hasInFlightReadChanges(read: ReplicaRead): boolean {
-    const changes = this.inFlightChanges;
-    if (!changes) return false;
-    if (changes.baselines.has(read.serverId) && read.kinds.some((kind) => kind !== "timeline")) {
-      return true;
-    }
-    return (
-      changes.upserts.some((row) => matchesReplicaRead(read, row)) ||
-      changes.deletes.some((row) => matchesReplicaRead(read, row))
     );
-  }
-
-  private invalidateReadsForChanges(changes: PendingReplicaChanges): void {
-    if (this.activeReads.size === 0) return;
-    for (const read of this.activeReads) {
-      if (changes.baselines.has(read.serverId) && read.kinds.some((kind) => kind !== "timeline")) {
-        read.invalidated = true;
-        continue;
-      }
-      if (
-        changes.upserts.some((row) => matchesReplicaRead(read, row)) ||
-        changes.deletes.some((row) => matchesReplicaRead(read, row))
-      ) {
-        read.invalidated = true;
-      }
-    }
   }
 
   private invalidateRowReads(row: ReplicaRowKey): void {
@@ -1358,6 +1342,17 @@ export class ReplicaCache {
         read.invalidated = true;
       }
     }
+  }
+
+  private hasPendingHostChanges(serverId: string): boolean {
+    if (this.pendingBaselines.has(serverId)) return true;
+    for (const row of this.pendingUpserts.values()) {
+      if (row.serverId === serverId) return true;
+    }
+    for (const row of this.pendingDeletes.values()) {
+      if (row.serverId === serverId) return true;
+    }
+    return false;
   }
 
   private drainPendingChanges(): PendingReplicaChanges {
@@ -1380,15 +1375,17 @@ export class ReplicaCache {
       if (row) upserts.push(row);
       else deletes.set(pendingRowKey(upsert), upsert);
     }
-    const replaceKinds = [...pending.baselines].map((serverId) => ({
-      serverId,
-      kinds: ["agent", "workspace", "project", "checkpoint"] as const,
-    }));
-    return {
-      upserts,
-      deletes: [...deletes.values()],
-      ...(replaceKinds.length > 0 ? { replaceKinds } : {}),
-    };
+    for (const serverId of pending.baselines) {
+      const replacementKeys = new Set(
+        upserts.filter((row) => row.serverId === serverId && row.kind !== "timeline").map(rowKey),
+      );
+      for (const row of this.storedRows.get(serverId)?.values() ?? []) {
+        if (row.kind !== "timeline" && !replacementKeys.has(rowKey(row))) {
+          deletes.set(pendingRowKey(row), row);
+        }
+      }
+    }
+    return { upserts, deletes: [...deletes.values()] };
   }
 
   private materializeUpsert(upsert: StructuredReplicaUpsert): ReplicaRow | null {
@@ -1445,36 +1442,102 @@ export class ReplicaCache {
     }
   }
 
-  private async evictToBudget(): Promise<Set<string>> {
-    const evicted = new Set<string>();
-    const protectedServers = new Set<string>();
-    for (const row of this.pendingUpserts.values()) protectedServers.add(row.serverId);
-    for (const row of this.pendingDeletes.values()) protectedServers.add(row.serverId);
-    for (const serverId of this.pendingBaselines) protectedServers.add(serverId);
-
-    while (this.totalBytes > this.maxBytes) {
-      const candidates = [...this.hostWriteOrder.keys()];
-      const serverId =
-        candidates.find((candidate) => !protectedServers.has(candidate)) ?? candidates[0];
-      if (serverId === undefined) break;
-      await this.rowStore.deleteHost(serverId);
-      this.removeStoredHost(serverId);
-      evicted.add(serverId);
-      this.invalidatedHosts.add(serverId);
-      protectedServers.delete(serverId);
+  private applyStoredChanges(changes: ReplicaRowChanges): void {
+    const touchedServerIds = new Set<string>();
+    for (const key of changes.deletes) {
+      const rows = this.storedRows.get(key.serverId);
+      const previous = rows?.get(rowKey(key));
+      if (previous) {
+        rows?.delete(rowKey(key));
+        this.adjustHostBytes(key.serverId, -rowBytes(previous));
+      }
+      touchedServerIds.add(key.serverId);
     }
-    return evicted;
+    for (const row of changes.upserts) {
+      const rows = this.storedRows.get(row.serverId) ?? new Map<string, ReplicaRow>();
+      const previous = rows.get(rowKey(row));
+      const previousBytes = previous ? rowBytes(previous) : 0;
+      rows.set(rowKey(row), row);
+      this.storedRows.set(row.serverId, rows);
+      this.adjustHostBytes(row.serverId, rowBytes(row) - previousBytes);
+      touchedServerIds.add(row.serverId);
+    }
+    for (const serverId of touchedServerIds) {
+      if ((this.storedRows.get(serverId)?.size ?? 0) === 0) {
+        this.removeStoredHost(serverId);
+      } else {
+        this.touchHost(serverId);
+      }
+    }
   }
 
-  private removeStoredHost(serverId: string): void {
-    this.totalBytes -= this.hostBytes.get(serverId) ?? 0;
-    this.hostBytes.delete(serverId);
-    this.hostWriteOrder.delete(serverId);
+  private adjustHostBytes(serverId: string, delta: number): void {
+    this.hostBytes.set(serverId, (this.hostBytes.get(serverId) ?? 0) + delta);
+    this.totalBytes += delta;
   }
 
   private touchHost(serverId: string): void {
     this.hostWriteOrder.delete(serverId);
     this.hostWriteOrder.set(serverId, true);
+  }
+
+  private async fitChangesToBudget(
+    changes: ReplicaRowChanges,
+  ): Promise<{ changes: ReplicaRowChanges; evicted: Set<string> }> {
+    const touchedServerIds = new Set<string>();
+    for (const key of changes.deletes) touchedServerIds.add(key.serverId);
+    for (const row of changes.upserts) touchedServerIds.add(row.serverId);
+
+    const projectedRows = new Map<string, Map<string, ReplicaRow>>();
+    const projectedBytes = new Map(this.hostBytes);
+    for (const serverId of touchedServerIds) {
+      projectedRows.set(serverId, new Map(this.storedRows.get(serverId)));
+    }
+    for (const key of changes.deletes) {
+      projectedRows.get(key.serverId)?.delete(rowKey(key));
+    }
+    for (const row of changes.upserts) {
+      projectedRows.get(row.serverId)?.set(rowKey(row), row);
+    }
+    for (const [serverId, rows] of projectedRows) {
+      projectedBytes.set(
+        serverId,
+        [...rows.values()].reduce((sum, row) => sum + rowBytes(row), 0),
+      );
+    }
+
+    const writeOrder = [...this.hostWriteOrder.keys()].filter(
+      (serverId) => !touchedServerIds.has(serverId),
+    );
+    writeOrder.push(...touchedServerIds);
+    let projectedTotal = [...projectedBytes.values()].reduce((sum, bytes) => sum + bytes, 0);
+    const evicted = new Set<string>();
+    while (projectedTotal > this.maxBytes) {
+      const serverId = writeOrder.shift();
+      if (serverId === undefined) break;
+      const bytes = projectedBytes.get(serverId) ?? 0;
+      projectedTotal -= bytes;
+      projectedBytes.delete(serverId);
+      evicted.add(serverId);
+      this.invalidatedHosts.add(serverId);
+      if (this.storedRows.has(serverId)) await this.rowStore.deleteHost(serverId);
+      this.removeStoredHost(serverId);
+    }
+
+    return {
+      changes: {
+        upserts: changes.upserts.filter((row) => !evicted.has(row.serverId)),
+        deletes: changes.deletes.filter((key) => !evicted.has(key.serverId)),
+      },
+      evicted,
+    };
+  }
+
+  private removeStoredHost(serverId: string): void {
+    this.totalBytes -= this.hostBytes.get(serverId) ?? 0;
+    this.storedRows.delete(serverId);
+    this.hostBytes.delete(serverId);
+    this.hostWriteOrder.delete(serverId);
   }
 
   private dropPendingHostChanges(serverId: string): void {
@@ -1505,49 +1568,32 @@ export class ReplicaCache {
     this.preparePromise ??= (async () => {
       await this.rowStore.open();
       // COMPAT(replica-blob-cache): remove after 2026-11
-      const legacyCleanupKey = "legacy-blob-cache-cleared";
-      const cleaned = await this.rowStore.readMetadata?.(legacyCleanupKey).catch(() => null);
-      if (cleaned !== "1") {
-        await this.clearLegacyCache().catch(() => undefined);
-        await this.rowStore.writeMetadata?.(legacyCleanupKey, "1").catch(() => undefined);
-      }
+      await this.clearLegacyCache().catch(() => undefined);
     })();
     return this.preparePromise;
   }
 
-  private ensureHostSummaries(): Promise<void> {
-    this.hostSummariesPromise ??= (async () => {
-      const summaries = await this.rowStore.readHostSummaries();
+  private ensureStoredIndex(): Promise<void> {
+    this.storedIndexPromise ??= this.rowStore.readAll().then(async (hosts) => {
+      this.storedRows.clear();
       this.hostBytes.clear();
       this.hostWriteOrder.clear();
       this.totalBytes = 0;
-      for (const summary of summaries) {
-        if (!this.activeServerIds.has(summary.serverId)) {
-          await this.rowStore.deleteHost(summary.serverId);
+      for (const host of hosts) {
+        if (!this.activeServerIds.has(host.serverId)) {
+          await this.rowStore.deleteHost(host.serverId);
           continue;
         }
-        this.hostBytes.set(summary.serverId, summary.bytes);
-        this.totalBytes += summary.bytes;
-        this.touchHost(summary.serverId);
+        const rows = new Map(host.rows.map((row) => [rowKey(row), row]));
+        const bytes = host.rows.reduce((sum, row) => sum + rowBytes(row), 0);
+        this.storedRows.set(host.serverId, rows);
+        this.hostBytes.set(host.serverId, bytes);
+        this.totalBytes += bytes;
+        this.touchHost(host.serverId);
       }
-    })();
-    return this.hostSummariesPromise;
-  }
-
-  private async refreshHostSummaries(): Promise<void> {
-    const summaries = await this.rowStore.readHostSummaries();
-    const seen = new Set<string>();
-    this.hostBytes.clear();
-    this.totalBytes = 0;
-    for (const summary of summaries) {
-      seen.add(summary.serverId);
-      this.hostBytes.set(summary.serverId, summary.bytes);
-      this.totalBytes += summary.bytes;
-      if (!this.hostWriteOrder.has(summary.serverId)) this.touchHost(summary.serverId);
-    }
-    for (const serverId of this.hostWriteOrder.keys()) {
-      if (!seen.has(serverId)) this.hostWriteOrder.delete(serverId);
-    }
+      return undefined;
+    });
+    return this.storedIndexPromise;
   }
 
   private queueOperation(operation: () => Promise<void>): Promise<void> {

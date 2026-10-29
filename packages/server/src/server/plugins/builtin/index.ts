@@ -1,3 +1,4 @@
+// oxlint-disable-next-line paseo/no-sync-io -- startup-only optional local plugin list
 import { existsSync, readFileSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
@@ -14,6 +15,7 @@ export const builtinPlugins = [
   "minimax-usage-source",
   "muse-provider",
   "opencode-go-usage-source",
+  "worktree-include",
   "zai-usage-source",
 ] as const;
 
@@ -46,6 +48,9 @@ const LOCAL_BUILTIN_PLUGINS_FILENAME = "local-builtin-plugins.json";
 function readLocalBuiltinPlugins(root: string): string[] {
   const file = path.join(root, LOCAL_BUILTIN_PLUGINS_FILENAME);
   if (!existsSync(file)) return [];
+  // Startup-only, optional local file: the loader has a synchronous constructor and the file is
+  // a short JSON list, so this does not sit on a request path.
+  // oxlint-disable-next-line paseo/no-sync-io
   const parsed: unknown = JSON.parse(readFileSync(file, "utf8"));
   if (!Array.isArray(parsed) || !parsed.every((id) => typeof id === "string" && id.length > 0)) {
     throw new Error(`${file} must be a JSON array of plugin IDs`);
