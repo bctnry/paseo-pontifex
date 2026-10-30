@@ -30,6 +30,7 @@ interface SupportedMutableConfigPatch {
   };
   app?: { baseUrl?: string };
   mcp?: { injectIntoAgents?: boolean };
+  usage?: { enabled: boolean };
   browserTools?: { enabled?: boolean };
   providers?: MutableDaemonConfig["providers"];
   removeProviders?: string[];
@@ -194,6 +195,7 @@ const RELOADABLE_PATHS = [
   "daemon.relay.requireProtectedSecurity",
   "daemon.mcp.enabled",
   "daemon.mcp.injectIntoAgents",
+  "daemon.usage.enabled",
   "daemon.browserTools.enabled",
   "daemon.hostnames",
   "daemon.cors.allowedOrigins",
@@ -225,6 +227,7 @@ const PERSISTED_TO_MUTABLE_PATH = new Map<string, string>([
   ["daemon.relay.requireProtectedSecurity", "relay.requireProtectedSecurity"],
   ["daemon.mcp.enabled", "mcp.enabled"],
   ["daemon.mcp.injectIntoAgents", "mcp.injectIntoAgents"],
+  ["daemon.usage.enabled", "usage.enabled"],
   ["daemon.browserTools.enabled", "browserTools.enabled"],
   ["daemon.hostnames", "hostnames"],
   ["daemon.cors.allowedOrigins", "cors.allowedOrigins"],
@@ -308,34 +311,45 @@ function pickRelayAndAppPatch(
 
 function pickSupportedPatchFields(patch: MutableDaemonConfigPatch): SupportedMutableConfigPatch {
   const next: SupportedMutableConfigPatch = pickRelayAndAppPatch(patch);
-  if (patch.mcp?.injectIntoAgents !== undefined) {
-    next.mcp = { injectIntoAgents: patch.mcp.injectIntoAgents };
+  const fields = [
+    ["usage", patch.usage],
+    [
+      "mcp",
+      patch.mcp?.injectIntoAgents !== undefined
+        ? { injectIntoAgents: patch.mcp.injectIntoAgents }
+        : undefined,
+    ],
+    [
+      "browserTools",
+      patch.browserTools?.enabled !== undefined
+        ? { enabled: patch.browserTools.enabled }
+        : undefined,
+    ],
+    ["providers", patch.providers],
+    ["removeProviders", patch.removeProviders],
+    [
+      "metadataGeneration",
+      patch.metadataGeneration?.providers !== undefined
+        ? { providers: patch.metadataGeneration.providers }
+        : undefined,
+    ],
+    ["autoArchiveAfterMerge", patch.autoArchiveAfterMerge],
+    ["enableTerminalAgentHooks", patch.enableTerminalAgentHooks],
+    ["resumeOnStartup", patch.resumeOnStartup],
+    ["resumePrompt", patch.resumePrompt],
+    ["idleRuntimeCleanup", patch.idleRuntimeCleanup],
+    ["appendSystemPrompt", patch.appendSystemPrompt],
+    ["terminalProfiles", patch.terminalProfiles],
+    ["agentProfiles", patch.agentProfiles],
+    ["pluginsEnabled", patch.pluginsEnabled],
+    ["plugins", patch.plugins],
+    ["features", patch.features],
+  ] as const;
+  for (const [key, value] of fields) {
+    if (value !== undefined) {
+      (next as Record<string, unknown>)[key] = value;
+    }
   }
-  if (patch.browserTools?.enabled !== undefined) {
-    next.browserTools = { enabled: patch.browserTools.enabled };
-  }
-  if (patch.providers !== undefined) next.providers = patch.providers;
-  if (patch.removeProviders !== undefined) next.removeProviders = patch.removeProviders;
-  if (patch.metadataGeneration?.providers !== undefined) {
-    next.metadataGeneration = { providers: patch.metadataGeneration.providers };
-  }
-  if (patch.autoArchiveAfterMerge !== undefined) {
-    next.autoArchiveAfterMerge = patch.autoArchiveAfterMerge;
-  }
-  if (patch.enableTerminalAgentHooks !== undefined) {
-    next.enableTerminalAgentHooks = patch.enableTerminalAgentHooks;
-  }
-  if (patch.resumeOnStartup !== undefined) next.resumeOnStartup = patch.resumeOnStartup;
-  if (patch.resumePrompt !== undefined) next.resumePrompt = patch.resumePrompt;
-  if (patch.idleRuntimeCleanup !== undefined) {
-    next.idleRuntimeCleanup = patch.idleRuntimeCleanup;
-  }
-  if (patch.appendSystemPrompt !== undefined) next.appendSystemPrompt = patch.appendSystemPrompt;
-  if (patch.terminalProfiles !== undefined) next.terminalProfiles = patch.terminalProfiles;
-  if (patch.agentProfiles !== undefined) next.agentProfiles = patch.agentProfiles;
-  if (patch.pluginsEnabled !== undefined) next.pluginsEnabled = patch.pluginsEnabled;
-  if (patch.plugins !== undefined) next.plugins = patch.plugins;
-  if (patch.features !== undefined) next.features = patch.features;
   return next;
 }
 
@@ -812,6 +826,7 @@ function mergeMutableDaemonPatch(
   if (patch.mcp?.injectIntoAgents !== undefined) {
     next.mcp = { ...next.mcp, injectIntoAgents: patch.mcp.injectIntoAgents };
   }
+  if (patch.usage) next.usage = patch.usage;
   if (patch.browserTools?.enabled !== undefined) {
     next.browserTools = { ...next.browserTools, enabled: patch.browserTools.enabled };
   }
