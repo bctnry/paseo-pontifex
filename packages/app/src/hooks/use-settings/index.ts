@@ -54,6 +54,7 @@ import {
   type ServiceUrlBehavior,
   type Settings,
   type SidebarWorkspaceTrailing,
+  type SidebarHierarchy,
   type SettingsDeps,
   type WorkspaceTitleSource,
 } from "./storage";
@@ -101,6 +102,7 @@ export type {
   Settings,
   SettingsDeps,
   SidebarWorkspaceTrailing,
+  SidebarHierarchy,
   WorkspaceTitleSource,
 };
 

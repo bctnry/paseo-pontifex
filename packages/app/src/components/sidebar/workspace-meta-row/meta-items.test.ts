@@ -35,6 +35,11 @@ function select(overrides: Partial<Parameters<typeof selectMetaRowItems>[0]> = {
 const kinds = (items: ReturnType<typeof selectMetaRowItems>) => items.map((item) => item.kind);
 
 describe("selectMetaRowItems", () => {
+  it("puts the workspace first for a session row", () => {
+    const items = select({ workspaceName: "feature/sidebar" });
+    expect(items[0]).toEqual({ kind: "workspace", name: "feature/sidebar" });
+  });
+
   it("puts the enabled branch and project badges first", () => {
     const visible = { ...DEFAULT_SIDEBAR_ROW_ITEMS, branch: true, project: true };
     expect(kinds(select({ visible }))).toEqual([

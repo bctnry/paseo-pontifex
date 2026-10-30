@@ -1285,6 +1285,11 @@ export const zhCN: TranslationResources = {
       archiveMessage: "这会停止所选会话并将所选项目从侧边栏移除。",
       archived: "已归档 {{count}} 项",
       archiveFailed: "无法归档 {{count}} 项",
+      removeChat: "移除聊天",
+      removeChatTitle: "移除此聊天？",
+      removeChatMessage: "这将永久删除此聊天及其历史记录。",
+      removeChatConfirm: "移除",
+      removeChatFailed: "无法移除聊天",
     },
     worktreeSetup: {
       title: "设置 worktree scripts",
@@ -1345,6 +1350,7 @@ export const zhCN: TranslationResources = {
         unpin: "取消置顶",
         archive: "归档",
         archiveWorkspace: "归档工作区",
+        remove: "移除工作区",
         hideFromSidebar: "从侧边栏隐藏",
         archiving: "正在归档...",
         hiding: "正在隐藏...",
@@ -1353,6 +1359,9 @@ export const zhCN: TranslationResources = {
         hideTitle: "隐藏 workspace？",
         hideMessage: "从侧边栏隐藏「{{workspaceName}}」？\n\n磁盘上的文件不会被更改。",
         hideConfirm: "隐藏",
+        removeTitle: "移除此工作区？",
+        removeMessage: "从 Paseo 中永久移除“{{workspaceName}}”及其聊天？磁盘文件不会被删除。",
+        removeConfirm: "移除",
         cancel: "取消",
       },
       rename: {
@@ -1367,6 +1376,7 @@ export const zhCN: TranslationResources = {
         hostDisconnected: "Host 未连接",
         hideFailed: "隐藏 workspace 失败",
         archiveFailed: "归档工作区失败",
+        removeFailed: "无法移除工作区",
       },
     },
   },
@@ -2603,6 +2613,12 @@ export const zhCN: TranslationResources = {
         behavior: {
           title: "行为",
           description: "使用项目列表时的交互方式",
+        },
+        hierarchy: {
+          title: "层级",
+          description: "选择项目在侧边栏中的展开方式",
+          workspaces: "工作区，然后会话",
+          sessions: "会话，并显示工作区详情",
         },
         typeToSearch: {
           title: "输入即搜索",

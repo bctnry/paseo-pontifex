@@ -1330,6 +1330,11 @@ export const es: TranslationResources = {
       archiveMessage: "Esto detiene los chats seleccionados y los quita de la barra lateral.",
       archived: "{{count}} elementos archivados",
       archiveFailed: "No se pudieron archivar {{count}} elementos",
+      removeChat: "Eliminar chat",
+      removeChatTitle: "¿Eliminar este chat?",
+      removeChatMessage: "Esto elimina permanentemente este chat y su historial.",
+      removeChatConfirm: "Eliminar",
+      removeChatFailed: "No se pudo eliminar el chat",
     },
     worktreeSetup: {
       title: "Configurar secuencias de comandos del árbol de trabajo",
@@ -1392,6 +1397,7 @@ export const es: TranslationResources = {
         unpin: "Desanclar",
         archive: "Archivo",
         archiveWorkspace: "Archivar espacio de trabajo",
+        remove: "Eliminar espacio de trabajo",
         hideFromSidebar: "Ocultar de la barra lateral",
         archiving: "Archivando...",
         hiding: "Ocultación...",
@@ -1401,6 +1407,10 @@ export const es: TranslationResources = {
         hideMessage:
           '¿Ocultar "{{workspaceName}}" de la barra lateral?\n\nLos archivos en el disco no se cambiarán.',
         hideConfirm: "Esconder",
+        removeTitle: "¿Eliminar este espacio de trabajo?",
+        removeMessage:
+          '¿Eliminar permanentemente "{{workspaceName}}" y sus chats de Paseo? Los archivos del disco no se eliminarán.',
+        removeConfirm: "Eliminar",
         cancel: "Cancelar",
       },
       rename: {
@@ -1415,6 +1425,7 @@ export const es: TranslationResources = {
         hostDisconnected: "Hostno está conectado",
         hideFailed: "No se pudo ocultar el espacio de trabajo",
         archiveFailed: "No se pudo archivar el espacio de trabajo",
+        removeFailed: "No se pudo eliminar el espacio de trabajo",
       },
     },
   },
@@ -2690,6 +2701,12 @@ export const es: TranslationResources = {
         behavior: {
           title: "Comportamiento",
           description: "Cómo responde la lista de proyectos mientras la usas",
+        },
+        hierarchy: {
+          title: "Jerarquía",
+          description: "Elige cómo se expanden los proyectos en la barra lateral",
+          workspaces: "Espacios de trabajo y luego sesiones",
+          sessions: "Sesiones con detalles del espacio de trabajo",
         },
         typeToSearch: {
           title: "Escribir para buscar",

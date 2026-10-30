@@ -53,7 +53,7 @@ import {
   type ToggleSidebarWorkspacePin,
 } from "@/hooks/use-sidebar-workspace-pin";
 import { useSidebarCollapsedSectionsStore } from "@/stores/sidebar-collapsed-sections-store";
-import { useHostFeatureMap } from "@/runtime/host-features";
+import { useHostFeature, useHostFeatureMap } from "@/runtime/host-features";
 import { useIsCompactFormFactor } from "@/constants/layout";
 import { useProjectIcons } from "@/projects/icons";
 import {
@@ -73,7 +73,7 @@ import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sideba
 import { useSidebarViewStore, type SidebarGroupMode } from "@/stores/sidebar-view-store";
 import { useSidebarSearchStore } from "@/stores/sidebar-search-store";
 import { useSidebarTypeToSearch } from "@/hooks/use-sidebar-type-to-search";
-import { useAppSettings } from "@/hooks/use-settings";
+import { useAppSettings, type SidebarHierarchy } from "@/hooks/use-settings";
 import { SidebarSearchView } from "@/components/sidebar/sidebar-search-view";
 import { useShowShortcutBadges } from "@/hooks/use-show-shortcut-badges";
 import {
@@ -145,6 +145,7 @@ import {
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { openExternalUrl } from "@/utils/open-external-url";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
+import { useWorkspaceRemove } from "@/workspace/use-workspace-remove";
 import {
   getCurrentProjectRemoveReadiness,
   removeProjectFromHosts,
@@ -290,6 +291,7 @@ interface WorkspaceRowInnerProps {
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   onArchive?: () => void;
+  onRemove?: () => void;
   onCopyBranchName?: () => void;
   onCopyPath?: () => void;
   onRename?: () => void;
@@ -638,6 +640,7 @@ function WorkspaceRowRightGroup({
   archivePendingLabel,
   archiveShortcutKeys,
   onArchive,
+  onRemove,
   onMarkAsRead,
   onMarkAsUnread,
   onCopyBranchName,
@@ -658,6 +661,7 @@ function WorkspaceRowRightGroup({
   archivePendingLabel?: string;
   archiveShortcutKeys?: ShortcutKey[][] | null;
   onArchive?: () => void;
+  onRemove?: () => void;
   onMarkAsRead?: () => void;
   onMarkAsUnread?: () => void;
   onCopyBranchName?: () => void;
@@ -717,6 +721,7 @@ function WorkspaceRowRightGroup({
                 archiveStatus={archiveStatus}
                 archivePendingLabel={archivePendingLabel}
                 archiveShortcutKeys={archiveShortcutKeys}
+                onRemove={onRemove}
                 isPinned={isPinned}
                 onTogglePin={onTogglePin}
                 openInFileManagerPath={workspacePath}
@@ -1099,6 +1104,7 @@ function WorkspaceRowInner({
   archiveStatus = "idle",
   archivePendingLabel,
   onArchive,
+  onRemove,
   onCopyBranchName,
   onCopyPath,
   onRename,
@@ -1190,6 +1196,7 @@ function WorkspaceRowInner({
               archiveStatus={archiveStatus}
               archivePendingLabel={archivePendingLabel}
               archiveShortcutKeys={archiveShortcutKeys}
+              onRemove={onRemove}
               isPinned={isPinned}
               onTogglePin={onTogglePin}
               openInFileManagerPath={workspace.workspaceDirectory}
@@ -1232,6 +1239,7 @@ function WorkspaceRowInner({
                   archivePendingLabel={archivePendingLabel}
                   archiveShortcutKeys={archiveShortcutKeys}
                   onArchive={onArchive}
+                  onRemove={onRemove}
                   onCopyBranchName={onCopyBranchName}
                   onCopyPath={onCopyPath}
                   onRename={onRename}
@@ -1314,6 +1322,21 @@ function WorkspaceRowWithMenu({
     archiveController.archive();
   }, [archiveController, isArchiving]);
 
+  const supportsRemoval = useHostFeature(workspace.serverId, "workspaceRemoval");
+  const removeController = useWorkspaceRemove({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    name: workspace.title ?? workspace.name,
+    onRemoveStarted: redirectAfterArchive,
+    onSetHiding: setIsHidingWorkspace,
+  });
+  const handleRemove = useCallback(() => {
+    if (isArchiving) {
+      return;
+    }
+    removeController.remove();
+  }, [isArchiving, removeController]);
+
   const clipboard = useWorkspaceClipboardActions();
   const handleCopyPath = useCallback(() => {
     clipboard.copyPath(workspace);
@@ -1386,6 +1409,7 @@ function WorkspaceRowWithMenu({
         archiveStatus={isArchiving ? "pending" : "idle"}
         archivePendingLabel={t("sidebar.workspace.actions.archiving")}
         onArchive={handleArchive}
+        onRemove={supportsRemoval ? handleRemove : undefined}
         onCopyBranchName={canCopyBranchName ? handleCopyBranchName : undefined}
         onCopyPath={handleCopyPath}
         onRename={handleOpenRename}
@@ -1599,6 +1623,88 @@ function WorkspaceRow({
   );
 }
 
+function SessionHierarchyWorkspaceGroup({
+  workspace,
+  workspaceEntry,
+  hostBadge,
+  leadingProjectName = null,
+  leadingProjectIconDataUri = null,
+  shortcutNumber,
+  showShortcutBadge,
+  canCopyBranchName,
+  canPin,
+  onToggleWorkspacePin,
+  isCreating,
+  selectionEnabled,
+  activeWorkspaceSelection,
+  onWorkspacePress,
+}: {
+  workspace: SidebarWorkspacePlacement;
+  workspaceEntry: SidebarWorkspaceEntry | null;
+  hostBadge: HostBadgeModel | null;
+  leadingProjectName?: string | null;
+  leadingProjectIconDataUri?: string | null;
+  shortcutNumber: number | null;
+  showShortcutBadge: boolean;
+  canCopyBranchName: boolean;
+  canPin: boolean;
+  onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+  isCreating: boolean;
+  selectionEnabled: boolean;
+  activeWorkspaceSelection: ActiveWorkspaceSelection | null;
+  onWorkspacePress?: () => void;
+}) {
+  const renderFallback = useCallback(
+    () => (
+      <MemoWorkspaceRowItem
+        workspace={workspace}
+        workspaceEntry={workspaceEntry}
+        hostBadge={hostBadge}
+        leadingProjectName={leadingProjectName}
+        leadingProjectIconDataUri={leadingProjectIconDataUri}
+        shortcutNumber={shortcutNumber}
+        showShortcutBadge={showShortcutBadge}
+        canCopyBranchName={canCopyBranchName}
+        canPin={canPin}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        isCreating={isCreating}
+        selectionEnabled={selectionEnabled}
+        activeWorkspaceSelection={activeWorkspaceSelection}
+        onWorkspacePress={onWorkspacePress}
+      />
+    ),
+    [
+      activeWorkspaceSelection,
+      canCopyBranchName,
+      canPin,
+      hostBadge,
+      isCreating,
+      leadingProjectIconDataUri,
+      leadingProjectName,
+      onToggleWorkspacePin,
+      onWorkspacePress,
+      selectionEnabled,
+      shortcutNumber,
+      showShortcutBadge,
+      workspace,
+      workspaceEntry,
+    ],
+  );
+
+  // Session-first rows are the workspace's sessions; an empty workspace still shows its own row
+  // so it remains a place to start one.
+  return (
+    <SidebarWorkspaceSessions
+      workspace={workspace}
+      workspaceEntry={workspaceEntry}
+      hostBadge={hostBadge}
+      variant="project"
+      onWorkspacePress={onWorkspacePress}
+      renderWorkspaceFallback={renderFallback}
+    />
+  );
+}
+
 function ProjectBlock({
   project,
   workspaceEntriesByKey,
@@ -1625,6 +1731,7 @@ function ProjectBlock({
   supportsMultiplicityByServerId,
   supportsPinningByServerId,
   onToggleWorkspacePin,
+  sessionHierarchy,
 }: {
   project: SidebarProjectEntry;
   workspaceEntriesByKey: ReadonlyMap<string, SidebarWorkspaceEntry>;
@@ -1651,6 +1758,7 @@ function ProjectBlock({
   supportsMultiplicityByServerId: ReadonlyMap<string, boolean>;
   supportsPinningByServerId: ReadonlyMap<string, boolean>;
   onToggleWorkspacePin: ToggleSidebarWorkspacePin;
+  sessionHierarchy: SidebarHierarchy;
 }) {
   const visibilityPolicy = useMemo(
     () => createWorkspaceVisibilityPolicy<SidebarWorkspacePlacement>(workspaceEntriesByKey),
@@ -1689,7 +1797,7 @@ function ProjectBlock({
     enabled: selectionEnabled,
   });
 
-  const renderWorkspaceRow = useCallback(
+  const renderWorkspaceRowOnly = useCallback(
     (
       item: SidebarWorkspacePlacement,
       input?: {
@@ -1699,27 +1807,24 @@ function ProjectBlock({
       },
     ) => {
       return (
-        <>
-          <MemoWorkspaceRowItem
-            key={item.workspaceKey}
-            workspace={item}
-            workspaceEntry={workspaceEntriesByKey.get(item.workspaceKey) ?? null}
-            hostBadge={hostBadgeByServerId.get(item.serverId) ?? null}
-            shortcutNumber={shortcutIndexByWorkspaceKey.get(item.workspaceKey) ?? null}
-            showShortcutBadge={showShortcutBadges}
-            canCopyBranchName={project.projectKind === "git"}
-            canPin={supportsPinningByServerId.get(item.serverId) === true}
-            onToggleWorkspacePin={onToggleWorkspacePin}
-            isCreating={creatingWorkspaceIds.has(item.workspaceId)}
-            selectionEnabled={selectionEnabled}
-            activeWorkspaceSelection={activeWorkspaceSelection}
-            onWorkspacePress={onWorkspacePress}
-            drag={input?.drag}
-            isDragging={input?.isDragging}
-            dragHandleProps={input?.dragHandleProps}
-          />
-          <SidebarWorkspaceSessions workspace={item} onWorkspacePress={onWorkspacePress} />
-        </>
+        <MemoWorkspaceRowItem
+          key={item.workspaceKey}
+          workspace={item}
+          workspaceEntry={workspaceEntriesByKey.get(item.workspaceKey) ?? null}
+          hostBadge={hostBadgeByServerId.get(item.serverId) ?? null}
+          shortcutNumber={shortcutIndexByWorkspaceKey.get(item.workspaceKey) ?? null}
+          showShortcutBadge={showShortcutBadges}
+          canCopyBranchName={project.projectKind === "git"}
+          canPin={supportsPinningByServerId.get(item.serverId) === true}
+          onToggleWorkspacePin={onToggleWorkspacePin}
+          isCreating={creatingWorkspaceIds.has(item.workspaceId)}
+          selectionEnabled={selectionEnabled}
+          activeWorkspaceSelection={activeWorkspaceSelection}
+          onWorkspacePress={onWorkspacePress}
+          drag={input?.drag}
+          isDragging={input?.isDragging}
+          dragHandleProps={input?.dragHandleProps}
+        />
       );
     },
     [
@@ -1733,6 +1838,58 @@ function ProjectBlock({
       selectionEnabled,
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
+      workspaceEntriesByKey,
+    ],
+  );
+
+  const renderWorkspaceRow = useCallback(
+    (
+      item: SidebarWorkspacePlacement,
+      input?: {
+        drag?: () => void;
+        isDragging?: boolean;
+        dragHandleProps?: DraggableListDragHandleProps;
+      },
+    ) => {
+      return (
+        <>
+          {renderWorkspaceRowOnly(item, input)}
+          <SidebarWorkspaceSessions workspace={item} onWorkspacePress={onWorkspacePress} />
+        </>
+      );
+    },
+    [onWorkspacePress, renderWorkspaceRowOnly],
+  );
+
+  const renderSessionWorkspace = useCallback(
+    (item: SidebarWorkspacePlacement) => (
+      <SessionHierarchyWorkspaceGroup
+        key={item.workspaceKey}
+        workspace={item}
+        workspaceEntry={workspaceEntriesByKey.get(item.workspaceKey) ?? null}
+        hostBadge={hostBadgeByServerId.get(item.serverId) ?? null}
+        shortcutNumber={shortcutIndexByWorkspaceKey.get(item.workspaceKey) ?? null}
+        showShortcutBadge={showShortcutBadges}
+        canCopyBranchName={project.projectKind === "git"}
+        canPin={supportsPinningByServerId.get(item.serverId) === true}
+        onToggleWorkspacePin={onToggleWorkspacePin}
+        isCreating={creatingWorkspaceIds.has(item.workspaceId)}
+        selectionEnabled={selectionEnabled}
+        activeWorkspaceSelection={activeWorkspaceSelection}
+        onWorkspacePress={onWorkspacePress}
+      />
+    ),
+    [
+      activeWorkspaceSelection,
+      creatingWorkspaceIds,
+      hostBadgeByServerId,
+      onToggleWorkspacePin,
+      onWorkspacePress,
+      project.projectKind,
+      selectionEnabled,
+      shortcutIndexByWorkspaceKey,
+      showShortcutBadges,
+      supportsPinningByServerId,
       workspaceEntriesByKey,
     ],
   );
@@ -1823,40 +1980,57 @@ function ProjectBlock({
   let projectChildren = null;
   if (!collapsed) {
     if (project.workspaces.length > 0) {
-      projectChildren = (
-        <>
-          {manualSort ? (
-            <DraggableList
-              testID={`sidebar-workspace-list-${project.viewKey}`}
-              data={visibleWorkspaces}
-              keyExtractor={workspaceKeyExtractor}
-              renderItem={renderWorkspace}
-              onDragEnd={handleWorkspaceDragEnd}
-              extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
-              scrollEnabled={false}
-              useDragHandle
-              nestable={useNestable}
-              simultaneousGestureRef={parentGestureRef}
-              gestureHostPresented={dragGestureHostActive}
-              containerStyle={styles.workspaceListContainer}
-            />
-          ) : (
+      projectChildren =
+        sessionHierarchy === "session" ? (
+          <>
             <View
               testID={`sidebar-workspace-list-${project.viewKey}`}
               style={styles.workspaceListContainer}
             >
-              {visibleWorkspaces.map((item) => renderWorkspaceRow(item))}
+              {visibleWorkspaces.map((item) => renderSessionWorkspace(item))}
             </View>
-          )}
-          {canToggleWorkspaces ? (
-            <SidebarGroupToggleRow
-              expanded={workspacesExpanded}
-              onPress={toggleWorkspacesExpanded}
-              testID={`sidebar-project-show-more-${project.viewKey}`}
-            />
-          ) : null}
-        </>
-      );
+            {canToggleWorkspaces ? (
+              <SidebarGroupToggleRow
+                expanded={workspacesExpanded}
+                onPress={toggleWorkspacesExpanded}
+                testID={`sidebar-project-show-more-${project.viewKey}`}
+              />
+            ) : null}
+          </>
+        ) : (
+          <>
+            {manualSort ? (
+              <DraggableList
+                testID={`sidebar-workspace-list-${project.viewKey}`}
+                data={visibleWorkspaces}
+                keyExtractor={workspaceKeyExtractor}
+                renderItem={renderWorkspace}
+                onDragEnd={handleWorkspaceDragEnd}
+                extraData={activeWorkspaceSelectionKey(activeWorkspaceSelection)}
+                scrollEnabled={false}
+                useDragHandle
+                nestable={useNestable}
+                simultaneousGestureRef={parentGestureRef}
+                gestureHostPresented={dragGestureHostActive}
+                containerStyle={styles.workspaceListContainer}
+              />
+            ) : (
+              <View
+                testID={`sidebar-workspace-list-${project.viewKey}`}
+                style={styles.workspaceListContainer}
+              >
+                {visibleWorkspaces.map((item) => renderWorkspaceRow(item))}
+              </View>
+            )}
+            {canToggleWorkspaces ? (
+              <SidebarGroupToggleRow
+                expanded={workspacesExpanded}
+                onPress={toggleWorkspacesExpanded}
+                testID={`sidebar-project-show-more-${project.viewKey}`}
+              />
+            ) : null}
+          </>
+        );
     } else if (rowModel.trailingAction.kind === "new_workspace") {
       projectChildren = (
         <NewWorkspaceGhostRow
@@ -1927,6 +2101,7 @@ function areProjectBlockPropsEqual(previous: ProjectBlockProps, next: ProjectBlo
     previous.useNestable === next.useNestable &&
     previous.dragGestureHostActive === next.dragGestureHostActive &&
     previous.manualSort === next.manualSort &&
+    previous.sessionHierarchy === next.sessionHierarchy &&
     previous.onWorktreeCreated === next.onWorktreeCreated &&
     previous.drag === next.drag &&
     previous.isDragging === next.isDragging &&
@@ -2248,6 +2423,7 @@ function ProjectModeList({
   );
 
   const manualSort = useSidebarViewStore((state) => state.workspaceSort === "manual");
+  const sessionHierarchy = useAppSettings().settings.sidebarHierarchy;
   const getWorkspaceOrder = useSidebarOrderStore((state) => state.getWorkspaceOrder);
   const setWorkspaceOrder = useSidebarOrderStore((state) => state.setWorkspaceOrder);
   const getProjectOrder = useSidebarOrderStore((state) => state.getProjectOrder);
@@ -2436,6 +2612,7 @@ function ProjectModeList({
           supportsMultiplicityByServerId={supportsMultiplicityByServerId}
           supportsPinningByServerId={supportsPinningByServerId}
           onToggleWorkspacePin={onToggleWorkspacePin}
+          sessionHierarchy={sessionHierarchy}
         />
       );
     },
@@ -2455,6 +2632,7 @@ function ProjectModeList({
       onToggleProjectCollapsed,
       projectIconByProjectViewKey,
       selectionEnabled,
+      sessionHierarchy,
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
       workspaceEntriesByKey,
@@ -2475,6 +2653,28 @@ function ProjectModeList({
       isActive,
       dragHandleProps,
     }: DraggableRenderItemInfo<SidebarWorkspacePlacement>) => {
+      if (sessionHierarchy === "session") {
+        return (
+          <SessionHierarchyWorkspaceGroup
+            workspace={workspace}
+            workspaceEntry={workspaceEntriesByKey.get(workspace.workspaceKey) ?? null}
+            hostBadge={hostBadgeByServerId.get(workspace.serverId) ?? null}
+            leadingProjectName={workspace.projectName}
+            leadingProjectIconDataUri={
+              projectIconByProjectViewKey.get(workspace.projectViewKey) ?? null
+            }
+            shortcutNumber={shortcutIndexByWorkspaceKey.get(workspace.workspaceKey) ?? null}
+            showShortcutBadge={showShortcutBadges}
+            canCopyBranchName={workspace.projectKind === "git"}
+            canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+            onToggleWorkspacePin={onToggleWorkspacePin}
+            isCreating={creatingWorkspaceIds.has(workspace.workspaceId)}
+            selectionEnabled={selectionEnabled}
+            activeWorkspaceSelection={activeWorkspaceSelection}
+            onWorkspacePress={onWorkspacePress}
+          />
+        );
+      }
       return (
         <>
           <MemoWorkspaceRowItem
@@ -2508,6 +2708,7 @@ function ProjectModeList({
       hostBadgeByServerId,
       onWorkspacePress,
       selectionEnabled,
+      sessionHierarchy,
       shortcutIndexByWorkspaceKey,
       showShortcutBadges,
       supportsPinningByServerId,

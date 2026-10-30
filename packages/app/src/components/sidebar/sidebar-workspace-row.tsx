@@ -13,6 +13,8 @@ import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-ac
 import { useToast } from "@/contexts/toast-context";
 import { toWorktreeArchiveRisk } from "@/git/worktree-archive-warning";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
+import { useWorkspaceRemove } from "@/workspace/use-workspace-remove";
+import { useHostFeature } from "@/runtime/host-features";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import { useWorkspaceReadState } from "@/hooks/use-workspace-read-state";
@@ -104,6 +106,21 @@ export function SidebarWorkspaceRow({
     archiveController.archive();
   }, [archiveController, isArchiving]);
 
+  const supportsRemoval = useHostFeature(workspace.serverId, "workspaceRemoval");
+  const removeController = useWorkspaceRemove({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    name: workspace.title ?? workspace.name,
+    onRemoveStarted: redirectAfterArchive,
+    onSetHiding: setIsHidingWorkspace,
+  });
+  const handleRemove = useCallback(() => {
+    if (isArchiving) {
+      return;
+    }
+    removeController.remove();
+  }, [isArchiving, removeController]);
+
   const clipboard = useWorkspaceClipboardActions();
   const handleCopyPath = useCallback(() => {
     clipboard.copyPath(workspace);
@@ -167,6 +184,7 @@ export function SidebarWorkspaceRow({
         archiveStatus={isArchiving ? "pending" : "idle"}
         archivePendingLabel={t("sidebar.workspace.actions.archiving")}
         onArchive={handleArchive}
+        onRemove={supportsRemoval ? handleRemove : undefined}
         onCopyBranchName={canCopyBranchName ? handleCopyBranchName : undefined}
         onCopyPath={handleCopyPath}
         onRename={handleOpenRename}
@@ -200,6 +218,7 @@ interface WorkspaceRowBodyProps {
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   onArchive?: () => void;
+  onRemove?: () => void;
   onCopyBranchName?: () => void;
   onCopyPath?: () => void;
   onRename?: () => void;
@@ -224,6 +243,7 @@ function WorkspaceRowBody({
   archiveStatus = "idle",
   archivePendingLabel,
   onArchive,
+  onRemove,
   onCopyBranchName,
   onCopyPath,
   onRename,
@@ -307,6 +327,7 @@ function WorkspaceRowBody({
               archiveStatus={archiveStatus}
               archivePendingLabel={archivePendingLabel}
               archiveShortcutKeys={archiveShortcutKeys}
+              onRemove={onRemove}
               openInFileManagerPath={workspace.workspaceDirectory}
               disabled={isArchiving}
               aria-selected={selected}
@@ -345,6 +366,7 @@ function WorkspaceRowBody({
                   archivePendingLabel={archivePendingLabel}
                   archiveShortcutKeys={archiveShortcutKeys}
                   onArchive={onArchive}
+                  onRemove={onRemove}
                   onCopyBranchName={onCopyBranchName}
                   onCopyPath={onCopyPath}
                   onRename={onRename}
@@ -374,6 +396,7 @@ function WorkspaceRowTrailingActions({
   archivePendingLabel,
   archiveShortcutKeys,
   onArchive,
+  onRemove,
   onMarkAsRead,
   onMarkAsUnread,
   onCopyBranchName,
@@ -393,6 +416,7 @@ function WorkspaceRowTrailingActions({
   archivePendingLabel?: string;
   archiveShortcutKeys?: ShortcutKey[][] | null;
   onArchive?: () => void;
+  onRemove?: () => void;
   onMarkAsRead?: () => void;
   onMarkAsUnread?: () => void;
   onCopyBranchName?: () => void;
@@ -448,6 +472,7 @@ function WorkspaceRowTrailingActions({
                 archiveStatus={archiveStatus}
                 archivePendingLabel={archivePendingLabel}
                 archiveShortcutKeys={archiveShortcutKeys}
+                onRemove={onRemove}
               />
             ) : null}
           </SidebarWorkspaceTrailingActionOverlay>

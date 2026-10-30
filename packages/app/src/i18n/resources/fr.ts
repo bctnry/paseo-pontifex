@@ -1324,6 +1324,11 @@ export const fr: TranslationResources = {
         "Cela arrête les conversations sélectionnées et les retire de la barre latérale.",
       archived: "{{count}} éléments archivés",
       archiveFailed: "Impossible d’archiver {{count}} éléments",
+      removeChat: "Supprimer la discussion",
+      removeChatTitle: "Supprimer cette discussion ?",
+      removeChatMessage: "Cette action supprime définitivement cette discussion et son historique.",
+      removeChatConfirm: "Supprimer",
+      removeChatFailed: "Impossible de supprimer la discussion",
     },
     worktreeSetup: {
       title: "Configurer les scripts de worktree",
@@ -1386,6 +1391,7 @@ export const fr: TranslationResources = {
         unpin: "Désépingler",
         archive: "Archiver",
         archiveWorkspace: "Archiver l’espace de travail",
+        remove: "Supprimer l’espace de travail",
         hideFromSidebar: "Masquer de la barre latérale",
         archiving: "Archivage…",
         hiding: "Masquage…",
@@ -1395,6 +1401,10 @@ export const fr: TranslationResources = {
         hideMessage:
           "Masquer « {{workspaceName}} » de la barre latérale ?\n\nLes fichiers sur le disque ne seront pas modifiés.",
         hideConfirm: "Masquer",
+        removeTitle: "Supprimer cet espace de travail ?",
+        removeMessage:
+          "Supprimer définitivement « {{workspaceName}} » et ses discussions de Paseo ? Les fichiers sur le disque ne seront pas supprimés.",
+        removeConfirm: "Supprimer",
         cancel: "Annuler",
       },
       rename: {
@@ -1409,6 +1419,7 @@ export const fr: TranslationResources = {
         hostDisconnected: "L’hôte n’est pas connecté",
         hideFailed: "Impossible de masquer l’espace de travail",
         archiveFailed: "Impossible d’archiver l’espace de travail",
+        removeFailed: "Impossible de supprimer l’espace de travail",
       },
     },
   },
@@ -2688,6 +2699,12 @@ export const fr: TranslationResources = {
         behavior: {
           title: "Comportement",
           description: "Comment la liste des projets réagit pendant que vous l'utilisez",
+        },
+        hierarchy: {
+          title: "Hiérarchie",
+          description: "Choisissez comment les projets se développent dans la barre latérale",
+          workspaces: "Espaces de travail, puis sessions",
+          sessions: "Sessions, avec les détails de l’espace de travail",
         },
         typeToSearch: {
           title: "Saisir pour rechercher",

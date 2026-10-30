@@ -1,8 +1,8 @@
-import { memo, useCallback, useMemo } from "react";
+import { memo, useCallback, useMemo, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View, type PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Archive, Plus, SquarePen } from "lucide-react-native";
+import { Archive, Plus, SquarePen, Trash2 } from "lucide-react-native";
 import { AgentStatusDot } from "@/components/agent-status-dot";
 import { PressHighlight } from "@/components/ui/press-highlight";
 import {
@@ -12,8 +12,12 @@ import {
   ContextMenuTrigger,
 } from "@/components/ui/context-menu";
 import { useArchiveAgent } from "@/hooks/use-archive-agent";
+import { useRemoveAgent } from "@/hooks/use-remove-agent";
 import { useAppSettings } from "@/hooks/use-settings";
-import type { SidebarWorkspacePlacement } from "@/hooks/use-sidebar-workspaces-list";
+import type {
+  SidebarWorkspaceEntry,
+  SidebarWorkspacePlacement,
+} from "@/hooks/use-sidebar-workspaces-list";
 import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
 import { useToast } from "@/contexts/toast-context";
 import {
@@ -24,8 +28,18 @@ import { useSessionStore } from "@/stores/session-store";
 import { useWorkspaceLayoutStore } from "@/stores/workspace-layout-store";
 import { collectAllTabs } from "@/stores/workspace-layout-actions";
 import { agentSelectionKey, useSidebarSelectionStore } from "@/stores/sidebar-selection-store";
-import { density } from "@/styles/density";
+import { density, densityIconBox } from "@/styles/density";
 import type { Theme } from "@/styles/theme";
+import { confirmDialog } from "@/utils/confirm-dialog";
+import {
+  WorkspaceMetaRow,
+  selectWorkspaceServiceSummary,
+} from "@/components/sidebar/workspace-meta-row";
+import { resolveSidebarWorkspacePrimaryLabel } from "@/components/sidebar/sidebar-workspace-title";
+import { useWorkspaceLabelDefinitions } from "@/workspace-labels";
+import { useIsCompactFormFactor } from "@/constants/layout";
+import { isNative } from "@/constants/platform";
+import type { HostBadgeModel } from "@/hosts/appearance";
 import {
   mergeWorkspaceSessionEntries,
   selectFocusedTabIds,
@@ -37,8 +51,10 @@ import {
 } from "@/components/sidebar/workspace-sessions";
 
 const ThemedArchive = withUnistyles(Archive);
+const ThemedTrash2 = withUnistyles(Trash2);
 const mutedIconMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
 const archiveLeadingIcon = <ThemedArchive size={14} uniProps={mutedIconMapping} />;
+const removeLeadingIcon = <ThemedTrash2 size={14} uniProps={mutedIconMapping} />;
 const ThemedSquarePen = withUnistyles(SquarePen);
 const ThemedPlus = withUnistyles(Plus);
 
@@ -49,12 +65,23 @@ const ThemedPlus = withUnistyles(Plus);
  */
 export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
   workspace,
+  workspaceEntry = null,
+  hostBadge = null,
+  variant = "nested",
   onWorkspacePress,
+  renderWorkspaceFallback,
 }: {
   workspace: SidebarWorkspacePlacement;
+  workspaceEntry?: SidebarWorkspaceEntry | null;
+  hostBadge?: HostBadgeModel | null;
+  /** `nested` keeps sessions indented under a workspace row; `project` makes them the rows. */
+  variant?: "nested" | "project";
   onWorkspacePress?: () => void;
+  /** A workspace with no sessions still needs a row. Project hierarchy supplies its workspace row. */
+  renderWorkspaceFallback?: () => ReactNode;
 }) {
   const { t } = useTranslation();
+  const { settings } = useAppSettings();
   const agents = useSessionStore((state) => state.sessions[workspace.serverId]?.agents);
   const focusedAgentId = useSessionStore(
     (state) => state.sessions[workspace.serverId]?.focusedAgentId ?? null,
@@ -62,7 +89,7 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
   const layout = useWorkspaceLayoutStore(
     (state) => state.layoutByWorkspace[workspace.workspaceKey],
   );
-  const showNewTabs = useAppSettings().settings.sidebarShowNewTabs;
+  const showNewTabs = settings.sidebarShowNewTabs;
   const activeSelection = useActiveWorkspaceSelection();
   const agentRows = useMemo(
     () => selectWorkspaceSessionRows({ agents, workspaceId: workspace.workspaceId }),
@@ -81,6 +108,17 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
     () => mergeWorkspaceSessionEntries(agentRows, tabRows),
     [agentRows, tabRows],
   );
+  const description = useMemo(
+    () =>
+      variant === "project" && workspaceEntry ? (
+        <SessionWorkspaceDescription
+          workspace={workspace}
+          workspaceEntry={workspaceEntry}
+          hostBadge={hostBadge}
+        />
+      ) : null,
+    [hostBadge, variant, workspace, workspaceEntry],
+  );
 
   const handlePress = useCallback(
     (row: SidebarWorkspaceSessionEntry) => {
@@ -94,9 +132,16 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
     [onWorkspacePress, workspace.serverId, workspace.workspaceId],
   );
 
-  // A workspace with one agent and nothing else already opens that agent from its own row.
-  // A waiting tab is a choice the workspace row cannot make for you, so it earns a child row.
-  if (rows.length === 0 || (rows.length === 1 && tabRows.length === 0)) {
+  if (rows.length === 0) {
+    if (variant === "project" && renderWorkspaceFallback) {
+      return <>{renderWorkspaceFallback()}</>;
+    }
+    return null;
+  }
+
+  // Workspace hierarchy keeps a single-session workspace as one row; its workspace row is
+  // already the choice. Project hierarchy always lists the session because it is the row.
+  if (variant === "nested" && rows.length === 1 && tabRows.length === 0) {
     return null;
   }
 
@@ -105,7 +150,10 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
     activeSelection.workspaceId === workspace.workspaceId;
 
   return (
-    <View style={styles.container} testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}>
+    <View
+      style={[styles.container, variant === "project" && styles.projectContainer]}
+      testID={`sidebar-workspace-sessions-${workspace.workspaceKey}`}
+    >
       {rows.map((row) =>
         row.kind === "agent" ? (
           <SidebarWorkspaceSessionRowView
@@ -115,6 +163,8 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
             workspaceKey={workspace.workspaceKey}
             selected={isWorkspaceActive && focusedAgentId === row.id}
             fallbackTitle={t("agentList.fallbackTitle")}
+            variant={variant}
+            description={description}
             onPress={handlePress}
           />
         ) : (
@@ -124,6 +174,8 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
             selected={isWorkspaceActive && row.selected}
             fallbackTitle={t("agentList.fallbackTitle")}
             newTabLabel={t("sidebar.sessions.newTab")}
+            variant={variant}
+            description={description}
             onPress={handlePress}
           />
         ),
@@ -132,12 +184,45 @@ export const SidebarWorkspaceSessions = memo(function SidebarWorkspaceSessions({
   );
 });
 
+function SessionWorkspaceDescription({
+  workspace,
+  workspaceEntry,
+  hostBadge,
+}: {
+  workspace: SidebarWorkspacePlacement;
+  workspaceEntry: SidebarWorkspaceEntry;
+  hostBadge: HostBadgeModel | null;
+}) {
+  const { settings } = useAppSettings();
+  const isCompact = useIsCompactFormFactor();
+  const workspaceLabel = resolveSidebarWorkspacePrimaryLabel({
+    workspace: workspaceEntry,
+    workspaceTitleSource: settings.workspaceTitleSource,
+  });
+  const labels = useWorkspaceLabelDefinitions(workspace.serverId, workspaceEntry.labels);
+  return (
+    <WorkspaceMetaRow
+      workspaceName={workspaceLabel}
+      currentBranch={workspaceEntry.currentBranch}
+      projectName={null}
+      hostBadge={hostBadge}
+      prHint={workspaceEntry.prHint}
+      serviceSummary={
+        isCompact || isNative ? null : selectWorkspaceServiceSummary(workspaceEntry.scripts)
+      }
+      labels={labels}
+    />
+  );
+}
+
 const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowView({
   row,
   serverId,
   workspaceKey,
   selected,
   fallbackTitle,
+  variant = "nested",
+  description = null,
   onPress,
 }: {
   row: SidebarWorkspaceSessionRow;
@@ -145,11 +230,14 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
   workspaceKey: string;
   selected: boolean;
   fallbackTitle: string;
+  variant?: "nested" | "project";
+  description?: ReactNode;
   onPress: (row: SidebarWorkspaceSessionEntry) => void;
 }) {
   const { t } = useTranslation();
   const toast = useToast();
   const { archiveAgent } = useArchiveAgent();
+  const { removeAgent } = useRemoveAgent();
   const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
   const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
   const isMultiSelected = useSidebarSelectionStore((state) =>
@@ -163,15 +251,20 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
   const rowStyle = useCallback(
     ({ hovered = false, pressed }: PressableStateCallbackType) => [
       styles.row,
+      variant === "project" && styles.projectRow,
       isRowSelected && styles.rowSelected,
       hovered && !isRowSelected && !pressed && styles.rowHovered,
       pressed && styles.rowPressed,
     ],
-    [isRowSelected],
+    [isRowSelected, variant],
   );
   const titleStyle = useMemo(
-    () => [styles.title, isRowSelected ? styles.titleSelected : null],
-    [isRowSelected],
+    () => [
+      styles.title,
+      variant === "project" && styles.projectTitle,
+      isRowSelected ? styles.titleSelected : null,
+    ],
+    [isRowSelected, variant],
   );
   const handlePress = useCallback(() => {
     if (isSelectionMode) {
@@ -195,6 +288,27 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
       );
     });
   }, [archiveAgent, row.id, serverId, t, toast]);
+  const handleRemoveChat = useCallback(() => {
+    void (async () => {
+      const confirmed = await confirmDialog({
+        title: t("sidebar.selection.removeChatTitle"),
+        message: t("sidebar.selection.removeChatMessage"),
+        confirmLabel: t("sidebar.selection.removeChatConfirm"),
+        cancelLabel: t("sidebar.selection.cancel"),
+        destructive: true,
+      });
+      if (!confirmed) return;
+      try {
+        await removeAgent({ serverId, agentId: row.id });
+      } catch (error) {
+        toast.error(
+          error instanceof Error
+            ? error.message
+            : t("sidebar.selection.removeChatFailed", { count: 1 }),
+        );
+      }
+    })();
+  }, [removeAgent, row.id, serverId, t, toast]);
   const accessibilityState = useMemo(() => ({ selected: isRowSelected }), [isRowSelected]);
 
   return (
@@ -208,7 +322,7 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
         style={rowStyle}
         testID={`sidebar-workspace-session-${workspaceKey}-${row.id}`}
       >
-        <View style={styles.statusSlot}>
+        <View style={[styles.statusSlot, variant === "project" && styles.projectStatusSlot]}>
           <AgentStatusDot
             status={row.status}
             requiresAttention={row.requiresAttention}
@@ -216,9 +330,18 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
             pendingPermissionCount={row.pendingPermissionCount}
           />
         </View>
-        <Text style={titleStyle} numberOfLines={1}>
-          {row.title ?? fallbackTitle}
-        </Text>
+        {variant === "project" ? (
+          <View style={styles.projectContent}>
+            <Text style={titleStyle} numberOfLines={1}>
+              {row.title ?? fallbackTitle}
+            </Text>
+            {description}
+          </View>
+        ) : (
+          <Text style={titleStyle} numberOfLines={1}>
+            {row.title ?? fallbackTitle}
+          </Text>
+        )}
       </ContextMenuTrigger>
       <ContextMenuContent
         align="start"
@@ -243,6 +366,14 @@ const SidebarWorkspaceSessionRowView = memo(function SidebarWorkspaceSessionRowV
           {t("sidebar.selection.archiveChat")}
         </ContextMenuItem>
         <ContextMenuItem
+          destructive
+          leading={removeLeadingIcon}
+          onSelect={handleRemoveChat}
+          testID={`sidebar-workspace-session-remove-${workspaceKey}-${row.id}`}
+        >
+          {t("sidebar.selection.removeChat")}
+        </ContextMenuItem>
+        <ContextMenuItem
           onSelect={handleSelect}
           testID={`sidebar-workspace-session-select-${workspaceKey}-${row.id}`}
         >
@@ -258,27 +389,36 @@ const SidebarWorkspaceTabRowView = memo(function SidebarWorkspaceTabRowView({
   selected,
   fallbackTitle,
   newTabLabel,
+  variant = "nested",
+  description = null,
   onPress,
 }: {
   row: SidebarWorkspaceTabRow;
   selected: boolean;
   fallbackTitle: string;
   newTabLabel: string;
+  variant?: "nested" | "project";
+  description?: ReactNode;
   onPress: (row: SidebarWorkspaceSessionEntry) => void;
 }) {
   const handlePress = useCallback(() => onPress(row), [onPress, row]);
   const rowStyle = useCallback(
     ({ hovered = false, pressed }: PressableStateCallbackType) => [
       styles.row,
+      variant === "project" && styles.projectRow,
       selected && styles.rowSelected,
       hovered && !selected && !pressed && styles.rowHovered,
       pressed && styles.rowPressed,
     ],
-    [selected],
+    [selected, variant],
   );
   const titleStyle = useMemo(
-    () => [styles.title, selected ? styles.titleSelected : null],
-    [selected],
+    () => [
+      styles.title,
+      variant === "project" && styles.projectTitle,
+      selected ? styles.titleSelected : null,
+    ],
+    [selected, variant],
   );
   const accessibilityState = useMemo(() => ({ selected }), [selected]);
   const title = row.tabKind === "new_tab" ? newTabLabel : fallbackTitle;
@@ -291,16 +431,25 @@ const SidebarWorkspaceTabRowView = memo(function SidebarWorkspaceTabRowView({
       style={rowStyle}
       testID={`sidebar-workspace-tab-${row.id}`}
     >
-      <View style={styles.statusSlot}>
+      <View style={[styles.statusSlot, variant === "project" && styles.projectStatusSlot]}>
         {row.tabKind === "new_tab" ? (
           <ThemedPlus size={12} uniProps={mutedIconMapping} />
         ) : (
           <ThemedSquarePen size={12} uniProps={mutedIconMapping} />
         )}
       </View>
-      <Text style={titleStyle} numberOfLines={1}>
-        {title}
-      </Text>
+      {variant === "project" ? (
+        <View style={styles.projectContent}>
+          <Text style={titleStyle} numberOfLines={1}>
+            {title}
+          </Text>
+          {description}
+        </View>
+      ) : (
+        <Text style={titleStyle} numberOfLines={1}>
+          {title}
+        </Text>
+      )}
     </PressHighlight>
   );
 });
@@ -308,6 +457,9 @@ const SidebarWorkspaceTabRowView = memo(function SidebarWorkspaceTabRowView({
 const styles = StyleSheet.create((theme) => ({
   container: {
     paddingBottom: theme.spacing[1],
+  },
+  projectContainer: {
+    paddingBottom: 0,
   },
   row: {
     minHeight: density.tightRowHeight,
@@ -322,6 +474,13 @@ const styles = StyleSheet.create((theme) => ({
     gap: theme.spacing[2],
     marginBottom: theme.spacing[0.5],
     userSelect: "none",
+  },
+  projectRow: {
+    minHeight: density.rowHeight,
+    paddingLeft: theme.spacing[2],
+    paddingRight: theme.spacing[3],
+    paddingVertical: theme.spacing[2],
+    alignItems: "flex-start",
   },
   rowHovered: {
     backgroundColor: theme.colors.surfaceSidebarHover,
@@ -339,6 +498,15 @@ const styles = StyleSheet.create((theme) => ({
     justifyContent: "center",
     flexShrink: 0,
   },
+  projectStatusSlot: {
+    width: densityIconBox("md"),
+    height: 20,
+  },
+  projectContent: {
+    flex: 1,
+    minWidth: 0,
+    gap: 2,
+  },
   title: {
     flex: 1,
     minWidth: 0,
@@ -346,6 +514,10 @@ const styles = StyleSheet.create((theme) => ({
     fontSize: theme.fontSize.base,
     fontWeight: "400",
     lineHeight: 20,
+  },
+  projectTitle: {
+    flex: 0,
+    color: theme.colors.foreground,
   },
   titleSelected: {
     color: theme.colors.foreground,

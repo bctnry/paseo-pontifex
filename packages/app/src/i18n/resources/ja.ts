@@ -1307,6 +1307,11 @@ export const ja: TranslationResources = {
       archiveMessage: "選択したチャットを停止し、サイドバーから削除します。",
       archived: "{{count}} 件をアーカイブしました",
       archiveFailed: "{{count}} 件をアーカイブできませんでした",
+      removeChat: "チャットを削除",
+      removeChatTitle: "このチャットを削除しますか？",
+      removeChatMessage: "このチャットと履歴は完全に削除されます。",
+      removeChatConfirm: "削除",
+      removeChatFailed: "チャットを削除できませんでした",
     },
     worktreeSetup: {
       title: "ワークツリースクリプトを設定",
@@ -1369,6 +1374,7 @@ export const ja: TranslationResources = {
         unpin: "固定解除",
         archive: "アーカイブ",
         archiveWorkspace: "ワークスペースをアーカイブ",
+        remove: "ワークスペースを削除",
         hideFromSidebar: "サイドバーから非表示",
         archiving: "アーカイブ中...",
         hiding: "非表示にしています...",
@@ -1378,6 +1384,10 @@ export const ja: TranslationResources = {
         hideMessage:
           '"{{workspaceName}}"をサイドバーから非表示にしますか？\n\nディスク上のファイルは変更されません。',
         hideConfirm: "非表示",
+        removeTitle: "このワークスペースを削除しますか？",
+        removeMessage:
+          "「{{workspaceName}}」とそのチャットを Paseo から完全に削除しますか？ディスク上のファイルは削除されません。",
+        removeConfirm: "削除",
         cancel: "キャンセル",
       },
       rename: {
@@ -1392,6 +1402,7 @@ export const ja: TranslationResources = {
         hostDisconnected: "ホストが接続されていません",
         hideFailed: "ワークスペースの非表示に失敗しました",
         archiveFailed: "ワークスペースのアーカイブに失敗しました",
+        removeFailed: "ワークスペースを削除できませんでした",
       },
     },
   },
@@ -2652,6 +2663,12 @@ export const ja: TranslationResources = {
         behavior: {
           title: "動作",
           description: "プロジェクト一覧の操作中の動作",
+        },
+        hierarchy: {
+          title: "階層",
+          description: "サイドバーでプロジェクトを展開する方法を選択します",
+          workspaces: "ワークスペース、次にセッション",
+          sessions: "セッション（ワークスペースの詳細付き）",
         },
         typeToSearch: {
           title: "入力して検索",

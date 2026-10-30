@@ -1319,6 +1319,11 @@ export const ptBR: TranslationResources = {
       archiveMessage: "Isso interrompe as conversas selecionadas e as remove da barra lateral.",
       archived: "{{count}} itens arquivados",
       archiveFailed: "Não foi possível arquivar {{count}} itens",
+      removeChat: "Remover conversa",
+      removeChatTitle: "Remover esta conversa?",
+      removeChatMessage: "Isso exclui permanentemente esta conversa e seu histórico.",
+      removeChatConfirm: "Remover",
+      removeChatFailed: "Não foi possível remover a conversa",
     },
     worktreeSetup: {
       title: "Configurar scripts de worktree",
@@ -1381,6 +1386,7 @@ export const ptBR: TranslationResources = {
         unpin: "Desafixar",
         archive: "Arquivar",
         archiveWorkspace: "Arquivar workspace",
+        remove: "Remover espaço de trabalho",
         hideFromSidebar: "Ocultar da barra lateral",
         archiving: "Arquivando...",
         hiding: "Ocultando...",
@@ -1390,6 +1396,10 @@ export const ptBR: TranslationResources = {
         hideMessage:
           'Ocultar "{{workspaceName}}" da barra lateral?\n\nOs arquivos no disco não serão alterados.',
         hideConfirm: "Ocultar",
+        removeTitle: "Remover este espaço de trabalho?",
+        removeMessage:
+          'Remover permanentemente "{{workspaceName}}" e suas conversas do Paseo? Os arquivos no disco não serão excluídos.',
+        removeConfirm: "Remover",
         cancel: "Cancelar",
       },
       rename: {
@@ -1404,6 +1414,7 @@ export const ptBR: TranslationResources = {
         hostDisconnected: "Host não está conectado",
         hideFailed: "Falha ao ocultar workspace",
         archiveFailed: "Falha ao arquivar workspace",
+        removeFailed: "Não foi possível remover o espaço de trabalho",
       },
     },
   },
@@ -2670,6 +2681,12 @@ export const ptBR: TranslationResources = {
         behavior: {
           title: "Comportamento",
           description: "Como a lista de projetos responde enquanto você a usa",
+        },
+        hierarchy: {
+          title: "Hierarquia",
+          description: "Escolha como os projetos se expandem na barra lateral",
+          workspaces: "Espaços de trabalho, depois sessões",
+          sessions: "Sessões, com detalhes do espaço de trabalho",
         },
         typeToSearch: {
           title: "Digitar para pesquisar",

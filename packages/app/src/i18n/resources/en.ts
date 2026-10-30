@@ -1301,6 +1301,11 @@ export const en = {
       archiveMessage: "This stops the selected chats and removes the selection from the sidebar.",
       archived: "Archived {{count}} items",
       archiveFailed: "Could not archive {{count}} items",
+      removeChat: "Remove chat",
+      removeChatTitle: "Remove this chat?",
+      removeChatMessage: "This permanently deletes this chat and its history.",
+      removeChatConfirm: "Remove",
+      removeChatFailed: "Could not remove chat",
     },
     worktreeSetup: {
       title: "Set up worktree scripts",
@@ -1363,6 +1368,7 @@ export const en = {
         unpin: "Unpin",
         archive: "Archive",
         archiveWorkspace: "Archive workspace",
+        remove: "Remove workspace",
         hideFromSidebar: "Hide from sidebar",
         archiving: "Archiving...",
         hiding: "Hiding...",
@@ -1372,6 +1378,10 @@ export const en = {
         hideMessage:
           'Hide "{{workspaceName}}" from the sidebar?\n\nFiles on disk will not be changed.',
         hideConfirm: "Hide",
+        removeTitle: "Remove this workspace?",
+        removeMessage:
+          'Permanently remove "{{workspaceName}}" and its chats from Paseo? Files on disk will not be deleted.',
+        removeConfirm: "Remove",
         cancel: "Cancel",
       },
       rename: {
@@ -1386,6 +1396,7 @@ export const en = {
         hostDisconnected: "Host is not connected",
         hideFailed: "Failed to hide workspace",
         archiveFailed: "Failed to archive workspace",
+        removeFailed: "Failed to remove workspace",
       },
     },
   },
@@ -2758,6 +2769,12 @@ export const en = {
         behavior: {
           title: "Behavior",
           description: "How the project list responds while you use it",
+        },
+        hierarchy: {
+          title: "Hierarchy",
+          description: "Choose how projects expand in the sidebar",
+          workspaces: "Workspaces, then sessions",
+          sessions: "Sessions, with workspace details",
         },
         typeToSearch: {
           title: "Type to search",

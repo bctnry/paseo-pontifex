@@ -16,6 +16,7 @@ import type { WorkspaceServiceSummary } from "./service-summary";
  * carries.
  */
 export type MetaRowItem =
+  | { kind: "workspace"; name: string }
   | { kind: "branch"; name: string }
   | { kind: "project"; name: string }
   | { kind: "host" }
@@ -35,6 +36,7 @@ export type MetaRowItem =
  * has no badge to hand down, so by the time a row sees one it is meant to be drawn.
  */
 export function selectMetaRowItems(input: {
+  workspaceName?: string | null;
   currentBranch: string | null;
   projectName: string | null;
   hasHostBadge: boolean;
@@ -45,6 +47,7 @@ export function selectMetaRowItems(input: {
   checksDisplay: SidebarChecksDisplay;
 }): MetaRowItem[] {
   const {
+    workspaceName,
     currentBranch,
     projectName,
     hasHostBadge,
@@ -56,6 +59,11 @@ export function selectMetaRowItems(input: {
   } = input;
   const items: MetaRowItem[] = [];
 
+  // A session row names its workspace first. This is hierarchy, not a toggle: the row is a
+  // session, so the workspace it belongs to has to be on the description line.
+  if (workspaceName) {
+    items.push({ kind: "workspace", name: workspaceName });
+  }
   if (currentBranch && visible.branch) {
     items.push({ kind: "branch", name: currentBranch });
   }

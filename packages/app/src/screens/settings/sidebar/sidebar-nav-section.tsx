@@ -20,6 +20,7 @@ import { Shortcut } from "@/components/ui/shortcut";
 import { Switch } from "@/components/ui/switch";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
+import { SettingsSelect } from "@/components/settings";
 import {
   builtinSidebarNavLabelKey,
   builtinSidebarNavShortcutAction,
@@ -29,7 +30,7 @@ import {
 } from "@/sidebar-nav/model";
 import { pluginIconComponent } from "@/plugins/icons";
 import { useSidebarNavItems } from "@/sidebar-nav/use-sidebar-nav-items";
-import { useAppSettings } from "@/hooks/use-settings";
+import { useAppSettings, type SidebarHierarchy } from "@/hooks/use-settings";
 import { isWeb } from "@/constants/platform";
 import { settingsStyles } from "@/styles/settings";
 import { ICON_SIZE, type Theme } from "@/styles/theme";
@@ -211,6 +212,25 @@ function SidebarBehaviorCard(): ReactElement {
     },
     [updateSettings],
   );
+  const hierarchyOptions = useMemo(
+    () => [
+      {
+        value: "workspace" as const,
+        label: t("settings.appearance.sidebar.hierarchy.workspaces"),
+      },
+      {
+        value: "session" as const,
+        label: t("settings.appearance.sidebar.hierarchy.sessions"),
+      },
+    ],
+    [t],
+  );
+  const changeHierarchy = useCallback(
+    (sidebarHierarchy: SidebarHierarchy) => {
+      void updateSettings({ sidebarHierarchy });
+    },
+    [updateSettings],
+  );
 
   return (
     <SettingsSection
@@ -219,6 +239,14 @@ function SidebarBehaviorCard(): ReactElement {
       testID="sidebar-behavior-section"
     >
       <View style={settingsStyles.card}>
+        <SettingsSelect
+          label={t("settings.appearance.sidebar.hierarchy.title")}
+          hint={t("settings.appearance.sidebar.hierarchy.description")}
+          value={settings.sidebarHierarchy}
+          options={hierarchyOptions}
+          onValueChange={changeHierarchy}
+          testID="sidebar-hierarchy-select"
+        />
         {isWeb ? (
           <PreferenceSwitchRow
             title={t("settings.appearance.sidebar.typeToSearch.title")}
@@ -226,7 +254,7 @@ function SidebarBehaviorCard(): ReactElement {
             value={settings.sidebarTypeToSearch}
             onValueChange={toggleTypeToSearch}
             testID="sidebar-type-to-search-toggle"
-            isFirst
+            isFirst={false}
           />
         ) : null}
         <PreferenceSwitchRow
@@ -235,7 +263,7 @@ function SidebarBehaviorCard(): ReactElement {
           value={settings.sidebarShowNewTabs}
           onValueChange={toggleShowNewTabs}
           testID="sidebar-show-new-tabs-toggle"
-          isFirst={!isWeb}
+          isFirst={false}
         />
       </View>
     </SettingsSection>

@@ -19,6 +19,7 @@ import {
   Pin,
   PinOff,
   Tag,
+  Trash2,
 } from "lucide-react-native";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
@@ -68,6 +69,8 @@ const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedPin = withUnistyles(Pin);
 const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
+const ThemedTrash2 = withUnistyles(Trash2);
+const removeLeadingIcon = <ThemedTrash2 size={14} uniProps={foregroundMutedColorMapping} />;
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -101,6 +104,8 @@ export interface SidebarWorkspaceMenuProps {
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   archiveShortcutKeys?: ShortcutKey[][] | null;
+  /** Permanent removal. Omitted when the host does not support workspace removal. */
+  onRemove?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
   openInFileManagerPath?: string | null;
@@ -149,6 +154,7 @@ function SidebarWorkspaceMenuItems({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
+  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
@@ -293,6 +299,17 @@ function SidebarWorkspaceMenuItems({
           {archiveLabel ?? t("sidebar.workspace.actions.archive")}
         </WorkspaceMenuItem>
       ) : null}
+      {onRemove ? (
+        <WorkspaceMenuItem
+          surface={surface}
+          testID={`sidebar-workspace-menu-remove-${workspaceKey}`}
+          leading={removeLeadingIcon}
+          destructive
+          onSelect={onRemove}
+        >
+          {t("sidebar.workspace.actions.remove")}
+        </WorkspaceMenuItem>
+      ) : null}
     </>
   );
 }
@@ -312,6 +329,7 @@ export function SidebarWorkspaceMenu({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
+  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
@@ -358,6 +376,7 @@ export function SidebarWorkspaceMenu({
           archiveStatus={archiveStatus}
           archivePendingLabel={archivePendingLabel}
           archiveShortcutKeys={archiveShortcutKeys}
+          onRemove={onRemove}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           openInFileManagerPath={openInFileManagerPath}
@@ -391,6 +410,7 @@ export function SidebarWorkspaceContextMenu({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
+  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
@@ -472,6 +492,7 @@ export function SidebarWorkspaceContextMenu({
           archiveStatus={archiveStatus}
           archivePendingLabel={archivePendingLabel}
           archiveShortcutKeys={archiveShortcutKeys}
+          onRemove={onRemove}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           openInFileManagerPath={openInFileManagerPath}

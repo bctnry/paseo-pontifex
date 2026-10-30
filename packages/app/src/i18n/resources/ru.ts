@@ -1311,6 +1311,11 @@ export const ru: TranslationResources = {
       archiveMessage: "Выбранные чаты будут остановлены и удалены из боковой панели.",
       archived: "Архивировано: {{count}}",
       archiveFailed: "Не удалось архивировать: {{count}}",
+      removeChat: "Удалить чат",
+      removeChatTitle: "Удалить этот чат?",
+      removeChatMessage: "Чат и его история будут удалены навсегда.",
+      removeChatConfirm: "Удалить",
+      removeChatFailed: "Не удалось удалить чат",
     },
     worktreeSetup: {
       title: "Настроить скрипты worktree",
@@ -1373,6 +1378,7 @@ export const ru: TranslationResources = {
         unpin: "Открепить",
         archive: "Архивировать",
         archiveWorkspace: "Архивировать рабочее пространство",
+        remove: "Удалить рабочее пространство",
         hideFromSidebar: "Скрыть на боковой панели",
         archiving: "Архивирование...",
         hiding: "Скрытие...",
@@ -1382,6 +1388,10 @@ export const ru: TranslationResources = {
         hideMessage:
           "Скрыть «{{workspaceName}}» на боковой панели?\n\nФайлы на диске не будут изменены.",
         hideConfirm: "Скрыть",
+        removeTitle: "Удалить это рабочее пространство?",
+        removeMessage:
+          "Навсегда удалить «{{workspaceName}}» и его чаты из Paseo? Файлы на диске не будут удалены.",
+        removeConfirm: "Удалить",
         cancel: "Отмена",
       },
       rename: {
@@ -1396,6 +1406,7 @@ export const ru: TranslationResources = {
         hostDisconnected: "Хост не подключён",
         hideFailed: "Не удалось скрыть рабочее пространство",
         archiveFailed: "Не удалось архивировать рабочее пространство",
+        removeFailed: "Не удалось удалить рабочее пространство",
       },
     },
   },
@@ -2675,6 +2686,12 @@ export const ru: TranslationResources = {
         behavior: {
           title: "Поведение",
           description: "Как список проектов реагирует во время работы",
+        },
+        hierarchy: {
+          title: "Иерархия",
+          description: "Выберите, как проекты раскрываются на боковой панели",
+          workspaces: "Рабочие пространства, затем сессии",
+          sessions: "Сессии с описанием рабочего пространства",
         },
         typeToSearch: {
           title: "Ввод для поиска",

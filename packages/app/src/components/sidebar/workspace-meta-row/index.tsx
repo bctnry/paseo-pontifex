@@ -61,6 +61,7 @@ const dangerMapping = (theme: Theme) => ({ color: theme.colors.statusDanger });
  * read first, and it stays the same height as the rest of the line.
  */
 export function WorkspaceMetaRow({
+  workspaceName,
   currentBranch,
   projectName,
   hostBadge,
@@ -68,6 +69,8 @@ export function WorkspaceMetaRow({
   serviceSummary,
   labels = EMPTY_LABELS,
 }: {
+  /** The workspace a session row belongs to. Session-first rows put this first. */
+  workspaceName?: string | null;
   currentBranch: string | null;
   projectName: string | null;
   hostBadge: HostBadgeModel | null;
@@ -77,6 +80,7 @@ export function WorkspaceMetaRow({
 }) {
   const { rowItems, checksDisplay } = useSidebarMetaPreferences();
   const items = selectMetaRowItems({
+    workspaceName,
     currentBranch,
     projectName,
     hasHostBadge: hostBadge !== null,
@@ -111,6 +115,9 @@ function MetaItemNode({
   /** First on the line, so this item's ink sets the rail the title above it already uses. */
   leading: boolean;
 }): ReactNode {
+  if (item.kind === "workspace") {
+    return <IdentityItem kind="workspace" name={item.name} />;
+  }
   if (item.kind === "branch") {
     return <IdentityItem kind="branch" name={item.name} />;
   }
@@ -132,10 +139,13 @@ function MetaItemNode({
   return <ServiceItem summary={item.summary} />;
 }
 
-function IdentityItem({ kind, name }: { kind: "branch" | "project"; name: string }) {
+function IdentityItem({ kind, name }: { kind: "workspace" | "branch" | "project"; name: string }) {
   const Icon = kind === "branch" ? ThemedGitBranch : ThemedFolder;
   return (
-    <View style={styles.identityItem} testID={`sidebar-workspace-${kind}`}>
+    <View
+      style={styles.identityItem}
+      testID={kind === "workspace" ? "sidebar-session-workspace" : `sidebar-workspace-${kind}`}
+    >
       <View style={styles.identityIcon}>
         <Icon size={META_ICON_SIZE} uniProps={mutedMapping} />
       </View>

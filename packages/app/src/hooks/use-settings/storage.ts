@@ -43,6 +43,8 @@ export type WorkspaceTitleSource = "title" | "branch";
 export type PullRequestOpenLocation = "main" | "side" | "explorer";
 /** What a sidebar workspace row shows in the space to the right of its title. */
 export type SidebarWorkspaceTrailing = "diff" | "timestamp" | "none";
+/** Whether a project expands into workspace rows or directly into session rows. */
+export type SidebarHierarchy = "workspace" | "session";
 /** How much of an agent's work the chat shows between the user's message and the reply. */
 export type ChatDisplay = "full" | "collapseToolCalls" | "collapseTurns";
 export type MarkdownOutlinePosition = "left" | "right";
@@ -110,6 +112,8 @@ export interface AppSettings {
   sidebarTypeToSearch: boolean;
   /** Show open new-tab and draft-chat tabs under their workspace in the sidebar. */
   sidebarShowNewTabs: boolean;
+  /** Project → workspace → session, or project → session with the workspace in the description. */
+  sidebarHierarchy: SidebarHierarchy;
   /** Top-level sidebar rows in display order; empty means the default order, all visible. */
   sidebarNavItems: SidebarNavPreference[];
   /** Sidebar footer items in display order; empty means the default order, all visible. */
@@ -178,6 +182,7 @@ export const DEFAULT_CLIENT_SETTINGS: AppSettings = {
   sidebarChecksDisplay: DEFAULT_SIDEBAR_CHECKS_DISPLAY,
   sidebarTypeToSearch: true,
   sidebarShowNewTabs: true,
+  sidebarHierarchy: "workspace",
   sidebarNavItems: [],
   sidebarFooterItems: [],
   usage: DEFAULT_USAGE_PREFERENCES,
@@ -284,6 +289,7 @@ const StoredAppSettingsSchema = z
       .catch(DEFAULT_SIDEBAR_CHECKS_DISPLAY),
     sidebarTypeToSearch: z.boolean().catch(true),
     sidebarShowNewTabs: z.boolean().catch(true),
+    sidebarHierarchy: z.enum(["workspace", "session"]).catch("workspace"),
     sidebarNavItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     sidebarFooterItems: z.array(z.object({ key: z.string(), visible: z.boolean() })).catch([]),
     usage: UsagePreferencesSchema,

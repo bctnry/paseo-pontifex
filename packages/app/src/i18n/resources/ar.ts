@@ -1293,6 +1293,11 @@ export const ar: TranslationResources = {
       archiveMessage: "سيؤدي هذا إلى إيقاف المحادثات المحددة وإزالتها من الشريط الجانبي.",
       archived: "تمت أرشفة {{count}} عناصر",
       archiveFailed: "تعذر أرشفة {{count}} عناصر",
+      removeChat: "إزالة الدردشة",
+      removeChatTitle: "إزالة هذه الدردشة؟",
+      removeChatMessage: "سيتم حذف هذه الدردشة وسجلها نهائيًا.",
+      removeChatConfirm: "إزالة",
+      removeChatFailed: "تعذرت إزالة الدردشة",
     },
     worktreeSetup: {
       title: "إعداد البرامج النصية لشجرة العمل",
@@ -1355,6 +1360,7 @@ export const ar: TranslationResources = {
         unpin: "إلغاء التثبيت",
         archive: "أرشيف",
         archiveWorkspace: "أرشفة مساحة العمل",
+        remove: "إزالة مساحة العمل",
         hideFromSidebar: "إخفاء من الشريط الجانبي",
         archiving: "أرشفة...",
         hiding: "إخفاء...",
@@ -1364,6 +1370,10 @@ export const ar: TranslationResources = {
         hideMessage:
           'إخفاء "{{workspaceName}}" من الشريط الجانبي؟\n\n لن يتم تغيير الملفات الموجودة على القرص.',
         hideConfirm: "يخفي",
+        removeTitle: "إزالة مساحة العمل هذه؟",
+        removeMessage:
+          "إزالة «{{workspaceName}}» ودردشاتها من Paseo نهائيًا؟ لن يتم حذف الملفات الموجودة على القرص.",
+        removeConfirm: "إزالة",
         cancel: "يلغي",
       },
       rename: {
@@ -1378,6 +1388,7 @@ export const ar: TranslationResources = {
         hostDisconnected: "Host غير متصل",
         hideFailed: "فشل في إخفاء مساحة العمل",
         archiveFailed: "فشل في أرشفة مساحة العمل",
+        removeFailed: "تعذرت إزالة مساحة العمل",
       },
     },
   },
@@ -2666,6 +2677,12 @@ export const ar: TranslationResources = {
         behavior: {
           title: "السلوك",
           description: "كيف تتفاعل قائمة المشاريع أثناء استخدامها",
+        },
+        hierarchy: {
+          title: "التسلسل الهرمي",
+          description: "اختر كيفية توسيع المشاريع في الشريط الجانبي",
+          workspaces: "مساحات العمل ثم الجلسات",
+          sessions: "الجلسات مع تفاصيل مساحة العمل",
         },
         typeToSearch: {
           title: "الكتابة للبحث",

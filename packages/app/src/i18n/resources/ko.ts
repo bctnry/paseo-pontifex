@@ -1300,6 +1300,11 @@ export const ko: TranslationResources = {
       archiveMessage: "선택한 채팅을 중지하고 사이드바에서 제거합니다.",
       archived: "{{count}}개 항목을 보관했습니다",
       archiveFailed: "{{count}}개 항목을 보관하지 못했습니다",
+      removeChat: "채팅 제거",
+      removeChatTitle: "이 채팅을 제거할까요?",
+      removeChatMessage: "이 채팅과 기록이 영구적으로 삭제됩니다.",
+      removeChatConfirm: "제거",
+      removeChatFailed: "채팅을 제거할 수 없습니다",
     },
     worktreeSetup: {
       title: "워크트리 스크립트 설정",
@@ -1362,6 +1367,7 @@ export const ko: TranslationResources = {
         unpin: "고정 해제",
         archive: "보관",
         archiveWorkspace: "워크스페이스 보관",
+        remove: "워크스페이스 제거",
         hideFromSidebar: "사이드바에서 숨기기",
         archiving: "보관하는 중...",
         hiding: "숨기는 중...",
@@ -1371,6 +1377,10 @@ export const ko: TranslationResources = {
         hideMessage:
           '"{{workspaceName}}"을(를) 사이드바에서 숨길까요?\n\n디스크의 파일은 변경되지 않습니다.',
         hideConfirm: "숨기기",
+        removeTitle: "이 워크스페이스를 제거할까요?",
+        removeMessage:
+          '"{{workspaceName}}" 및 해당 채팅을 Paseo에서 영구적으로 제거할까요? 디스크의 파일은 삭제되지 않습니다.',
+        removeConfirm: "제거",
         cancel: "취소",
       },
       rename: {
@@ -1385,6 +1395,7 @@ export const ko: TranslationResources = {
         hostDisconnected: "호스트가 연결되어 있지 않습니다",
         hideFailed: "워크스페이스를 숨기지 못했습니다",
         archiveFailed: "워크스페이스를 보관하지 못했습니다.",
+        removeFailed: "워크스페이스를 제거할 수 없습니다",
       },
     },
   },
@@ -2643,6 +2654,12 @@ export const ko: TranslationResources = {
         behavior: {
           title: "동작",
           description: "프로젝트 목록을 사용하는 동안의 반응 방식",
+        },
+        hierarchy: {
+          title: "계층",
+          description: "사이드바에서 프로젝트가 펼쳐지는 방식을 선택하세요",
+          workspaces: "워크스페이스 다음 세션",
+          sessions: "세션과 워크스페이스 세부 정보",
         },
         typeToSearch: {
           title: "입력하여 검색",

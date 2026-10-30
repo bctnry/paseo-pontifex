@@ -46,11 +46,13 @@ import { WorkspaceRenameModal } from "@/components/workspace-rename-modal";
 import { useWorkspaceClipboardActions } from "@/hooks/use-workspace-clipboard-actions";
 import { redirectIfArchivingActiveWorkspace } from "@/utils/sidebar-workspace-archive-redirect";
 import { useWorkspaceArchive } from "@/workspace/use-workspace-archive";
+import { useWorkspaceRemove } from "@/workspace/use-workspace-remove";
 import { toWorktreeArchiveRisk } from "@/git/worktree-archive-warning";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { useKeyboardActionHandler } from "@/hooks/use-keyboard-action-handler";
 import { useWorkspaceReadState } from "@/hooks/use-workspace-read-state";
+import { useHostFeature } from "@/runtime/host-features";
 import {
   SidebarWorkspaceRowFrame,
   SidebarWorkspaceRowContent,
@@ -660,6 +662,19 @@ function StatusWorkspaceRowWithMenu({
     archiveController.archive();
   }, [archiveController, isArchiving]);
 
+  const supportsRemoval = useHostFeature(workspace.serverId, "workspaceRemoval");
+  const removeController = useWorkspaceRemove({
+    serverId: workspace.serverId,
+    workspaceId: workspace.workspaceId,
+    name: workspace.title ?? workspace.name,
+    onRemoveStarted: redirectAfterArchive,
+    onSetHiding: setIsHidingWorkspace,
+  });
+  const handleRemove = useCallback(() => {
+    if (isArchiving) return;
+    removeController.remove();
+  }, [isArchiving, removeController]);
+
   const clipboard = useWorkspaceClipboardActions();
   const handleCopyPath = useCallback(() => {
     clipboard.copyPath(workspace);
@@ -721,6 +736,7 @@ function StatusWorkspaceRowWithMenu({
         archiveStatus={isArchiving ? "pending" : "idle"}
         archivePendingLabel={t("sidebar.workspace.actions.archiving")}
         onArchive={handleArchive}
+        onRemove={supportsRemoval ? handleRemove : undefined}
         onCopyBranchName={workspace.projectKind === "git" ? handleCopyBranchName : undefined}
         onCopyPath={handleCopyPath}
         onRename={handleOpenRename}
@@ -759,6 +775,7 @@ interface StatusWorkspaceRowInnerProps {
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   onArchive?: () => void;
+  onRemove?: () => void;
   onCopyBranchName?: () => void;
   onCopyPath?: () => void;
   onRename?: () => void;
@@ -806,6 +823,7 @@ function StatusWorkspaceRowInnerContent({
   archiveStatus = "idle",
   archivePendingLabel,
   onArchive,
+  onRemove,
   onCopyBranchName,
   onCopyPath,
   onRename,
@@ -921,6 +939,7 @@ function StatusWorkspaceRowInnerContent({
               archiveStatus={archiveStatus}
               archivePendingLabel={archivePendingLabel}
               archiveShortcutKeys={archiveShortcutKeys}
+              onRemove={onRemove}
               isPinned={isPinned}
               onTogglePin={onTogglePin}
               openInFileManagerPath={workspace.workspaceDirectory}
@@ -969,6 +988,7 @@ function StatusWorkspaceRowInnerContent({
                     archiveStatus={archiveStatus}
                     archivePendingLabel={archivePendingLabel}
                     archiveShortcutKeys={archiveShortcutKeys}
+                    onRemove={onRemove}
                   />
                 ) : null}
               </SidebarWorkspaceRowContent>
@@ -1000,6 +1020,7 @@ function StatusWorkspaceActionSlot({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
+  onRemove,
 }: {
   workspace: SidebarWorkspaceEntry;
   backdrop: SidebarSurfaceBackdrop;
@@ -1020,6 +1041,7 @@ function StatusWorkspaceActionSlot({
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   archiveShortcutKeys?: ShortcutKey[][] | null;
+  onRemove?: () => void;
 }) {
   const kebab = useOpenKebabMenuVisibility(showKebab);
   return (
@@ -1048,6 +1070,7 @@ function StatusWorkspaceActionSlot({
             archiveStatus={archiveStatus}
             archivePendingLabel={archivePendingLabel}
             archiveShortcutKeys={archiveShortcutKeys}
+            onRemove={onRemove}
             isPinned={isPinned}
             onTogglePin={onTogglePin}
           />
