@@ -176,11 +176,15 @@ function ShellDetailSection({ command, output, ds }: ShellDetailProps) {
             contentContainerStyle={styles.codeHorizontalContent}
           >
             <View style={styles.codeLine} dataSet={CODE_SURFACE_DATASET}>
-              <Text selectable style={styles.scrollText}>
+              <Text selectable style={[styles.scrollText, styles.shellCommand]}>
                 <Text style={styles.shellPrompt}>$ </Text>
                 {normalizedCommand}
-                {hasOutput ? `\n\n${commandOutput}` : ""}
               </Text>
+              {hasOutput ? (
+                <Text selectable style={[styles.scrollText, styles.shellOutput]}>
+                  {commandOutput}
+                </Text>
+              ) : null}
             </View>
           </ScrollView>
         </ScrollView>
@@ -945,6 +949,13 @@ const styles = StyleSheet.create((theme) => {
     },
     shellPrompt: {
       color: theme.colors.foregroundMuted,
+    },
+    shellCommand: {
+      color: theme.colors.foreground,
+    },
+    shellOutput: {
+      color: theme.colors.foregroundMuted,
+      marginTop: theme.spacing[2],
     },
     subAgentSessionText: {
       fontFamily: theme.fontFamily.mono,
