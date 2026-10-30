@@ -1763,6 +1763,19 @@ export const CreateAgentWorktreeTargetSchema = z.discriminatedUnion("mode", [
 
 export type CreateAgentWorktreeTarget = z.infer<typeof CreateAgentWorktreeTargetSchema>;
 
+/**
+ * The conversation a new session starts with. It is session content, not a
+ * prompt: creating with a history does not call the model, and the history is
+ * carried by the first message someone actually sends. A fork uses it to give a
+ * new session the source conversation without burning a turn on it.
+ */
+export const AgentHistorySchema = z.object({
+  text: z.string().optional(),
+  attachments: z.array(AgentAttachmentSchema).optional(),
+});
+
+export type AgentHistory = z.infer<typeof AgentHistorySchema>;
+
 export const CreateAgentRequestMessageSchema = z.object({
   type: z.literal("create_agent_request"),
   // Legacy create_agent_request uses a separate initial-message receipt when keyed.
@@ -1774,11 +1787,17 @@ export const CreateAgentRequestMessageSchema = z.object({
   // workspace and parentage policy as agent-scoped MCP creation.
   callerAgentId: z.string().optional(),
   worktreeName: z.string().optional(),
+  // The first message. Creation never sends it: the daemon creates the agent and
+  // the caller then sends this as its own step, so a request carrying only
+  // `history` creates an idle session and calls no model.
   initialPrompt: z.string().optional(),
   clientMessageId: z.string().optional(),
   outputSchema: z.record(z.string(), z.unknown()).optional(),
   images: z.array(ImageAttachmentSchema).optional(),
   attachments: AgentAttachmentsSchema,
+  // Session content. Creating with only this starts no turn; the first message
+  // someone sends carries it.
+  history: AgentHistorySchema.optional(),
   git: GitSetupOptionsSchema.optional(),
   worktree: CreateAgentWorktreeTargetSchema.optional(),
   autoArchive: z.boolean().optional(),
@@ -2705,6 +2724,12 @@ export const ArchiveWorkspaceRequestSchema = z.object({
   requestId: z.string(),
 });
 
+export const WorkspaceRemoveRequestSchema = z.object({
+  type: z.literal("workspace.remove.request"),
+  workspaceId: z.string(),
+  requestId: z.string(),
+});
+
 // Create a new workspace record. Unlike open_project, this never deduplicates by
 // directory: it always produces a fresh workspace. The source discriminates
 // between an existing local directory and a newly created paseo worktree.
@@ -3440,6 +3465,7 @@ export const SessionInboundMessageSchema = z.discriminatedUnion("type", [
   WorkspaceGithubSearchRepositoriesRequestSchema,
   ProjectGithubCloneRequestSchema,
   ArchiveWorkspaceRequestSchema,
+  WorkspaceRemoveRequestSchema,
   WorkspaceCreateRequestSchema,
   AgentCreateRequestSchema,
   CreationSubscribeRequestSchema,
@@ -3810,6 +3836,8 @@ export const ServerInfoStatusPayloadSchema = z
         providerSubagentNesting: z.boolean().optional(),
         // COMPAT(workspacePinning): added in v0.1.107, remove gate after 2027-01-12.
         workspacePinning: z.boolean().optional(),
+        // COMPAT(workspaceRemoval): added in v0.14.0, remove gate after 2027-04-30.
+        workspaceRemoval: z.boolean().optional(),
         // COMPAT(workspaceMarkUnread): added in v0.5.0, remove after 2027-08-20.
         workspaceMarkUnread: z.boolean().optional(),
         // COMPAT(hubRelationship): added in v0.1.X, drop the gate when floor >= v0.1.X.
@@ -4733,6 +4761,16 @@ export const ArchiveWorkspaceResponseMessageSchema = z.object({
     requestId: z.string(),
     workspaceId: z.string(),
     archivedAt: z.string().nullable(),
+    error: z.string().nullable(),
+  }),
+});
+
+export const WorkspaceRemoveResponseMessageSchema = z.object({
+  type: z.literal("workspace.remove.response"),
+  payload: z.object({
+    requestId: z.string(),
+    workspaceId: z.string(),
+    removed: z.boolean(),
     error: z.string().nullable(),
   }),
 });
@@ -7108,6 +7146,7 @@ export const SessionOutboundMessageSchema = z.discriminatedUnion("type", [
   LegacyListAvailableEditorsResponseMessageSchema,
   LegacyOpenInEditorResponseMessageSchema,
   ArchiveWorkspaceResponseMessageSchema,
+  WorkspaceRemoveResponseMessageSchema,
   FetchAgentResponseMessageSchema,
   FetchAgentTimelineResponseMessageSchema,
   AgentTimelineReplacementMessageSchema,
@@ -7336,6 +7375,7 @@ export type LegacyOpenInEditorResponseMessage = z.infer<
   typeof LegacyOpenInEditorResponseMessageSchema
 >;
 export type ArchiveWorkspaceResponseMessage = z.infer<typeof ArchiveWorkspaceResponseMessageSchema>;
+export type WorkspaceRemoveResponseMessage = z.infer<typeof WorkspaceRemoveResponseMessageSchema>;
 export type FetchAgentResponseMessage = z.infer<typeof FetchAgentResponseMessageSchema>;
 export type FetchAgentTimelineResponseMessage = z.infer<
   typeof FetchAgentTimelineResponseMessageSchema
@@ -7638,6 +7678,7 @@ export type WorkspaceGithubSearchRepositoriesRequest = z.infer<
 export type ProjectGithubCloneRequest = z.infer<typeof ProjectGithubCloneRequestSchema>;
 export type ProjectGithubCloneProtocol = z.infer<typeof ProjectGithubCloneProtocolSchema>;
 export type ArchiveWorkspaceRequest = z.infer<typeof ArchiveWorkspaceRequestSchema>;
+export type WorkspaceRemoveRequest = z.infer<typeof WorkspaceRemoveRequestSchema>;
 export type WorkspaceClearAttentionRequest = z.infer<typeof WorkspaceClearAttentionRequestSchema>;
 export type WorkspaceMarkUnreadRequest = z.infer<typeof WorkspaceMarkUnreadRequestSchema>;
 export type FileExplorerRequest = z.infer<typeof FileExplorerRequestSchema>;

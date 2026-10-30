@@ -9,7 +9,7 @@ import { createProviderSnapshotManagerStub } from "../../test-utils/session-stub
 import { AgentManager } from "../agent-manager.js";
 import { AgentStorage } from "../agent-storage.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../../worktree-session.js";
-import { createAgentCommand } from "./create.js";
+import { createAgentCommand, sendCreatedAgentFirstMessage } from "./create.js";
 import type { ManagedAgent } from "../agent-manager.js";
 
 const logger = createTestLogger();
@@ -78,7 +78,7 @@ test("session create forwards clientMessageId to the initial prompt run options"
     providerSnapshotManager: createProviderSnapshotManagerStub().manager,
   };
 
-  await createAgentCommand(dependencies, {
+  const created = await createAgentCommand(dependencies, {
     kind: "session",
     config: { provider: "codex", cwd: "/tmp/paseo-create-test" },
     workspaceId: "ws-create-test",
@@ -89,6 +89,13 @@ test("session create forwards clientMessageId to the initial prompt run options"
     firstAgentContext: { attachments: [] },
   });
 
+  // Creation alone never calls the model; the first message is its own step.
+  expect(streamAgent).not.toHaveBeenCalled();
+  const firstMessage = created.firstMessage;
+  if (!firstMessage) throw new Error("expected a pending first message");
+  expect(firstMessage.runOptions?.clientMessageId).toBe("msg-create-1");
+
+  await sendCreatedAgentFirstMessage(dependencies, created.snapshot, firstMessage);
   expect(streamAgent).toHaveBeenCalledWith("agent-1", "hello from create", {
     clientMessageId: "msg-create-1",
   });
@@ -468,4 +475,61 @@ test("session create with an internal config skips provider session persistence"
   );
   expect(createAgent.mock.calls[1]?.[0]).not.toHaveProperty("internal");
   expect(createAgent.mock.calls[1]?.[2]).not.toHaveProperty("persistSession");
+});
+
+test("initialPrompt is optional: present sends in the same request, absent only creates", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "paseo-create-optional-"));
+  const storage = new AgentStorage(join(workdir, "agents"), logger);
+  await storage.initialize();
+  const agentManager = createRealAgentManager(storage);
+  const dependencies = {
+    agentManager,
+    agentStorage: storage,
+    logger,
+    providerSnapshotManager: createProviderSnapshotManagerStub().manager,
+  } as unknown as Parameters<typeof createAgentCommand>[0];
+
+  const created: string[] = [];
+  try {
+    // With a first message: create, then send it — one caller request, two steps.
+    const withPrompt = await createAgentCommand(dependencies, {
+      kind: "session",
+      config: { provider: "codex", cwd: workdir },
+      workspaceId: "ws-optional",
+      initialPrompt: "say hello",
+      labels: {},
+      provisionalTitle: null,
+      firstAgentContext: { attachments: [] },
+    });
+    created.push(withPrompt.snapshot.id);
+    expect(withPrompt.firstMessage?.prompt).toBe("say hello");
+    const sent = await sendCreatedAgentFirstMessage(
+      dependencies,
+      withPrompt.snapshot,
+      withPrompt.firstMessage!,
+    );
+    expect(sent.started).toBe(true);
+    expect(agentManager.getAgent(withPrompt.snapshot.id)?.lifecycle).not.toBe("idle");
+
+    // Without one: only a session exists, nothing was sent.
+    const withoutPrompt = await createAgentCommand(dependencies, {
+      kind: "session",
+      config: { provider: "codex", cwd: workdir },
+      workspaceId: "ws-optional",
+      labels: {},
+      provisionalTitle: null,
+      firstAgentContext: { attachments: [] },
+    });
+    created.push(withoutPrompt.snapshot.id);
+    expect(withoutPrompt.firstMessage).toBeUndefined();
+    expect(agentManager.getAgent(withoutPrompt.snapshot.id)?.lifecycle).toBe("idle");
+    expect(
+      agentManager.getAgent(withoutPrompt.snapshot.id)?.activeForegroundTurnId ?? null,
+    ).toBeNull();
+  } finally {
+    for (const agentId of created) {
+      await agentManager.closeAgent(agentId).catch(() => undefined);
+    }
+    await removeRealAgentManagerWorkdir({ agentManager, storage, workdir });
+  }
 });

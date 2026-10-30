@@ -10,7 +10,7 @@ import type {
   CreatePaseoWorktreeWorkflowFn,
   CreatePaseoWorktreeWorkflowResult,
 } from "../../worktree-session.js";
-import type { AgentAttachment, FirstAgentContext } from "../../messages.js";
+import type { AgentAttachment, AgentHistory, FirstAgentContext } from "../../messages.js";
 import type { AgentManager, CreateAgentOptions, ManagedAgent } from "../agent-manager.js";
 import type { AgentPromptInput, AgentRunOptions, AgentSessionConfig } from "../agent-sdk-types.js";
 import type { AgentStorage } from "../agent-storage.js";
@@ -55,6 +55,8 @@ export interface CreateAgentFromSessionInput {
   outputSchema?: Record<string, unknown>;
   images?: Array<{ data: string; mimeType: string }>;
   attachments?: AgentAttachment[];
+  /** The conversation the session starts with; never starts a turn by itself. */
+  history?: AgentHistory;
   labels: Record<string, string>;
   env?: Record<string, string>;
   provisionalTitle: string | null;
@@ -108,14 +110,34 @@ export type CreateAgentPromptFailureMode = "throw" | "log" | "return-error";
 export interface CreateAgentCommandResult {
   snapshot: ManagedAgent;
   liveSnapshot: ManagedAgent;
-  initialPromptStarted: boolean;
-  initialPromptError: unknown | null;
   createdWorktree?: CreatePaseoWorktreeWorkflowResult;
+  /** The request's first message, if any, waiting to be sent as a second step. */
+  firstMessage?: PendingFirstMessage;
+}
+
+export interface PendingFirstMessage {
+  prompt: AgentPromptInput;
+  source?: AgentPromptSource;
+  runOptions?: AgentRunOptions;
+  failure: CreateAgentPromptFailureMode;
+  logger: Logger;
+  notifyOnFinish?: { callerAgentId: string; detached: boolean };
+}
+
+export interface SendFirstMessageResult {
+  started: boolean;
+  liveSnapshot: ManagedAgent;
+  error: unknown | null;
 }
 
 export type BoundCreateAgentCommand = (
   input: CreateAgentCommandInput,
 ) => Promise<CreateAgentCommandResult>;
+
+export type BoundSendFirstMessage = (
+  snapshot: ManagedAgent,
+  pending: PendingFirstMessage,
+) => Promise<SendFirstMessageResult>;
 
 function requireResolvedWorkspaceId(workspaceId: string | undefined): string {
   if (!workspaceId) {
@@ -153,6 +175,13 @@ interface ResolvedCreateAgent {
   createdWorktree?: CreatePaseoWorktreeWorkflowResult;
 }
 
+/**
+ * Creates an agent. Nothing is sent to the model here: no turn starts, and no
+ * provider prompt is submitted. A request that carries a first message gets it
+ * back as `firstMessage`, which the caller sends as its own step through
+ * {@link sendCreatedAgentFirstMessage}. A session created with only `history`
+ * comes back idle and keeps that history until someone actually speaks.
+ */
 export async function createAgentCommand(
   dependencies: CreateAgentCommandDependencies,
   input: CreateAgentCommandInput,
@@ -168,49 +197,78 @@ export async function createAgentCommand(
     resolved.createOptions,
   );
 
-  if (input.kind === "session") await input.onAgentReady?.(snapshot);
-
-  let liveSnapshot = snapshot;
-  let initialPromptStarted = false;
-  let initialPromptError: unknown | null = null;
+  if (input.kind === "session") {
+    if (input.history) {
+      await dependencies.agentStorage.setHistory(snapshot.id, input.history);
+    }
+    await input.onAgentReady?.(snapshot);
+  }
   if (input.kind === "mcp") {
     input.onCreated?.({ agentId: snapshot.id, createdWorktree: resolved.createdWorktree ?? null });
-  }
-  const notification =
-    input.kind === "mcp" &&
-    input.notifyOnFinish &&
-    input.callerAgentId &&
-    resolved.prompt !== undefined
-      ? await requireFinishSubscriptions(dependencies).register(
-          {
-            childAgentId: snapshot.id,
-            callerAgentId: input.callerAgentId,
-            requireParentOwnership: !(input.detached ?? false),
-          },
-          true,
-        )
-      : undefined;
-
-  if (resolved.prompt !== undefined) {
-    const sendResult = await sendInitialPrompt(dependencies, resolved, snapshot).catch(
-      async (error) => {
-        await notification?.reject();
-        throw error;
-      },
-    );
-    notification?.accept();
-    initialPromptStarted = sendResult.started;
-    liveSnapshot = sendResult.liveSnapshot;
-    initialPromptError = sendResult.error ?? null;
   }
 
   return {
     snapshot,
-    liveSnapshot,
-    initialPromptStarted,
-    initialPromptError,
+    liveSnapshot: snapshot,
     ...(resolved.createdWorktree ? { createdWorktree: resolved.createdWorktree } : {}),
+    ...(resolved.prompt !== undefined
+      ? {
+          firstMessage: {
+            prompt: resolved.prompt,
+            ...(resolved.source ? { source: resolved.source } : {}),
+            ...(resolved.runOptions ? { runOptions: resolved.runOptions } : {}),
+            failure: resolved.promptFailure,
+            logger: resolved.promptLogger ?? dependencies.logger,
+            ...(input.kind === "mcp" && input.notifyOnFinish && input.callerAgentId
+              ? {
+                  notifyOnFinish: {
+                    callerAgentId: input.callerAgentId,
+                    detached: input.detached ?? false,
+                  },
+                }
+              : {}),
+          } satisfies PendingFirstMessage,
+        }
+      : {}),
   };
+}
+
+/**
+ * Second step of creating an agent with a first message. Callers that want a
+ * turn started do this right after {@link createAgentCommand}; the fork path
+ * simply never calls it.
+ */
+export async function sendCreatedAgentFirstMessage(
+  dependencies: CreateAgentCommandDependencies,
+  created: ManagedAgent,
+  pending: PendingFirstMessage,
+): Promise<SendFirstMessageResult> {
+  const agentId = created.id;
+  const snapshot = dependencies.agentManager.getAgent(agentId) ?? created;
+
+  const notification = pending.notifyOnFinish
+    ? await requireFinishSubscriptions(dependencies).register(
+        {
+          childAgentId: agentId,
+          callerAgentId: pending.notifyOnFinish.callerAgentId,
+          requireParentOwnership: !pending.notifyOnFinish.detached,
+        },
+        true,
+      )
+    : undefined;
+
+  try {
+    const sendResult = await sendFirstMessage(dependencies, pending, snapshot);
+    notification?.accept();
+    return {
+      started: sendResult.started,
+      liveSnapshot: sendResult.liveSnapshot,
+      error: sendResult.error ?? null,
+    };
+  } catch (error) {
+    await notification?.reject();
+    throw error;
+  }
 }
 
 async function resolveSessionCreateAgent(
@@ -422,32 +480,28 @@ async function ensureWorkspaceForMcpCreate(
   );
 }
 
-async function sendInitialPrompt(
+async function sendFirstMessage(
   dependencies: CreateAgentCommandDependencies,
-  resolved: ResolvedCreateAgent,
+  pending: PendingFirstMessage,
   snapshot: ManagedAgent,
 ): Promise<{ started: boolean; liveSnapshot: ManagedAgent; error?: unknown }> {
   try {
-    const prompt = resolved.prompt;
-    if (prompt === undefined) {
-      return { started: false, liveSnapshot: snapshot };
-    }
     const liveSnapshot = await startCreatedAgentInitialPrompt({
       agentStorage: dependencies.agentStorage,
       agentManager: dependencies.agentManager,
       agentId: snapshot.id,
       snapshot,
-      prompt,
-      source: resolved.source,
-      runOptions: resolved.runOptions,
-      logger: resolved.promptLogger ?? dependencies.logger,
+      prompt: pending.prompt,
+      source: pending.source,
+      runOptions: pending.runOptions,
+      logger: pending.logger,
     });
     return { started: true, liveSnapshot };
   } catch (error) {
-    if (resolved.promptFailure === "throw") {
+    if (pending.failure === "throw") {
       throw error;
     }
-    if (resolved.promptFailure === "return-error") {
+    if (pending.failure === "return-error") {
       return {
         started: false,
         liveSnapshot: dependencies.agentManager.getAgent(snapshot.id) ?? snapshot,

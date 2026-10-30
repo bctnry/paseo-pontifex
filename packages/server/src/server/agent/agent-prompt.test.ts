@@ -14,9 +14,11 @@ import { join } from "node:path";
 
 import { createTestLogger } from "../../test-utils/test-logger.js";
 import { AgentManager } from "./agent-manager.js";
-import { waitForAgentRunStartWithTimeout } from "./agent-prompt.js";
+import { sendPromptToAgent, waitForAgentRunStartWithTimeout } from "./agent-prompt.js";
+import { AgentStorage } from "./agent-storage.js";
 import type {
   AgentClient,
+  AgentPromptInput,
   AgentRunResult,
   AgentSession,
   AgentStreamEvent,
@@ -58,9 +60,12 @@ class SlowStartAgentSession implements AgentSession {
     this.releaseStartTurn = resolve;
   });
 
+  readonly prompts: AgentPromptInput[] = [];
+
   constructor(private readonly startDelayMs: number | null) {}
 
-  async run(): Promise<AgentRunResult> {
+  async run(prompt: AgentPromptInput): Promise<AgentRunResult> {
+    this.prompts.push(prompt);
     return { sessionId: this.id, finalText: "", timeline: [] };
   }
 
@@ -69,7 +74,8 @@ class SlowStartAgentSession implements AgentSession {
     this.releaseStartTurn();
   }
 
-  async startTurn(): Promise<{ turnId: string }> {
+  async startTurn(prompt: AgentPromptInput): Promise<{ turnId: string }> {
+    this.prompts.push(prompt);
     await new Promise<void>((resolve) => {
       if (this.startDelayMs !== null) {
         setTimeout(resolve, this.startDelayMs);
@@ -374,4 +380,107 @@ test("schedule trigger identity survives the provider assigning a message ID", (
   expect(projectAgentMessages({ type: "user_message", text })).toEqual(
     projectAgentMessages({ type: "user_message", text, messageId: "provider-message" }),
   );
+});
+
+function promptTexts(prompt: AgentPromptInput | undefined): string[] | undefined {
+  if (prompt === undefined) return undefined;
+  if (typeof prompt === "string") return [prompt];
+  return prompt.map((block) => ("text" in block ? block.text : block.type));
+}
+
+test("a seeded history rides on the first send and is consumed once", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-history-"));
+  const logger = createTestLogger();
+  const agentStorage = new AgentStorage(join(workdir, "agents"), logger);
+  await agentStorage.initialize();
+  const client = new SlowStartAgentClient(0);
+  const agentManager = new AgentManager({
+    clients: { codex: client },
+    registry: agentStorage,
+    logger,
+  });
+  const snapshot = await agentManager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const session = client.sessions[0];
+  if (!session) throw new Error("expected a provider session");
+
+  const history = {
+    type: "text" as const,
+    mimeType: "text/plain" as const,
+    contextKind: "chat_history" as const,
+    title: "Chat history",
+    text: "<chat-history-summary>earlier work</chat-history-summary>",
+  };
+  await agentStorage.setHistory(snapshot.id, { attachments: [history] });
+  // Creating with a held prompt must survive a restart, i.e. it is on disk.
+  expect((await agentStorage.get(snapshot.id))?.history).toBeDefined();
+
+  try {
+    await sendPromptToAgent({
+      agentManager,
+      agentStorage,
+      agentId: snapshot.id,
+      prompt: "keep going",
+      logger,
+    });
+    expect(promptTexts(session.prompts.at(-1))).toEqual([
+      "<chat-history-summary>earlier work</chat-history-summary>",
+      "keep going",
+    ]);
+    // The held prompt is spent: the next turn is only what the user typed.
+    expect((await agentStorage.get(snapshot.id))?.history).toBeUndefined();
+    await sendPromptToAgent({
+      agentManager,
+      agentStorage,
+      agentId: snapshot.id,
+      prompt: "and again",
+      logger,
+    });
+    expect(promptTexts(session.prompts.at(-1))).toEqual(["and again"]);
+  } finally {
+    await agentManager.closeAgent(snapshot.id).catch(() => undefined);
+    await agentStorage.flush().catch(() => undefined);
+    rmSync(workdir, { recursive: true, force: true });
+  }
+});
+
+test("a failed first send puts the seeded history back", async () => {
+  const workdir = mkdtempSync(join(tmpdir(), "agent-history-fail-"));
+  const logger = createTestLogger();
+  const agentStorage = new AgentStorage(join(workdir, "agents"), logger);
+  await agentStorage.initialize();
+  const client = new SlowStartAgentClient(0);
+  const agentManager = new AgentManager({
+    clients: { codex: client },
+    registry: agentStorage,
+    logger,
+  });
+  const snapshot = await agentManager.createAgent({ provider: "codex", cwd: workdir }, undefined, {
+    workspaceId: undefined,
+  });
+  const held = { text: "held context" };
+  await agentStorage.setHistory(snapshot.id, held);
+
+  try {
+    // Dispatch fails before the provider sees anything.
+    vi.spyOn(agentManager, "streamAgent").mockImplementation(() => {
+      throw new Error("dispatch failed");
+    });
+    await expect(
+      sendPromptToAgent({
+        agentManager,
+        agentStorage,
+        agentId: snapshot.id,
+        prompt: "hello",
+        logger,
+      }),
+    ).rejects.toThrow();
+    expect((await agentStorage.get(snapshot.id))?.history).toEqual(held);
+  } finally {
+    vi.restoreAllMocks();
+    await agentManager.closeAgent(snapshot.id).catch(() => undefined);
+    await agentStorage.flush().catch(() => undefined);
+    rmSync(workdir, { recursive: true, force: true });
+  }
 });

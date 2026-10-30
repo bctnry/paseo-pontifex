@@ -41,7 +41,13 @@ import {
   requireActiveWorkspaceForArchive,
   type ArchiveDependencies,
 } from "../../workspace-archive-service.js";
-import { createAgentCommand } from "../create-agent/create.js";
+import {
+  createAgentCommand,
+  sendCreatedAgentFirstMessage,
+  type CreateAgentCommandDependencies,
+  type CreateAgentCommandResult,
+  type SendFirstMessageResult,
+} from "../create-agent/create.js";
 import type { VoiceCallerContext, VoiceSpeakHandler } from "../../voice-types.js";
 import type { FirstAgentContext } from "../../messages.js";
 import { everyMsToFiveFieldCron } from "@getpaseo/protocol/schedule/cadence";
@@ -195,6 +201,15 @@ const WorkspaceAutomationSummarySchema = z.object({
   title: z.string().nullable(),
   background: z.boolean().optional(),
 });
+
+/** Creation and the first message are two steps; this runs the second one. */
+async function sendCreatedFirstMessageIfAny(
+  dependencies: CreateAgentCommandDependencies,
+  created: CreateAgentCommandResult,
+): Promise<SendFirstMessageResult | undefined> {
+  if (!created.firstMessage) return undefined;
+  return await sendCreatedAgentFirstMessage(dependencies, created.snapshot, created.firstMessage);
+}
 
 function toWorkspaceAutomationSummary(workspace: PersistedWorkspaceRecord) {
   return {
@@ -1614,50 +1629,52 @@ function createToolCatalog(
       }
       const selectedProvider = resolveRequiredProviderModel(parsedArgs.provider).provider;
       const inheritedConfig = resolveInheritedProviderConfig(selectedProvider);
-      const { snapshot, initialPromptStarted } = await createAgentCommand(
-        {
-          agentManager,
-          agentStorage,
-          finishSubscriptions: options.finishSubscriptions?.(),
-          logger: childLogger,
-          paseoHome: options.paseoHome,
-          worktreesRoot: options.worktreesRoot,
-          terminalManager,
-          providerSnapshotManager,
-          createPaseoWorktree: options.createPaseoWorktree,
-          ...(options.ensureWorkspaceForCreate
-            ? { ensureWorkspaceForCreate: options.ensureWorkspaceForCreate }
+      const commandDependencies = {
+        agentManager,
+        agentStorage,
+        finishSubscriptions: options.finishSubscriptions?.(),
+        logger: childLogger,
+        paseoHome: options.paseoHome,
+        worktreesRoot: options.worktreesRoot,
+        terminalManager,
+        providerSnapshotManager,
+        createPaseoWorktree: options.createPaseoWorktree,
+        ...(options.ensureWorkspaceForCreate
+          ? { ensureWorkspaceForCreate: options.ensureWorkspaceForCreate }
+          : {}),
+      };
+      const created = await createAgentCommand(commandDependencies, {
+        kind: "mcp",
+        provider: parsedArgs.provider,
+        title: parsedArgs.title,
+        initialPrompt: parsedArgs.initialPrompt,
+        config: inheritedConfig,
+        cwd: resolvedArgs.cwd,
+        workspaceId: resolvedArgs.workspaceId,
+        thinking: parsedArgs.settings?.thinkingOptionId,
+        features: parsedArgs.settings?.features,
+        labels: {
+          ...parsedArgs.labels,
+          ...(callerAgentId && !resolvedArgs.detached && options.serverId
+            ? { "paseo.parent-server-id": options.serverId }
             : {}),
         },
-        {
-          kind: "mcp",
-          provider: parsedArgs.provider,
-          title: parsedArgs.title,
-          initialPrompt: parsedArgs.initialPrompt,
-          config: inheritedConfig,
-          cwd: resolvedArgs.cwd,
-          workspaceId: resolvedArgs.workspaceId,
-          thinking: parsedArgs.settings?.thinkingOptionId,
-          features: parsedArgs.settings?.features,
-          labels: {
-            ...parsedArgs.labels,
-            ...(callerAgentId && !resolvedArgs.detached && options.serverId
-              ? { "paseo.parent-server-id": options.serverId }
-              : {}),
-          },
-          mode: parsedArgs.settings?.modeId,
-          promptFailure: "throw",
-          notifyOnFinish,
-          detached: resolvedArgs.detached,
-          callerAgentId,
-          callerContext,
-        },
-      );
+        mode: parsedArgs.settings?.modeId,
+        promptFailure: "throw",
+        notifyOnFinish,
+        detached: resolvedArgs.detached,
+        callerAgentId,
+        callerContext,
+      });
+
+      // Step 2: send the first prompt. Creation itself never starts a turn.
+      const sent = await sendCreatedFirstMessageIfAny(commandDependencies, created);
+      const snapshot = created.snapshot;
 
       // Return immediately for async creation.
       const currentSnapshot = agentManager.getAgent(snapshot.id) ?? snapshot;
       const guidance =
-        callerAgentId && notifyOnFinish && initialPromptStarted
+        callerAgentId && notifyOnFinish && (sent?.started ?? false)
           ? "You will get notified when the created agent finishes, errors, or needs permission. Do not poll for status; continue with other work until the notification arrives."
           : "Creation acknowledged. Observe completion using get_agent_status/get_agent_activity or SDK/RPC subscriptions and wait APIs.";
       const response = {

@@ -4,7 +4,7 @@ import { z } from "zod";
 import type { Logger } from "pino";
 
 import { writeJsonFileAtomic } from "../atomic-file.js";
-import { AgentFeatureSchema, AgentStatusSchema } from "../messages.js";
+import { AgentFeatureSchema, AgentHistorySchema, AgentStatusSchema } from "../messages.js";
 import { toStoredAgentRecord } from "./agent-projections.js";
 import type { ManagedAgent } from "./agent-manager.js";
 import type { AgentSessionConfig } from "./agent-sdk-types.js";
@@ -77,6 +77,10 @@ const STORED_AGENT_SCHEMA = z.object({
   internal: z.boolean().optional(),
   archivedAt: z.string().nullable().optional(),
   owner: AgentOwnerSchema.optional(),
+  // The conversation the session started with, carried by its first message.
+  // Surviving a daemon restart matters: a fork nobody has messaged yet must keep
+  // its history.
+  history: AgentHistorySchema.optional(),
 });
 
 export type SerializableAgentConfig = Pick<
@@ -263,8 +267,39 @@ export class AgentStorage {
       }
       record.resumeOnStartup =
         existing?.resumeOnStartup && agent.lifecycle !== "idle" && agent.lifecycle !== "error";
+      // Snapshots are projected from the live agent, which does not carry the
+      // seeded history; it lives only here until the first send consumes it.
+      if (existing?.history !== undefined) {
+        record.history = existing.history;
+      }
       return record;
     });
+  }
+
+  async setHistory(agentId: string, history: StoredAgentRecord["history"]): Promise<void> {
+    await this.load();
+    await this.waitForPendingWrite(agentId);
+    const record = await this.get(agentId);
+    if (!record) {
+      throw new Error(`Agent ${agentId} not found`);
+    }
+    await this.upsert({ ...record, history });
+  }
+
+  /**
+   * Reads and clears the seeded conversation. Sends to one agent are serialized
+   * by the run queue, so the read-then-clear pair cannot be observed by a second
+   * send.
+   */
+  async takeHistory(agentId: string): Promise<StoredAgentRecord["history"]> {
+    await this.load();
+    await this.waitForPendingWrite(agentId);
+    const record = this.cache.get(agentId);
+    const history = record?.history;
+    if (!record || history === undefined) return undefined;
+    const { history: _cleared, ...rest } = record;
+    await this.upsert(rest);
+    return history;
   }
 
   async setTitle(agentId: string, title: string): Promise<void> {

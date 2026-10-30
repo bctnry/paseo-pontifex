@@ -137,6 +137,7 @@ import type {
   AgentSkillSelection,
   AgentSkillsStatus,
   AgentSkillsSaveResult,
+  AgentHistory,
 } from "@getpaseo/protocol/messages";
 import type {
   AgentPermissionRequest,
@@ -491,6 +492,12 @@ export interface CreateAgentRequestOptions extends AgentConfigOverrides {
   outputSchema?: Record<string, unknown>;
   images?: CreateAgentRequestMessage["images"];
   attachments?: CreateAgentRequestMessage["attachments"];
+  /**
+   * The conversation the session starts with. It is session content, not a
+   * prompt: creating with only this starts no turn, and the first message
+   * someone sends carries it.
+   */
+  history?: AgentHistory;
   /** @deprecated Use createWorkspace({ source, agent, idempotencyKey }); rejected by createAgent. */
   git?: GitSetupOptions;
   worktree?: CreateAgentRequestMessage["worktree"];
@@ -3092,6 +3099,20 @@ export class DaemonClient {
         workspaceId,
       },
       responseType: "archive_workspace_response",
+    });
+  }
+
+  async removeWorkspace(
+    workspaceId: string,
+    requestId?: string,
+  ): Promise<Extract<SessionOutboundMessage, { type: "workspace.remove.response" }>["payload"]> {
+    return this.sendCorrelatedSessionRequest({
+      requestId,
+      message: {
+        type: "workspace.remove.request",
+        workspaceId,
+      },
+      responseType: "workspace.remove.response",
     });
   }
 

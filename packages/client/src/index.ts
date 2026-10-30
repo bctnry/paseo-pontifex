@@ -260,6 +260,8 @@ export interface PaseoAgentCreateOptions {
   outputSchema?: Record<string, unknown>;
   images?: CreateAgentRequestMessage["images"];
   attachments?: CreateAgentRequestMessage["attachments"];
+  /** Conversation the session starts with; never starts a turn by itself. */
+  history?: CreateAgentRequestMessage["history"];
   git?: CreateAgentRequestMessage["git"];
   worktree?: CreateAgentRequestMessage["worktree"];
   autoArchive?: CreateAgentRequestMessage["autoArchive"];

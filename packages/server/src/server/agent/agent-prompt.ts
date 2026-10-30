@@ -1,12 +1,17 @@
 import { prepareAgentMessage, type AgentPromptSource } from "./agent-messages/index.js";
 import type { Logger } from "pino";
 
-import type { AgentPromptInput, AgentRunOptions } from "./agent-sdk-types.js";
+import type {
+  AgentPromptContentBlock,
+  AgentPromptInput,
+  AgentRunOptions,
+} from "./agent-sdk-types.js";
 import type { AgentManager, ManagedAgent } from "./agent-manager.js";
 import type { AgentStorage } from "./agent-storage.js";
 import { ensureAgentLoaded } from "./agent-loading.js";
 import { isStaleProviderSessionError } from "./stale-provider-session-error.js";
-import type { ActiveTurnBehavior } from "@getpaseo/protocol/messages";
+import type { ActiveTurnBehavior, AgentHistory } from "@getpaseo/protocol/messages";
+import { buildAgentPrompt } from "./prompt-attachments.js";
 
 export type AgentUnarchiveController = Pick<AgentManager, "notifyAgentState" | "unarchiveSnapshot">;
 
@@ -296,6 +301,28 @@ async function resolvePromptSource(
   return title ? { ...source, title } : source;
 }
 
+function promptBlocks(prompt: AgentPromptInput): AgentPromptContentBlock[] {
+  if (typeof prompt === "string") {
+    return prompt.length > 0 ? [{ type: "text", text: prompt }] : [];
+  }
+  return prompt;
+}
+
+/**
+ * Puts the session's seeded conversation in front of the message being sent. A
+ * fork stores the source conversation this way, so the first thing the new
+ * session actually sends is "here is the history, now here is what I want" —
+ * one turn, triggered by a human, never by the fork itself.
+ */
+function withHistory(
+  prompt: AgentPromptInput,
+  history: AgentHistory | undefined,
+): AgentPromptInput {
+  if (!history) return prompt;
+  const seeded = buildAgentPrompt(history.text ?? "", undefined, history.attachments);
+  return [...promptBlocks(seeded), ...promptBlocks(prompt)];
+}
+
 /**
  * Full send-prompt orchestration: (optional unarchive) → load → (optional
  * mode change) → start run.
@@ -311,14 +338,26 @@ export async function sendPromptToAgent(
   params: SendPromptToAgentParams,
 ): Promise<{ disposition: PromptDispatchDisposition }> {
   const source = await resolvePromptSource(params.source, params.agentManager, params.agentStorage);
-  const delivery = prepareAgentMessage(params.prompt, source, params.messageId);
-  return sendPreparedPromptToAgent({
-    ...params,
-    prompt: delivery.prompt,
-    runOptions: delivery.messageId
-      ? { ...params.runOptions, clientMessageId: delivery.messageId }
-      : params.runOptions,
-  });
+  const history = await params.agentStorage.takeHistory(params.agentId);
+  const prompt = withHistory(params.prompt, history);
+  const delivery = prepareAgentMessage(prompt, source, params.messageId);
+  try {
+    return await sendPreparedPromptToAgent({
+      ...params,
+      prompt: delivery.prompt,
+      runOptions: delivery.messageId
+        ? { ...params.runOptions, clientMessageId: delivery.messageId }
+        : params.runOptions,
+    });
+  } catch (error) {
+    // Dispatch never reached the provider, so the seeded history is still owed.
+    // Putting it back keeps a failed first send from silently eating a fork's
+    // history; a retry then carries it exactly as the first attempt would have.
+    if (history) {
+      await params.agentStorage.setHistory(params.agentId, history).catch(() => undefined);
+    }
+    throw error;
+  }
 }
 
 /** Dispatch daemon-prepared context without reclassifying it as human input. */

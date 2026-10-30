@@ -576,3 +576,48 @@ describe("AgentStorage", () => {
     expect(after.some((r) => r.id === agentId)).toBe(false);
   });
 });
+
+describe("seeded history", () => {
+  let tmpDir: string;
+  let storagePath: string;
+  let storage: AgentStorage;
+  const logger = createTestLogger();
+
+  beforeEach(() => {
+    tmpDir = mkdtempSync(path.join(os.tmpdir(), "agent-registry-deferred-"));
+    storagePath = path.join(tmpDir, "agents");
+    storage = new AgentStorage(storagePath, logger);
+  });
+
+  afterEach(() => {
+    rmSync(tmpDir, { recursive: true, force: true });
+  });
+
+  const held = {
+    attachments: [
+      {
+        type: "text" as const,
+        mimeType: "text/plain" as const,
+        contextKind: "chat_history" as const,
+        title: "Chat history",
+        text: "earlier work",
+      },
+    ],
+  };
+
+  test("survives a reload and a snapshot flush, then is taken exactly once", async () => {
+    await storage.applySnapshot(createManagedAgent({ id: "agent-1", cwd: "/tmp/project" }));
+    await storage.setHistory("agent-1", held);
+
+    // A snapshot flush must not drop what is waiting for the first send.
+    await storage.applySnapshot(createManagedAgent({ id: "agent-1", cwd: "/tmp/project" }));
+
+    const reloaded = new AgentStorage(storagePath, logger);
+    expect((await reloaded.get("agent-1"))?.history).toEqual(held);
+
+    expect(await reloaded.takeHistory("agent-1")).toEqual(held);
+    expect((await reloaded.get("agent-1"))?.history).toBeUndefined();
+    // A second take finds nothing: the first message already carried it.
+    expect(await reloaded.takeHistory("agent-1")).toBeUndefined();
+  });
+});

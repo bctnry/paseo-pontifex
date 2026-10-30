@@ -9,7 +9,10 @@ import type { ProviderOptions, ToolPolicy } from "@getpaseo/protocol/agent-types
 import type { AgentManager, AgentManagerEvent, ManagedAgent } from "../agent/agent-manager.js";
 import type { McpServerConfig } from "../agent/agent-sdk-types.js";
 import type { AgentStorage, StoredAgentRecord } from "../agent/agent-storage.js";
-import type { BoundCreateAgentCommand } from "../agent/create-agent/create.js";
+import type {
+  BoundCreateAgentCommand,
+  BoundSendFirstMessage,
+} from "../agent/create-agent/create.js";
 import type { CreatePaseoWorktreeWorkflowResult } from "../worktree-session.js";
 import { buildStoredAgentPayload } from "../agent/agent-projections.js";
 import { serializeAgentSnapshot, serializeAgentStreamEvent } from "../messages.js";
@@ -56,6 +59,7 @@ interface DaemonExecutionsOptions {
   agentManager: AgentManager;
   agentStorage: AgentStorage;
   createAgent: BoundCreateAgentCommand;
+  sendFirstMessage: BoundSendFirstMessage;
   interruptAgent: (agentId: string) => Promise<unknown>;
   archiveWorkspace: (workspaceId: string, requestId: string) => Promise<unknown>;
   cleanupFailedCreate?: (input: {
@@ -76,6 +80,7 @@ export class DaemonExecutions implements HubExecutionAgents {
   private readonly agentManager: AgentManager;
   private readonly agentStorage: AgentStorage;
   private readonly createAgentCommand: BoundCreateAgentCommand;
+  private readonly sendFirstMessage: BoundSendFirstMessage;
   private readonly pendingCreates = new Map<string, Promise<OwnedAgentSnapshot>>();
   private readonly pendingControlActions = new Map<string, Promise<void>>();
   private readonly controlTails = new Map<string, Promise<void>>();
@@ -88,6 +93,7 @@ export class DaemonExecutions implements HubExecutionAgents {
     this.agentManager = options.agentManager;
     this.agentStorage = options.agentStorage;
     this.createAgentCommand = options.createAgent;
+    this.sendFirstMessage = options.sendFirstMessage;
     this.cleanupFailedCreate = options.cleanupFailedCreate ?? (async () => undefined);
   }
 
@@ -216,6 +222,11 @@ export class DaemonExecutions implements HubExecutionAgents {
       });
       this.requireAuthority(authorityGeneration);
       requireExecutionWorkspaceId(result.liveSnapshot);
+      // Step 2: send the first prompt. Creation itself never starts a turn.
+      if (result.firstMessage) {
+        const sent = await this.sendFirstMessage(result.snapshot, result.firstMessage);
+        result = { ...result, liveSnapshot: sent.liveSnapshot };
+      }
     } catch (error) {
       try {
         if (createdAgentId && this.agentManager.getAgent(createdAgentId)) {

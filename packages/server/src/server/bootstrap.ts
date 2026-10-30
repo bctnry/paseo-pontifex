@@ -234,6 +234,7 @@ import { resolveGitProcessPolicy } from "../utils/git-process-scheduler.js";
 import { resolveFirstAgentPromptTitle } from "./agent/create-agent-title.js";
 import {
   createAgentCommand,
+  sendCreatedAgentFirstMessage,
   type CreateAgentCommandDependencies,
 } from "./agent/create-agent/create.js";
 import { archiveAgentCommand, cancelAgentRunCommand } from "./agent/lifecycle-command.js";
@@ -1307,6 +1308,10 @@ export async function createPaseoDaemon(
   };
   const createAgent = (input: Parameters<typeof createAgentCommand>[1]) =>
     createAgentCommand(createAgentCommandDependencies, input);
+  const sendAgentFirstMessage = (
+    snapshot: Parameters<typeof sendCreatedAgentFirstMessage>[1],
+    pending: Parameters<typeof sendCreatedAgentFirstMessage>[2],
+  ) => sendCreatedAgentFirstMessage(createAgentCommandDependencies, snapshot, pending);
   const archiveWorkspaceByIdExternal = (workspaceId: string, requestId: string) =>
     archiveByScope(
       {
@@ -1394,6 +1399,7 @@ export async function createPaseoDaemon(
         agentManager,
         agentStorage,
         createAgent,
+        sendFirstMessage: sendAgentFirstMessage,
         interruptAgent: (agentId) => cancelAgentRunCommand({ agentManager, logger }, agentId),
         archiveWorkspace: archiveWorkspaceByIdExternal,
         cleanupFailedCreate: (input) =>

@@ -40,6 +40,7 @@ import { AgentManager } from "../../agent/agent-manager.js";
 import { DaemonExecutions } from "../daemon-executions.js";
 import {
   createAgentCommand,
+  sendCreatedAgentFirstMessage,
   type CreateAgentCommandDependencies,
 } from "../../agent/create-agent/create.js";
 import type {
@@ -1590,6 +1591,17 @@ export class HubRelationshipHarness {
             providerSnapshotManager: providerCatalog,
           },
           input,
+        ),
+      sendFirstMessage: (snapshot, pending) =>
+        sendCreatedAgentFirstMessage(
+          {
+            agentManager: manager,
+            agentStorage: storage,
+            logger: pino({ level: "silent" }),
+            providerSnapshotManager: providerCatalog,
+          },
+          snapshot,
+          pending,
         ),
       interruptAgent: (agentId) => manager.cancelAgentRun(agentId),
       archiveWorkspace: async () => undefined,

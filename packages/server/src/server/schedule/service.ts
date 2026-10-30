@@ -1011,9 +1011,6 @@ export class ScheduleService {
         workspaceId: workspace.workspaceId,
         agentId,
       });
-      if (created.initialPromptError) {
-        throw created.initialPromptError;
-      }
       const result = await this.agentManager.runAgent(agent.id, schedule.prompt);
       const waitResult = await this.agentManager.waitForAgentEvent(agent.id, {
         waitForActive: true,

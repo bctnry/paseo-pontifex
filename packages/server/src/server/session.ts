@@ -113,7 +113,7 @@ import type {
   AgentTimelineFetchResult,
   ManagedAgent,
 } from "./agent/agent-manager.js";
-import { createAgentCommand } from "./agent/create-agent/create.js";
+import { createAgentCommand, sendCreatedAgentFirstMessage } from "./agent/create-agent/create.js";
 import { resolveCreateAgentIntent, type CreateAgentIntent } from "./agent/create-agent/intent.js";
 import {
   archiveAgentCommand,
@@ -3066,6 +3066,8 @@ export class Session {
         return this.handleProjectGithubCloneRequest(msg);
       case "archive_workspace_request":
         return this.handleArchiveWorkspaceRequest(msg);
+      case "workspace.remove.request":
+        return this.handleRemoveWorkspaceRequest(msg);
       case "project.remove.request":
         return this.handleProjectRemoveRequest(msg);
       case "workspace.title.set.request":
@@ -4422,6 +4424,7 @@ export class Session {
       autoArchive,
       images,
       attachments,
+      history,
       env,
     } = msg;
     this.sessionLogger.info(
@@ -4469,40 +4472,61 @@ export class Session {
         throw new Error(`Working directory does not exist or is not a directory: ${resolvedCwd}`);
       }
 
-      const { snapshot, liveSnapshot, initialPromptStarted } = await createAgentCommand(
-        {
-          agentManager: this.agentManager,
-          agentStorage: this.agentStorage,
-          logger: this.sessionLogger,
-          paseoHome: this.paseoHome,
-          worktreesRoot: this.worktreesRoot,
-          providerSnapshotManager: this.providerSnapshotManager,
+      const commands = {
+        agentManager: this.agentManager,
+        agentStorage: this.agentStorage,
+        logger: this.sessionLogger,
+        paseoHome: this.paseoHome,
+        worktreesRoot: this.worktreesRoot,
+        providerSnapshotManager: this.providerSnapshotManager,
+      };
+
+      // Step 1: create the session. No prompt is submitted here, so a fork that
+      // only carries history stays idle until someone speaks to it.
+      const created = await createAgentCommand(commands, {
+        kind: "session",
+        onAgentReady: async (agent) => {
+          createdAgentId = agent.id;
+          await onAgentReady?.(await this.buildAgentPayload(agent));
         },
-        {
-          kind: "session",
-          onAgentReady: async (agent) => {
-            createdAgentId = agent.id;
-            await onAgentReady?.(await this.buildAgentPayload(agent));
-          },
-          agentId,
-          config: resolvedIntent.config,
-          workspaceId: resolvedIntent.intent.workspaceId,
-          initialPrompt,
-          source: msg.callerAgentId
-            ? { kind: "agent-message", agentId: msg.callerAgentId }
-            : undefined,
-          clientMessageId,
-          outputSchema,
-          images,
-          attachments,
-          labels: resolvedIntent.intent.labels,
-          env,
-          provisionalTitle,
-          firstAgentContext,
-        },
-      );
+        agentId,
+        config: resolvedIntent.config,
+        workspaceId: resolvedIntent.intent.workspaceId,
+        initialPrompt,
+        source: msg.callerAgentId
+          ? { kind: "agent-message", agentId: msg.callerAgentId }
+          : undefined,
+        clientMessageId,
+        outputSchema,
+        images,
+        attachments,
+        history,
+        labels: resolvedIntent.intent.labels,
+        env,
+        provisionalTitle,
+        firstAgentContext,
+      });
+      const snapshot = created.snapshot;
       createdAgentId = snapshot.id;
       await this.agentUpdates.forwardLiveAgent(snapshot);
+
+      // Step 2: send the request's first message, when it has one. This is the
+      // only thing that ever starts a turn for a freshly created session.
+      let liveSnapshot = created.liveSnapshot;
+      let initialPromptStarted = false;
+      if (created.firstMessage) {
+        const sent = await sendCreatedAgentFirstMessage(commands, snapshot, created.firstMessage);
+        liveSnapshot = sent.liveSnapshot;
+        initialPromptStarted = sent.started;
+        // A failed first turn belongs to the created agent, not to creation:
+        // the session stays, exactly as it did when the send was bundled here.
+        if (sent.error) {
+          this.sessionLogger.error(
+            { err: sent.error, agentId: snapshot.id },
+            "First message failed after creating the agent",
+          );
+        }
+      }
       if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
         this.workspaceAutoName.scheduleForDirectory(
           {
@@ -7612,6 +7636,63 @@ export class Session {
           requestId: request.requestId,
           workspaceId: request.workspaceId,
           archivedAt: null,
+          error: message,
+        },
+      });
+    }
+  }
+
+  private async handleRemoveWorkspaceRequest(
+    request: Extract<SessionInboundMessage, { type: "workspace.remove.request" }>,
+  ): Promise<void> {
+    const { workspaceId, requestId } = request;
+    this.sessionLogger.info({ workspaceId, requestId }, "session: workspace.remove.request");
+
+    try {
+      const existing = await this.workspaceRegistry.get(workspaceId);
+      if (!existing) {
+        throw new Error(`Workspace not found: ${workspaceId}`);
+      }
+
+      this.markWorkspaceArchiving([workspaceId], new Date().toISOString());
+      await this.emitWorkspaceUpdatesForWorkspaceIds([workspaceId]);
+
+      try {
+        await this.terminalController.killTerminalsForWorkspace(workspaceId);
+        this.workspaceSetupRuntime.stop(workspaceId);
+        this.workspaceRuntimeStore.remove(existing.cwd);
+
+        const agents = await this.agentStorage.listByWorkspace(workspaceId);
+        for (const agent of agents) {
+          await this.handleDeleteAgentRequest(agent.id, requestId);
+        }
+
+        await this.workspaceRegistry.remove(workspaceId);
+      } finally {
+        this.clearWorkspaceArchiving([workspaceId]);
+      }
+
+      this.emit({
+        type: "workspace.remove.response",
+        payload: {
+          requestId,
+          workspaceId,
+          removed: true,
+          error: null,
+        },
+      });
+    } catch (error) {
+      const message = getErrorMessageOr(error, "Failed to remove workspace");
+      this.sessionLogger.error(
+        { err: error, workspaceId, requestId },
+        "session: workspace.remove.request error",
+      );
+      this.emit({
+        type: "workspace.remove.response",
+        payload: {
+          requestId,
+          workspaceId,
+          removed: false,
           error: message,
         },
       });
