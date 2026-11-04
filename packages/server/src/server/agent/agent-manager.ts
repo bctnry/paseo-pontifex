@@ -324,6 +324,8 @@ export interface CreateAgentOptions {
   // undefined is an explicit decision: the agent never appears in the sidebar.
   workspaceId: string | undefined;
   owner?: AgentOwner;
+  /** Background agents stay out of discovery, tabs, tracks and attention. Fixed at creation. */
+  background?: boolean;
 }
 
 export interface AgentManagerOptions {
@@ -386,6 +388,11 @@ export type AttentionState =
       attentionReason: "finished" | "error" | "permission";
       attentionTimestamp: Date;
     };
+
+/** Private helpers and background agents report to their creator, never to the user. */
+function raisesAttention(agent: Pick<ManagedAgent, "internal" | "background">): boolean {
+  return !agent.internal && !agent.background;
+}
 
 function resolveInitialAttention(input: AttentionState | undefined): AttentionState {
   if (input == null || !input.requiresAttention) {
@@ -452,6 +459,11 @@ interface ManagedAgentBase {
    * Internal agents are hidden from listings and don't trigger notifications.
    */
   internal?: boolean;
+  /**
+   * Background agents are durable but hidden from default discovery and never raise attention.
+   * Fixed at creation.
+   */
+  background?: boolean;
   /**
    * User-defined labels for categorizing agents (e.g., { surface: "workspace" }).
    */
@@ -1402,6 +1414,7 @@ export class AgentManager {
       initialTitle: options.initialTitle,
       workspaceId: options.workspaceId,
       owner: options.owner,
+      background: options.background,
       launchEnv: options.env ? { ...options.env } : undefined,
       historyPrimed: true,
     });
@@ -1434,6 +1447,7 @@ export class AgentManager {
       labels?: Record<string, string>;
       workspaceId?: string;
       owner?: AgentOwner;
+      background?: boolean;
       attention?: AttentionState;
     },
     resumeOptions?: AgentResumeSessionOptions,
@@ -1466,6 +1480,7 @@ export class AgentManager {
       labels?: Record<string, string>;
       workspaceId?: string;
       owner?: AgentOwner;
+      background?: boolean;
       attention?: AttentionState;
     },
     resumeOptions?: AgentResumeSessionOptions,
@@ -1727,6 +1742,7 @@ export class AgentManager {
         labels: existing.labels,
         workspaceId: existing.workspaceId,
         owner: existing.owner,
+        background: existing.background,
         launchEnv: existing.launchEnv,
         createdAt: existing.createdAt,
         updatedAt: existing.updatedAt,
@@ -1947,6 +1963,7 @@ export class AgentManager {
     // Retain ownership until shutdown succeeds. A failed close may still own a
     // native writer, so publishing a resumable closed snapshot would orphan it.
     await agent.session.close();
+    await this.drainSessionEvents(agentId);
     this.cancelRunningProviderSubagents(agentId);
     const closedAgent = this.prepareAgentForClosure(agent, "agent closed");
 
@@ -2180,6 +2197,7 @@ export class AgentManager {
         lastError: record.lastError ?? undefined,
         attention,
         internal: record.internal,
+        background: record.background,
         labels: record.labels,
       },
     });
@@ -2852,6 +2870,7 @@ export class AgentManager {
       this.runs.settleForegroundStart(pendingRun, { status: "started", turnId });
       agent.activeForegroundTurnId = turnId;
       this.openActiveTurn(agent, turnId, turnStartedAt);
+      agent.attention = { requiresAttention: false };
       agent.lifecycle = "running";
       this.touchUpdatedAt(agent);
       // AgentManager owns the accepted-turn boundary. Publish liveness before the canonical
@@ -3041,7 +3060,13 @@ export class AgentManager {
         expectedTurnId,
       });
       if (admission.status === "accepted") {
-        await this.recordAcceptedSteer(agent, prompt, options?.clientMessageId, expectedTurnId);
+        await this.recordAcceptedSteer(
+          agent,
+          prompt,
+          options?.clientMessageId,
+          expectedTurnId,
+          admission.providerMessageId,
+        );
       }
       return admission;
     });
@@ -3074,7 +3099,13 @@ export class AgentManager {
             expectedTurnId,
           });
           if (admission.status === "accepted") {
-            await this.recordAcceptedSteer(agent, prompt, options?.clientMessageId, expectedTurnId);
+            await this.recordAcceptedSteer(
+              agent,
+              prompt,
+              options?.clientMessageId,
+              expectedTurnId,
+              admission.providerMessageId,
+            );
           }
           return admission;
         })
@@ -3179,6 +3210,7 @@ export class AgentManager {
     prompt: AgentPromptInput,
     clientMessageId: string | undefined,
     expectedTurnId: string,
+    providerMessageId: string | undefined,
   ): Promise<void> {
     if (!clientMessageId) {
       return;
@@ -3186,6 +3218,7 @@ export class AgentManager {
     this.recordSubmittedPrompt(agent, prompt, clientMessageId, "accepted", {
       messageId: clientMessageId,
       turnId: expectedTurnId,
+      ...(providerMessageId ? { providerMessageId } : {}),
     });
     this.emitState(agent);
   }
@@ -3517,6 +3550,10 @@ export class AgentManager {
         "agent.rewind.complete",
       );
     } catch (error) {
+      // Native rewind can commit a fork before history refresh fails. Recovery
+      // must resume that latest handle rather than the abandoned conversation.
+      this.refreshSessionPersistence(agent);
+      await this.persistSnapshot(agent);
       this.logger.warn(
         { err: error, agentId, provider: agent.provider, messageId, mode },
         "agent.rewind.failed",
@@ -3799,6 +3836,7 @@ export class AgentManager {
       publishWhenReady?: boolean;
       workspaceId?: string;
       owner?: AgentOwner;
+      background?: boolean;
       launchEnv?: Record<string, string>;
     },
   ): Promise<ManagedAgent> {
@@ -3828,6 +3866,7 @@ export class AgentManager {
         config,
         now,
         durableTimelineHasRows,
+        background: options?.background === true,
         options,
       });
 
@@ -3972,6 +4011,7 @@ export class AgentManager {
     config: AgentSessionConfig;
     now: Date;
     durableTimelineHasRows: boolean;
+    background: boolean;
     options:
       | {
           createdAt?: Date;
@@ -4026,6 +4066,7 @@ export class AgentManager {
       lastError: options?.lastError,
       attention: resolveInitialAttention(options?.attention),
       internal: config.internal ?? false,
+      background: params.background,
       labels: options?.labels ?? {},
     } as ActiveManagedAgent;
   }
@@ -4946,6 +4987,8 @@ export class AgentManager {
     if (eventTurnId) {
       this.openActiveTurn(agent, eventTurnId, new Date());
     }
+    agent.lastError = undefined;
+    agent.attention = { requiresAttention: false };
     agent.lifecycle = "running";
     this.emitState(agent);
   }
@@ -4957,7 +5000,7 @@ export class AgentManager {
     const hadPendingPermissions = agent.pendingPermissions.size > 0;
     agent.pendingPermissions.set(event.request.id, event.request);
     this.refreshSessionPersistence(agent);
-    if (!hadPendingPermissions && !agent.internal) {
+    if (!hadPendingPermissions && raisesAttention(agent)) {
       this.broadcastAgentAttention(agent, "permission");
     }
     this.emitState(agent);
@@ -5212,8 +5255,7 @@ export class AgentManager {
     // Track the new status
     this.previousStatuses.set(agent.id, currentStatus);
 
-    // Skip attention tracking for internal agents
-    if (agent.internal) {
+    if (!raisesAttention(agent)) {
       return;
     }
 

@@ -179,6 +179,9 @@ export class V2Harness {
     event: { subscribe: (options) => this.events(options?.signal) },
   };
   readonly connection: V2Connection = {
+    bindSession: async () => {},
+    unbindSession: async () => {},
+    refreshLocation: async () => {},
     client: this.api,
     release: async () => {
       this.releases += 1;

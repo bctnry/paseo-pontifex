@@ -1,6 +1,7 @@
 import { useCallback, useEffect, useRef } from "react";
 import type { View } from "react-native";
-import { hasActiveWebOverlay, hasOpenDomPopover } from "@/lib/overlay-root";
+import { hasActiveOverlay } from "@/keyboard";
+import { hasOpenDomPopover } from "@/keyboard/internal/dom-popover";
 import { isImeComposingKeyboardEvent } from "@/utils/keyboard-ime";
 import type {
   SidebarTypeToSearchInput,
@@ -53,7 +54,7 @@ export function useSidebarTypeToSearch(input: SidebarTypeToSearchInput): Sidebar
       if (!enabledRef.current || !hoveredRef.current) return;
       if (!isPrintableKey(event)) return;
       if (isTypingTarget(event.target) || isTypingTarget(document.activeElement)) return;
-      if (hasActiveWebOverlay() || hasOpenDomPopover()) return;
+      if (hasActiveOverlay() || hasOpenDomPopover()) return;
       event.preventDefault();
       onStartRef.current(event.key);
     };

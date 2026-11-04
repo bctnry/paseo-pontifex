@@ -2,8 +2,8 @@ import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { Monitor, Moon, Sun } from "lucide-react-native";
+import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import {
   SYNTAX_THEME_OPTIONS,
   type SyntaxThemeId,
@@ -17,7 +17,6 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { useContributedThemes } from "@/appearance/provider";
 import { Button } from "@/components/ui/button";
 import {
   EditingTextInput as TextInput,
@@ -35,8 +34,8 @@ import {
   resolveContentMaxWidth,
   sanitizeFontFamily,
   useAppSettings,
-  type AppSettings,
   DEFAULT_THEME_PREFERENCE,
+  type AppSettings,
 } from "@/hooks/use-settings";
 import {
   CUSTOM_THEME_PREFERENCE,
@@ -52,6 +51,7 @@ import { getIsElectron, isNative } from "@/constants/platform";
 import type { PluginThemeOption } from "@/plugins/themes";
 import type { CustomThemeOption } from "@/styles/custom-theme";
 import { useCustomThemeCatalog } from "@/appearance/custom-themes";
+import { useContributedThemes } from "@/appearance/provider";
 import { settingsStyles } from "@/styles/settings";
 import { AppearancePreview } from "./appearance-preview";
 import { CustomThemesSection } from "./custom-themes-section";
@@ -420,7 +420,6 @@ function ContentWidthRow({ value, onChange }: ContentWidthRowProps) {
         {value === null ? null : (
           <Button
             variant="ghost"
-            size="sm"
             onPress={reset}
             accessibilityLabel={t("settings.appearance.layout.resetAccessibility")}
           >
@@ -785,12 +784,13 @@ const styles = StyleSheet.create((theme) => ({
     borderTopWidth: theme.borderWidth[1],
     borderTopColor: theme.colors.border,
   },
+  themeCard: {
+    padding: theme.spacing[3],
+  },
   swatch: {
     width: ICON_SIZE.md,
     height: ICON_SIZE.md,
-    borderRadius: ICON_SIZE.md / 2,
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
+    borderRadius: theme.borderRadius.sm,
   },
   fontFamilyInput: {
     flexGrow: 1,

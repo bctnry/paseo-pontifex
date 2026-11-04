@@ -607,7 +607,7 @@ function createInitialMutableDaemonConfig(config: ResolvedDaemonSettings): Mutab
     autoArchiveAfterMerge: config.autoArchiveAfterMerge ?? false,
     enableTerminalAgentHooks: config.enableTerminalAgentHooks ?? false,
     idleRuntimeCleanup: config.idleRuntimeCleanup !== false,
-    resumeOnStartup: config.resumeOnStartup !== false,
+    resumeOnStartup: config.resumeOnStartup === true,
     resumePrompt: config.resumePrompt ?? "Resume working.",
     appendSystemPrompt: config.appendSystemPrompt ?? "",
     pluginsEnabled: config.pluginsEnabled ?? false,
@@ -1069,7 +1069,7 @@ export async function createPaseoDaemon(
   const restartRecovery = createRestartRecovery({
     storage: agentStorage,
     settings: () => ({
-      enabled: daemonConfigStore.get().resumeOnStartup !== false,
+      enabled: daemonConfigStore.get().resumeOnStartup === true,
       prompt: daemonConfigStore.get().resumePrompt ?? "Resume working.",
     }),
     eligible: async (record) =>
@@ -1141,7 +1141,7 @@ export async function createPaseoDaemon(
   const ensureWorkspaceForCreateExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
-    context?: { callerWorkspaceId?: string },
+    context?: { background?: boolean; callerWorkspaceId?: string },
   ): Promise<string> => {
     const workspace = await workspaceProvisioning.createWorkspaceForDirectory(
       cwd,
@@ -1194,7 +1194,7 @@ export async function createPaseoDaemon(
   const ensureWorkspaceForCreateAndBroadcastExternal = async (
     cwd: string,
     firstAgentContext?: FirstAgentContext,
-    context?: { callerWorkspaceId?: string },
+    context?: { background?: boolean; callerWorkspaceId?: string },
   ): Promise<string> => {
     const workspaceId = await ensureWorkspaceForCreateExternal(cwd, firstAgentContext, context);
     await emitWorkspaceUpdatesExternal([workspaceId]);

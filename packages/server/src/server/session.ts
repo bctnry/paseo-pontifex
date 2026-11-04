@@ -1,6 +1,6 @@
 import { type WorkspaceRuntimeStore } from "./workspace-runtime-store/index.js";
 import type { AgentMessageDelivery } from "./agent/agent-messages/index.js";
-import { AgentDirectory } from "./agent/directory.js";
+import { AgentDirectory, type BackgroundVisibility } from "./agent/directory.js";
 import { ConnectedHostSession } from "./connected-hosts/index.js";
 import type { ConnectedHosts } from "./connected-hosts/index.js";
 import { searchTimeline } from "./agent/chat-search/index.js";
@@ -50,6 +50,11 @@ import type {
 import { TerminalSessionController } from "../terminal/terminal-session-controller.js";
 import type { TerminalActivity } from "@getpaseo/protocol/terminal-activity";
 import type { BinaryFrame } from "@getpaseo/protocol/binary-frames/index";
+import {
+  encodePluginEventFrame,
+  encodePluginOutputFrame,
+  PluginFrameOpcode,
+} from "@getpaseo/protocol/binary-frames/index";
 import { CursorError } from "./pagination/cursor.js";
 import { SortablePager, type SortSpec } from "./pagination/sortable-pager.js";
 import { matchesAgentHistoryQuery } from "./agent-history-search.js";
@@ -114,7 +119,13 @@ import type {
   ManagedAgent,
 } from "./agent/agent-manager.js";
 import { createAgentCommand, sendCreatedAgentFirstMessage } from "./agent/create-agent/create.js";
-import { resolveCreateAgentIntent, type CreateAgentIntent } from "./agent/create-agent/intent.js";
+import {
+  inheritAgentBackground,
+  inheritWorkspaceBackground,
+  resolveCreateAgentIntent,
+  type CreateAgentIntent,
+  type CreateAgentCaller,
+} from "./agent/create-agent/intent.js";
 import {
   archiveAgentCommand,
   cancelAgentRunCommand,
@@ -144,6 +155,7 @@ import {
   listImportableProviderSessions,
   normalizeImportAgentRequest,
 } from "./agent/import-sessions.js";
+import { listProjectSuggestions, ProjectSuggestionsRequestError } from "./project-suggestions.js";
 import {
   checkoutLiteFromGitSnapshot,
   checkoutFromPersistedWorkspacePlacement,
@@ -382,6 +394,7 @@ type CreateAgentRequestMessage = Extract<SessionInboundMessage, { type: "create_
 interface ResolvedSessionCreateAgentIntent {
   config: AgentSessionConfig;
   intent: CreateAgentIntent;
+  background: boolean;
   createdDirectoryWorkspace: boolean;
 }
 
@@ -521,6 +534,11 @@ export interface SessionOptions {
     subscribeSettings?(listener: (pluginId: string, settingsId: string) => void): () => void;
     catalog(): Array<{ id: string; clientBundle: string; clientBundleHash?: string }>;
     invokePluginRpc(pluginId: string, method: string, input: unknown): Promise<unknown>;
+    subscribePluginRpc(
+      pluginId: string,
+      method: string,
+      input: unknown,
+    ): import("./plugins/runtime-subscription.js").PluginRuntimeSubscription;
     listUsageReports(options?: {
       forceRefresh?: boolean;
       reportIds?: string[];
@@ -926,7 +944,7 @@ export class Session {
     this.workspaceFilesSession = new WorkspaceFilesSession({
       host: {
         emit: (msg, source) => this.emitForSource(msg, source),
-        emitBinary: (frame, source) => this.emitBinaryForFileTransfer(frame, source),
+        emitBinary: (frame, source) => this.emitBinaryReply(frame, source),
         hasBinaryChannel: () => this.onBinaryMessage !== null,
       },
       downloadTokenStore,
@@ -1130,11 +1148,11 @@ export class Session {
       terminalManager,
       emit: (msg) => this.emit(msg),
       hasBinaryChannel: () => this.onBinaryMessage !== null,
+      supportsChunkedReplay: (source) =>
+        this.supportsForSource(CLIENT_CAPS.terminalChunkedReplay, source),
       isPathWithinRoot: (rootPath, candidatePath) => this.isPathWithinRoot(rootPath, candidatePath),
       sessionLogger: this.sessionLogger,
       listTerminalWorkspaceRefs: () => this.listActiveWorkspaceRefs(),
-      clientSupportsWrapReflow: (source) =>
-        this.supportsForSource(CLIENT_CAPS.terminalReflowableSnapshot, source),
       getClientBufferedAmount: (source) => this.getTransportBufferedAmount(source),
     });
     this.agentDirectory = new AgentDirectory({
@@ -1151,8 +1169,8 @@ export class Session {
         ),
     });
     this.agentUpdates = createAgentUpdatesService({
-      includesWorkspace: (agent, includeBackground) =>
-        this.agentDirectory.includes(agent, includeBackground),
+      includesWorkspace: (agent, backgroundVisibility) =>
+        this.agentDirectory.includes(agent, backgroundVisibility),
       emit: (message) => this.emit(message),
       enrichAgentPayload: (payload) => this.enrichAgentPayload(payload),
       buildStoredAgentPayload: (record) => this.buildStoredAgentPayload(record),
@@ -2221,13 +2239,15 @@ export class Session {
       this.peakInflightRequests = this.inflightRequests;
     }
     try {
-      this.sessionLogger.trace(
-        {
-          messageType: msg.type,
-          payloadBytes: JSON.stringify(msg).length,
-        },
-        "agent.session.inbound",
-      );
+      // Stringifying a binary plugin input costs its size; test logger stubs lack isLevelEnabled.
+      if (this.sessionLogger.isLevelEnabled?.("trace"))
+        this.sessionLogger.trace(
+          {
+            messageType: msg.type,
+            payloadBytes: JSON.stringify(msg).length,
+          },
+          "agent.session.inbound",
+        );
       if (!this.authorization.allowsInbound(msg)) {
         const requestId = sessionRequestId(msg);
         if (requestId) {
@@ -2290,6 +2310,17 @@ export class Session {
         .releaseFamily("browser-host")
         .catch((error) =>
           this.sessionLogger.error({ err: error }, "Failed to release revoked browser hosting"),
+        );
+    }
+    // Binary plugin events skip the outbound permission check, so revocation ends the streams.
+    if (!this.authorization.allowsPermission("daemon.manage")) {
+      void this.delivery
+        .releaseFamily("plugin-rpc")
+        .catch((error) =>
+          this.sessionLogger.error(
+            { err: error },
+            "Failed to release revoked plugin subscriptions",
+          ),
         );
     }
   }
@@ -2454,6 +2485,7 @@ export class Session {
       this.dispatchOrchestrationSkillsMessage(msg) ??
       this.dispatchPluginDirectoryMessage(msg) ??
       this.dispatchPluginMessage(msg) ??
+      this.dispatchPluginRpcMessage(msg) ??
       this.dispatchHostServiceMessage(msg) ??
       this.dispatchMiscMessage(msg);
     if (promise) await promise;
@@ -2621,19 +2653,96 @@ export class Session {
       });
       return undefined;
     }
+    return undefined;
+  }
+
+  private dispatchPluginRpcMessage(msg: SessionInboundMessage): Promise<void> | undefined {
     if (msg.type === "plugin.rpc.invoke.request") {
       if (!this.pluginRuntime) throw new Error("Plugin service is unavailable");
       return this.pluginRuntime
         .invokePluginRpc(msg.pluginId, msg.method, msg.input)
-        .then((output) => {
-          this.emit({
-            type: "plugin.rpc.invoke.response",
-            payload: { requestId: msg.requestId, output },
-          });
-          return undefined;
-        });
+        .then((output) => this.replyPluginRpc(msg, output));
     }
+    if (msg.type === "plugin.rpc.subscribe.request") return this.subscribePluginRpc(msg);
     return undefined;
+  }
+
+  /** A `Uint8Array` output is the binary form of `plugin.rpc.invoke.response`. */
+  private async replyPluginRpc(
+    request: Extract<SessionInboundMessage, { type: "plugin.rpc.invoke.request" }>,
+    output: unknown,
+  ): Promise<void> {
+    const response: SessionOutboundMessage = {
+      type: "plugin.rpc.invoke.response",
+      payload: { requestId: request.requestId, output },
+    };
+    if (!(output instanceof Uint8Array)) {
+      this.emit(response);
+      return;
+    }
+    // The frame is the binary form of the response, so it needs the response's permission.
+    if (!this.authorization.allowsOutbound(response)) return;
+    if (!this.supports(CLIENT_CAPS.pluginBinaryPayloads) || this.onBinaryMessage === null)
+      throw new Error(
+        `Update Paseo to receive the binary output of plugin RPC ${request.pluginId}.${request.method}`,
+      );
+    await this.emitBinaryReply(
+      encodePluginOutputFrame(request.requestId, output),
+      this.delivery.currentSource,
+    );
+  }
+
+  private async subscribePluginRpc(
+    request: Extract<SessionInboundMessage, { type: "plugin.rpc.subscribe.request" }>,
+  ): Promise<void> {
+    if (!this.pluginRuntime) throw new Error("Plugin service is unavailable");
+    const subscription = this.pluginRuntime.subscribePluginRpc(
+      request.pluginId,
+      request.method,
+      request.input,
+    );
+    const owner = this.delivery.begin("plugin-rpc", undefined, () => subscription.release());
+    try {
+      await subscription.ready;
+    } catch (error) {
+      await owner.release();
+      throw error;
+    }
+    if (owner.signal.aborted) return;
+    this.emit({
+      type: "plugin.rpc.subscribe.response",
+      payload: { requestId: request.requestId, subscriptionId: owner.responseId },
+    });
+    const close = (reason?: string) => {
+      owner.emit({
+        type: "plugin.rpc.closed",
+        payload: {
+          subscriptionId: owner.responseId,
+          ...(reason === undefined ? {} : { error: reason }),
+        },
+      });
+      void owner.release().catch(() => undefined);
+    };
+    subscription.attach({
+      event: (event) => {
+        const message: SessionOutboundMessage = {
+          type: "plugin.rpc.event",
+          payload: { subscriptionId: owner.responseId, event },
+        };
+        if (!(event instanceof Uint8Array)) {
+          owner.emit(message);
+          return;
+        }
+        if (!this.authorization.allowsOutbound(message)) return;
+        if (this.onBinaryMessage === null) {
+          subscription.release();
+          close("This connection cannot carry binary plugin events");
+          return;
+        }
+        owner.emitBinary(encodePluginEventFrame(owner.responseId, event));
+      },
+      closed: close,
+    });
   }
 
   private dispatchPluginDirectoryMessage(msg: SessionInboundMessage): Promise<void> | undefined {
@@ -3062,6 +3171,8 @@ export class Session {
         return this.handleFetchWorkspacesRequest(msg);
       case "project.list.request":
         return this.handleProjectListRequest(msg);
+      case "project.suggestions.request":
+        return this.handleProjectSuggestionsRequest(msg);
       case "paseo_worktree_list_request":
         return this.handlePaseoWorktreeListRequest(msg);
       case "paseo_worktree_archive_request":
@@ -3275,6 +3386,22 @@ export class Session {
   public async handleBinaryFrame(binaryFrame: BinaryFrame, source: object): Promise<void> {
     if (binaryFrame.kind === "host_route") {
       this.connectedHostSession?.binary(binaryFrame.frame, source);
+      return;
+    }
+    if (binaryFrame.kind === "plugin") {
+      const frame = binaryFrame.frame;
+      // The binary form of plugin.rpc.invoke.request; it authorizes and replies like the JSON form.
+      if (frame.opcode !== PluginFrameOpcode.Input) return;
+      await this.handleMessage(
+        {
+          type: "plugin.rpc.invoke.request",
+          requestId: frame.requestId,
+          pluginId: frame.pluginId,
+          method: frame.method,
+          input: frame.payload,
+        },
+        source,
+      );
       return;
     }
     if (!this.authorization.allowsPermission("workspace.write")) {
@@ -4412,14 +4539,6 @@ export class Session {
       throw new Error(
         "Public internal agents were removed; create a background workspace instead.",
       );
-    if (
-      request.background !== undefined &&
-      (request.workspaceId || (request.callerAgentId && !request.worktree))
-    ) {
-      throw new Error(
-        "background is workspace creation intent; configure the selected workspace at creation.",
-      );
-    }
   }
 
   private async createSessionAgent(
@@ -4471,8 +4590,7 @@ export class Session {
         cwd: config.cwd,
         target: worktree,
         firstAgentContext,
-        background: msg.background,
-        callerWorkspaceId: this.getCallerWorkspaceId(msg.callerAgentId),
+        ...(await this.workspaceBackgroundIntent(msg.background, msg.callerAgentId)),
       });
       createdWorktreeForCleanup = createdWorktree;
       const resolvedIntent = await this.resolveSessionCreateAgentIntent({
@@ -4505,6 +4623,7 @@ export class Session {
         agentId,
         config: resolvedIntent.config,
         workspaceId: resolvedIntent.intent.workspaceId,
+        background: resolvedIntent.background,
         initialPrompt,
         source: msg.callerAgentId
           ? { kind: "agent-message", agentId: msg.callerAgentId }
@@ -4521,7 +4640,6 @@ export class Session {
       });
       const snapshot = created.snapshot;
       createdAgentId = snapshot.id;
-      await this.agentUpdates.forwardLiveAgent(snapshot);
 
       // Step 2: send the request's first message, when it has one. This is the
       // only thing that ever starts a turn for a freshly created session.
@@ -4540,6 +4658,10 @@ export class Session {
           );
         }
       }
+      // `snapshot` predates the initial prompt; subscribers keep the last state they receive.
+      await this.agentUpdates.forwardLiveAgent(
+        this.agentManager.getAgent(snapshot.id) ?? liveSnapshot,
+      );
       if (resolvedIntent.createdDirectoryWorkspace && trimmedPrompt) {
         this.workspaceAutoName.scheduleForDirectory(
           {
@@ -4575,20 +4697,13 @@ export class Session {
     workspacePromptTitle: string | null;
   }): Promise<ResolvedSessionCreateAgentIntent> {
     const { request, createdWorktree } = input;
-    const callerAgent = request.callerAgentId
-      ? this.agentManager.getAgent(request.callerAgentId)
-      : null;
-    if (request.callerAgentId && !callerAgent) {
-      throw new Error(`Caller agent ${request.callerAgentId} not found`);
-    }
+    const callerAgent = await this.resolveCreationCaller(request.callerAgentId);
 
     let config = request.config;
 
     const intent = await resolveCreateAgentIntent({
       explicitWorkspaceId: createdWorktree?.workspace.workspaceId ?? request.workspaceId,
-      caller: callerAgent
-        ? { id: callerAgent.id, cwd: callerAgent.cwd, workspaceId: callerAgent.workspaceId }
-        : null,
+      caller: callerAgent,
       labels: request.labels,
       resolveWorkspace: async (workspaceId) => {
         if (createdWorktree?.workspace.workspaceId === workspaceId) {
@@ -4605,7 +4720,7 @@ export class Session {
           createdWorktree: null,
           cwd: config.cwd,
           initialTitle: input.workspacePromptTitle,
-          background: request.background,
+          background: inheritWorkspaceBackground(request.background, callerAgent),
           callerWorkspaceId: callerAgent?.workspaceId,
         }),
         cwd: config.cwd,
@@ -4616,6 +4731,7 @@ export class Session {
     return {
       config,
       intent,
+      background: inheritAgentBackground(request.background, callerAgent),
       createdDirectoryWorkspace: !createdWorktree && !request.workspaceId && !callerAgent,
     };
   }
@@ -5601,7 +5717,22 @@ export class Session {
     return matchedEntries;
   }
 
-  private async listFetchAgentsEntries(request: AgentDirectoryRequestMessage): Promise<{
+  /**
+   * Inclusive discovery for the requesting source. Exact-ID reads never pass through this.
+   * COMPAT(backgroundAgents): added in v0.15.0, remove after 2027-05-03 once client floor
+   * >= v0.15.0. Sources without the capability see background workspaces' agents only.
+   */
+  private resolveBackgroundVisibility(
+    includeBackground: boolean | undefined,
+  ): BackgroundVisibility {
+    if (!includeBackground) return false;
+    return this.supports(CLIENT_CAPS.backgroundAgents) ? true : "workspaces";
+  }
+
+  private async listFetchAgentsEntries(
+    request: AgentDirectoryRequestMessage,
+    backgroundVisibility: BackgroundVisibility,
+  ): Promise<{
     entries: FetchAgentsResponseEntry[];
     pageInfo: FetchAgentsResponsePageInfo;
     searchTruncated?: boolean;
@@ -5617,9 +5748,7 @@ export class Session {
     let agents = await this.listAgentPayloads({
       labels: filter?.labels,
       includeArchived: filter?.includeArchived,
-      includeBackground:
-        filter?.includeBackground ||
-        (request.type === "fetch_agents_request" && request.includeBackground),
+      includeBackground: backgroundVisibility,
       includeUnavailablePersisted: request.type === "fetch_agent_history_request",
     });
     const activePlacementsByWorkspaceId =
@@ -6353,16 +6482,17 @@ export class Session {
         })
       : null;
     const subscriptionId = owner?.responseId;
+    const backgroundVisibility = this.resolveBackgroundVisibility(
+      request.includeBackground || request.filter?.includeBackground,
+    );
     try {
       if (owner) {
         this.agentUpdates.beginSubscription({
           subscriptionId: owner.id,
           isProviderVisible: (provider) =>
             this.delivery.forSource(owner.source, () => this.isProviderVisibleToClient(provider)),
-          filter: {
-            ...request.filter,
-            ...(request.includeBackground ? { includeBackground: true } : {}),
-          },
+          filter: request.filter,
+          backgroundVisibility,
           syncEnabled: Boolean(request.sync),
           emit: (message) => {
             if (message.type === "agent_update") owner.emit(message);
@@ -6372,8 +6502,8 @@ export class Session {
       }
 
       const payload = request.sync
-        ? await this.readAgentDirectorySync(request)
-        : await this.listFetchAgentsEntries(request);
+        ? await this.readAgentDirectorySync(request, backgroundVisibility)
+        : await this.listFetchAgentsEntries(request, backgroundVisibility);
       const snapshotUpdatedAtByAgentId = new Map<string, number>();
       for (const entry of payload.entries) {
         const parsedUpdatedAt = Date.parse(entry.agent.updatedAt);
@@ -6417,7 +6547,10 @@ export class Session {
     request: Extract<SessionInboundMessage, { type: "fetch_agent_history_request" }>,
   ): Promise<void> {
     try {
-      const payload = await this.listFetchAgentsEntries(request);
+      const payload = await this.listFetchAgentsEntries(
+        request,
+        this.resolveBackgroundVisibility(request.filter?.includeBackground),
+      );
       this.emit({
         type: "fetch_agent_history_response",
         payload: {
@@ -6611,6 +6744,37 @@ export class Session {
     }
   }
 
+  private async handleProjectSuggestionsRequest(
+    request: Extract<SessionInboundMessage, { type: "project.suggestions.request" }>,
+  ): Promise<void> {
+    try {
+      const result = await listProjectSuggestions({
+        request,
+        agentManager: this.agentManager,
+        projectRegistry: this.projectRegistry,
+        workspaceGitService: this.workspaceGitService,
+      });
+      this.emit({
+        type: "project.suggestions.response",
+        payload: { requestId: request.requestId, ...result },
+      });
+    } catch (error) {
+      this.sessionLogger.error({ err: error }, "Failed to handle project.suggestions.request");
+      this.emit({
+        type: "rpc_error",
+        payload: {
+          requestId: request.requestId,
+          requestType: request.type,
+          error: error instanceof Error ? error.message : "Failed to list project suggestions",
+          code:
+            error instanceof ProjectSuggestionsRequestError
+              ? error.code
+              : "project_suggestions_failed",
+        },
+      });
+    }
+  }
+
   private requireWorkspaceLabels(): WorkspaceLabelService {
     if (!this.workspaceLabelService) {
       throw new SessionRequestError("workspace_labels_unavailable", "Workspace labels unavailable");
@@ -6751,6 +6915,7 @@ export class Session {
 
   private async readAgentDirectorySync(
     request: Extract<SessionInboundMessage, { type: "fetch_agents_request" }>,
+    backgroundVisibility: BackgroundVisibility,
   ) {
     if (request.scope !== "active" || request.filter) {
       throw new SessionRequestError(
@@ -6758,19 +6923,19 @@ export class Session {
         "Sequenced agent directory reads require scope=active and no filter.",
       );
     }
-    const snapshot = await this.listFetchAgentsEntries({
-      ...request,
-      includeBackground: true,
-      page: { limit: Number.MAX_SAFE_INTEGER },
-    });
+    // The canonical collection is complete; only the read below is scoped.
+    const snapshot = await this.listFetchAgentsEntries(
+      { ...request, page: { limit: Number.MAX_SAFE_INTEGER } },
+      true,
+    );
     const result = this.directorySync.synchronizeAgents(
       snapshot.entries,
       request.sync ?? {},
-      request.includeBackground,
+      backgroundVisibility,
     );
     const entries = await Promise.all(
       result.entries.map(async (entry) =>
-        (await this.agentDirectory.includes(entry.agent, request.includeBackground)) ? entry : null,
+        (await this.agentDirectory.includes(entry.agent, backgroundVisibility)) ? entry : null,
       ),
     );
     return { ...result, entries: entries.filter((entry) => entry !== null) };
@@ -6871,11 +7036,34 @@ export class Session {
     }
   }
 
-  private getCallerWorkspaceId(callerAgentId?: string): string | undefined {
-    if (!callerAgentId) return undefined;
-    const caller = this.agentManager.getAgent(callerAgentId);
+  private async resolveCreationCaller(
+    callerAgentId?: string,
+  ): Promise<(CreateAgentCaller & { background?: boolean }) | null> {
+    if (!callerAgentId) return null;
+    let caller: (CreateAgentCaller & { background?: boolean }) | null =
+      this.agentManager.getAgent(callerAgentId);
+    if (!caller) {
+      const stored = await this.agentStorage.get(callerAgentId);
+      if (stored && !stored.archivedAt) caller = stored;
+    }
     if (!caller) throw new Error(`Caller agent ${callerAgentId} not found`);
-    return caller.workspaceId;
+    return {
+      id: caller.id,
+      cwd: caller.cwd,
+      workspaceId: caller.workspaceId,
+      background: caller.background,
+    };
+  }
+
+  private async workspaceBackgroundIntent(
+    background: boolean | undefined,
+    callerAgentId: string | undefined,
+  ): Promise<{ background?: boolean; callerWorkspaceId?: string }> {
+    const caller = await this.resolveCreationCaller(callerAgentId);
+    return {
+      background: inheritWorkspaceBackground(background, caller),
+      callerWorkspaceId: caller?.workspaceId,
+    };
   }
 
   private async createRequestedWorkspace(
@@ -6924,8 +7112,7 @@ export class Session {
       {
         expectsInitialAgent: Boolean(request.firstAgentContext),
         workspaceId,
-        background: request.background,
-        callerWorkspaceId: this.getCallerWorkspaceId(request.callerAgentId),
+        ...(await this.workspaceBackgroundIntent(request.background, request.callerAgentId)),
       },
     );
     await this.syncWorkspaceGitObserverForWorkspace(workspace);
@@ -6988,8 +7175,7 @@ export class Session {
         githubPrNumber: source.githubPrNumber,
         firstAgentContext: request.firstAgentContext,
         title: request.title,
-        background: request.background,
-        callerWorkspaceId: this.getCallerWorkspaceId(request.callerAgentId),
+        ...(await this.workspaceBackgroundIntent(request.background, request.callerAgentId)),
       },
       source.baseBranch
         ? { resolveDefaultBranch: async () => source.baseBranch as string }
@@ -7864,7 +8050,8 @@ export class Session {
       );
       const agentsById = new Map(agents.map((agent) => [agent.id, agent] as const));
       const candidates = agents
-        .filter((agent) => !agent.archivedAt && agent.workspaceId === workspace.workspaceId)
+        .filter((agent) => !agent.archivedAt && !agent.background)
+        .filter((agent) => agent.workspaceId === workspace.workspaceId)
         .filter((agent) => resolveWorkspaceRootAgent(agent, agentsById)?.id === agent.id)
         .filter((agent) => agent.status === "idle" || agent.status === "closed")
         .filter((agent) => agent.requiresAttention !== true)
@@ -8433,7 +8620,7 @@ export class Session {
             },
             activeTurnBehavior: msg.activeTurnBehavior ?? "steer",
             sessionMode: msg.sessionMode,
-            clearPendingPermissions: true,
+            clearPendingPermissions: false,
           });
           deliveryStatus = "queued";
           queued();
@@ -8805,9 +8992,9 @@ export class Session {
     }
   }
 
-  private async emitBinaryForFileTransfer(frame: Uint8Array, source?: object): Promise<void> {
+  private async emitBinaryReply(frame: Uint8Array, source?: object): Promise<void> {
     if (source && this.onBinaryMessageToSource) {
-      this.delivery.authorizeFileReply(frame, source);
+      this.delivery.authorizeBinaryReply(frame, source);
       await this.onBinaryMessageToSource(source, frame);
       return;
     }
