@@ -1,3 +1,4 @@
+import { useAddHost } from "@/hosts/add-host";
 import { router } from "expo-router";
 import {
   Archive,
@@ -16,13 +17,14 @@ import { useTranslation } from "react-i18next";
 import { memo, useCallback, useEffect, useMemo, useRef, useState, type RefObject } from "react";
 import {
   Pressable,
+  ScrollView,
   StyleSheet as RNStyleSheet,
   Text,
   useWindowDimensions,
   View,
   type PressableStateCallbackType,
 } from "react-native";
-import { Gesture } from "react-native-gesture-handler";
+import { Gesture, ScrollView as GHScrollView } from "react-native-gesture-handler";
 import Animated, { runOnJS, useAnimatedStyle, useSharedValue } from "react-native-reanimated";
 import { scheduleOnRN } from "react-native-worklets";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -34,6 +36,7 @@ import {
   resolveDesktopSidebarWidth,
   shouldShowSidebarTopStrip,
 } from "@/components/desktop-sidebar-layout";
+import { useWindowLayout, resolveDesktopDivisionLayout } from "@/window-layout";
 import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
   SIDEBAR_RESIZE_FAIL_OFFSET,
@@ -58,6 +61,7 @@ import { Shortcut } from "@/components/ui/shortcut";
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { HEADER_INNER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
 import { getDesktopWindowChromeMode } from "@/desktop/host";
+import { isNative as platformIsNative } from "@/constants/platform";
 import { useOpenAddProject } from "@/hooks/use-open-add-project";
 import { useImportSession } from "@/hooks/use-import-session";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
@@ -83,7 +87,7 @@ import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
-import { buildSettingsAddHostRoute, buildSettingsRoute } from "@/utils/host-routes";
+import { buildSettingsRoute } from "@/utils/host-routes";
 import { openHostOverview } from "@/navigation/settings-navigation";
 import { UsageSidebarItem, UsageSidebarRoot, useUsageSummary, useOpenSidebarUsage } from "@/usage";
 import { SidebarAgentListSkeleton } from "./sidebar-agent-list-skeleton";
@@ -198,14 +202,8 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
     router.push(buildSettingsRoute());
   }, []);
 
-  const handleAddHostMobile = useCallback(() => {
-    showMobileAgent();
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, [showMobileAgent]);
-
-  const handleAddHostDesktop = useCallback(() => {
-    router.push(buildSettingsAddHostRoute(Date.now()));
-  }, []);
+  const handleAddHostMobile = useAddHost();
+  const handleAddHostDesktop = handleAddHostMobile;
 
   const handleOpenHostSettingsMobile = useCallback(
     (serverId: string) => {
@@ -552,6 +550,7 @@ function MobileSidebar({
   insetsBottom,
   closeSidebar,
 }: MobileSidebarProps) {
+  const insets = useSafeAreaInsets();
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
   const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture();
 
@@ -566,10 +565,10 @@ function MobileSidebar({
         onPress={closeSidebar}
         testID="sidebar-close"
         nativeID="sidebar-close"
-        style={styles.mobileCloseButton}
+        style={styles.mobileCloseButton(insets.right)}
       />
     ),
-    [labels.closeSidebar, closeSidebar],
+    [labels.closeSidebar, closeSidebar, insets.right],
   );
 
   const mobileSidebarInsetStyle = useMemo(
@@ -586,6 +585,14 @@ function MobileSidebar({
     [groupMode, handleOpenProject],
   );
 
+  const navRows = (
+    <SidebarNavRows
+      style={styles.mobileNavRowsGroup}
+      onBeforeNavigate={closeSidebar}
+      firstRowTrailing={closeButton}
+    />
+  );
+
   return (
     <MobilePanelOverlay
       panel="agent-list"
@@ -594,11 +601,29 @@ function MobileSidebar({
     >
       <View style={styles.sidebarContent} pointerEvents="auto">
         <WindowChromeSafeArea placement="below" />
-        <SidebarNavRows
-          style={styles.sidebarHeaderGroup}
-          onBeforeNavigate={closeSidebar}
-          firstRowTrailing={closeButton}
-        />
+        {platformIsNative ? (
+          <GHScrollView
+            // Same contract as the workspace list: vertical drags scroll the nav
+            // block, a clear horizontal intent still activates the close pan.
+            simultaneousHandlers={closeGestureRef}
+            style={styles.mobileNavScroll}
+            showsVerticalScrollIndicator={false}
+            alwaysBounceVertical={false}
+            testID="sidebar-nav-scroll"
+          >
+            {navRows}
+          </GHScrollView>
+        ) : (
+          <ScrollView
+            style={styles.mobileNavScroll}
+            showsVerticalScrollIndicator={false}
+            alwaysBounceVertical={false}
+            testID="sidebar-nav-scroll"
+          >
+            {navRows}
+          </ScrollView>
+        )}
+        <SidebarSeparator />
 
         {isInitialLoad && !hasActiveHostFilter ? (
           <SidebarAgentListSkeleton />
@@ -671,13 +696,22 @@ function DesktopSidebar({
   const sidebarWidth = usePanelStore((state) => state.sidebarWidth);
   const setSidebarWidth = usePanelStore((state) => state.setSidebarWidth);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
-  const { width: windowWidth } = useWindowDimensions();
+  const { width: windowWidth, height: windowHeight } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const viewportWidth = windowWidth - insets.left - insets.right;
-  const visibleSidebarWidth = resolveDesktopSidebarWidth({
-    requestedWidth: sidebarWidth,
-    viewportWidth,
+  const divisionLayout = resolveDesktopDivisionLayout({
+    geometry: useWindowLayout(),
+    windowWidth,
+    windowHeight,
+    leftInset: insets.left,
+    rightInset: insets.right,
   });
+  const visibleSidebarWidth =
+    divisionLayout?.sidebarWidth ??
+    resolveDesktopSidebarWidth({
+      requestedWidth: sidebarWidth,
+      viewportWidth,
+    });
 
   const workspacesSectionHeaderElement = useMemo(
     () => <WorkspacesSectionHeader groupMode={groupMode} onAddProject={handleOpenProject} />,
@@ -697,6 +731,7 @@ function DesktopSidebar({
   const resizeGesture = useMemo(
     () =>
       Gesture.Pan()
+        .enabled(divisionLayout === null)
         .hitSlop({ left: 8, right: 8, top: 0, bottom: 0 })
         .onBegin(() => {
           scheduleOnRN(showResizeGrip);
@@ -718,13 +753,14 @@ function DesktopSidebar({
             viewportWidth,
           });
         })
-        .onEnd(() => {
-          runOnJS(setSidebarWidth)(resizeWidth.value);
+        .onEnd((_event, success) => {
+          if (success) runOnJS(setSidebarWidth)(resizeWidth.value);
         })
         .onFinalize(() => {
           scheduleOnRN(hideResizeGrip);
         }),
     [
+      divisionLayout,
       hideResizeGrip,
       resizeWidth,
       setSidebarWidth,
@@ -735,7 +771,7 @@ function DesktopSidebar({
   );
 
   const resizeAnimatedStyle = useAnimatedStyle(() => ({
-    width: resizeWidth.value,
+    width: divisionLayout?.sidebarWidth ?? resizeWidth.value,
   }));
 
   const desktopSidebarStyle = useMemo(
@@ -748,10 +784,10 @@ function DesktopSidebar({
   );
   const desktopSidebarBorderStyle = useMemo(
     () => [
-      styles.desktopSidebarBorder,
+      styles.desktopSidebarBorder(divisionLayout !== null),
       { flex: 1, paddingTop: insetsTop, paddingBottom: insets.bottom },
     ],
-    [insetsTop, insets.bottom],
+    [insetsTop, insets.bottom, divisionLayout],
   );
   const sidebarHeaderGroupStyle = useMemo(
     () => [
@@ -843,12 +879,14 @@ function DesktopSidebar({
             handleOpenHostSettings={handleOpenHostSettings}
           />
 
-          <SidebarResizeHandle
-            edge="right"
-            gesture={resizeGesture}
-            pressed={resizePressed}
-            testID="left-sidebar-resize-handle"
-          />
+          {divisionLayout === null ? (
+            <SidebarResizeHandle
+              edge="right"
+              gesture={resizeGesture}
+              pressed={resizePressed}
+              testID="left-sidebar-resize-handle"
+            />
+          ) : null}
         </View>
       </SidebarContextMenu>
     </Animated.View>
@@ -1087,18 +1125,30 @@ const styles = StyleSheet.create((theme) => ({
   sidebarHeaderGroupBelowChrome: {
     paddingTop: 0,
   },
+  // The nav block caps at half the sidebar; a long item list scrolls inside the
+  // cap instead of crowding the workspace list off a short screen.
+  mobileNavScroll: {
+    flexGrow: 0,
+    flexShrink: 1,
+    maxHeight: "50%",
+  },
+  mobileNavRowsGroup: {
+    paddingTop: theme.spacing[2],
+    gap: 2,
+    paddingBottom: theme.spacing[1.5],
+  },
   sidebarContent: {
     flex: 1,
     minHeight: 0,
   },
-  mobileCloseButton: {
-    marginRight: theme.spacing[2],
-  },
-  desktopSidebarBorder: {
-    borderRightWidth: 1,
+  mobileCloseButton: (rightInset: number) => ({
+    marginRight: theme.spacing[2] + rightInset,
+  }),
+  desktopSidebarBorder: (hasDivision: boolean) => ({
+    borderRightWidth: hasDivision ? 0 : 1,
     borderRightColor: theme.colors.border,
     backgroundColor: theme.colors.surfaceSidebar,
-  },
+  }),
   sidebarDragArea: {
     position: "relative",
   },

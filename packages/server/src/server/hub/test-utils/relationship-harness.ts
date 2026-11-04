@@ -841,7 +841,7 @@ export class HubRelationshipHarness {
   }
 
   async durableOwnedAgentIds(): Promise<string[]> {
-    return (await this.daemon!.agentStorage.list())
+    return (await this.daemon!.agentStorage.listAll())
       .filter((record) => record.owner?.kind === "daemon")
       .map((record) => record.id);
   }
@@ -851,7 +851,7 @@ export class HubRelationshipHarness {
       path.join(this.paseoHome, "agents"),
       pino({ level: "silent" }),
     );
-    return (await storage.list())
+    return (await storage.listAll())
       .filter((record) => record.owner?.kind === "daemon")
       .map((record) => record.id);
   }
@@ -1273,7 +1273,7 @@ export class HubRelationshipHarness {
     });
     const executions = this.executionsForReconstruction(manager, storage);
     const replay = await executions.create(this.ownedCreateInput(executionId));
-    const durableAgentCount = (await storage.list()).filter(
+    const durableAgentCount = (await storage.listAll()).filter(
       (record) => record.owner?.kind === "daemon",
     ).length;
     return { replay, durableAgentCount };
@@ -1286,8 +1286,9 @@ export class HubRelationshipHarness {
       pino({ level: "silent" }),
     );
     return {
-      durableAgentCount: (await storage.list()).filter((record) => record.owner?.kind === "daemon")
-        .length,
+      durableAgentCount: (await storage.listAll()).filter(
+        (record) => record.owner?.kind === "daemon",
+      ).length,
     };
   }
 
