@@ -1080,7 +1080,7 @@ function WorkspaceScreenContent({
   const workspaceDirectory = workspaceDescriptor?.workspaceDirectory || null;
   const isMissingWorkspaceDirectory = Boolean(workspaceDescriptor) && !workspaceDirectory;
   const [isImportSheetVisible, setIsImportSheetVisible] = useState(false);
-  const [, setHoveredCloseTabKey] = useState<string | null>(null);
+  const setHoveredCloseTabKey = useCallback((_key?: unknown) => {}, []);
   const canOpenImportSheet = [client, isConnected, workspaceDirectory].every(Boolean);
   const openImportSheet = useCallback(() => {
     setIsImportSheetVisible(true);
