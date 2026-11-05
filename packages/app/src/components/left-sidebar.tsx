@@ -33,6 +33,7 @@ import { SidebarTopStrip } from "@/components/desktop/sidebar-top-strip";
 import { TitlebarDragRegion } from "@/components/desktop/titlebar-drag-region";
 import { SidebarCloseButton } from "@/components/headers/sidebar-close-button";
 import {
+  resolveDesktopSidebarInsetLeft,
   resolveDesktopSidebarWidth,
   shouldShowSidebarTopStrip,
 } from "@/components/desktop-sidebar-layout";
@@ -86,6 +87,7 @@ import { useSidebarSelectionStore } from "@/stores/sidebar-selection-store";
 import { usePanelStore } from "@/stores/panel-store";
 import { useOwnsWindowChromeCorner, WindowChromeSafeArea } from "@/utils/desktop-window";
 import { useCloseAgentListGesture } from "@/mobile-panels/gestures";
+import { useLeftPanelWidth } from "@/mobile-panels/provider";
 import { MobilePanelOverlay } from "@/mobile-panels/presentation";
 import { buildSettingsRoute } from "@/utils/host-routes";
 import { openHostOverview } from "@/navigation/settings-navigation";
@@ -142,9 +144,16 @@ interface MobileSidebarProps extends SidebarSharedProps {
 interface DesktopSidebarProps extends SidebarSharedProps {
   insetsTop: number;
   active: boolean;
+  overlay: boolean;
 }
 
-export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boolean }) {
+export const LeftSidebar = memo(function LeftSidebar({
+  active,
+  desktopOverlay,
+}: {
+  active: boolean;
+  desktopOverlay: boolean;
+}) {
   const { theme } = useUnistyles();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -185,41 +194,26 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
   const openProjectPicker = useOpenAddProject();
   const { open: openImportSession, sheet: importSessionSheet } = useImportSession();
 
-  const handleOpenProjectMobile = useCallback(() => {
+  // Each destination closes the navigation overlay first. Closing is idempotent, so a docked
+  // sidebar runs the same handler.
+  const handleOpenProject = useCallback(() => {
     void openProjectPicker();
   }, [openProjectPicker]);
 
-  const handleOpenProjectDesktop = useCallback(() => {
-    void openProjectPicker();
-  }, [openProjectPicker]);
-
-  const handleSettingsMobile = useCallback(() => {
+  const handleSettings = useCallback(() => {
     showMobileAgent();
     router.push(buildSettingsRoute());
   }, [showMobileAgent]);
 
-  const handleSettingsDesktop = useCallback(() => {
-    router.push(buildSettingsRoute());
-  }, []);
+  const handleAddHost = useAddHost();
 
-  const handleAddHostMobile = useAddHost();
-  const handleAddHostDesktop = handleAddHostMobile;
-
-  const handleOpenHostSettingsMobile = useCallback(
+  const handleOpenHostSettings = useCallback(
     (serverId: string) => {
       showMobileAgent();
       openHostOverview(serverId);
     },
     [showMobileAgent],
   );
-
-  const handleOpenHostSettingsDesktop = useCallback((serverId: string) => {
-    openHostOverview(serverId);
-  }, []);
-
-  const handleImportSessionMobile = useCallback(() => {
-    openImportSession();
-  }, [openImportSession]);
 
   const labels = useMemo(
     (): SidebarLabels => ({
@@ -253,41 +247,35 @@ export const LeftSidebar = memo(function LeftSidebar({ active }: { active: boole
     labels,
   };
 
-  if (isCompactLayout) {
-    return (
-      <>
-        <RetainedPanelActivity active={active}>
-          <MobileSidebar
-            {...sharedProps}
-            active={active}
-            insetsTop={insets.top}
-            insetsBottom={insets.bottom}
-            closeSidebar={showMobileAgent}
-            handleOpenProject={handleOpenProjectMobile}
-            handleImportSession={handleImportSessionMobile}
-            handleSettings={handleSettingsMobile}
-            handleAddHost={handleAddHostMobile}
-            handleOpenHostSettings={handleOpenHostSettingsMobile}
-          />
-        </RetainedPanelActivity>
-        {importSessionSheet}
-      </>
-    );
-  }
+  const handlers = {
+    handleOpenProject,
+    handleImportSession: openImportSession,
+    handleSettings,
+    handleAddHost,
+    handleOpenHostSettings,
+  };
 
   return (
     <>
       <RetainedPanelActivity active={active}>
-        <DesktopSidebar
-          {...sharedProps}
-          insetsTop={insets.top}
-          active={active}
-          handleOpenProject={handleOpenProjectDesktop}
-          handleImportSession={openImportSession}
-          handleSettings={handleSettingsDesktop}
-          handleAddHost={handleAddHostDesktop}
-          handleOpenHostSettings={handleOpenHostSettingsDesktop}
-        />
+        {isCompactLayout ? (
+          <MobileSidebar
+            {...sharedProps}
+            {...handlers}
+            active={active}
+            insetsTop={insets.top}
+            insetsBottom={insets.bottom}
+            closeSidebar={showMobileAgent}
+          />
+        ) : (
+          <DesktopSidebar
+            {...sharedProps}
+            {...handlers}
+            insetsTop={insets.top}
+            active={active}
+            overlay={desktopOverlay}
+          />
+        )}
       </RetainedPanelActivity>
       {importSessionSheet}
     </>
@@ -689,11 +677,11 @@ function DesktopSidebar({
   handleOpenHostSettings,
   insetsTop,
   active,
+  overlay,
 }: DesktopSidebarProps) {
   const ownsTopLeft = useOwnsWindowChromeCorner("top-left");
   const showTopStrip = shouldShowSidebarTopStrip(getDesktopWindowChromeMode());
   const hasActiveHostFilter = useSidebarViewStore((state) => state.hostFilters.length > 0);
-  const sidebarWidth = usePanelStore((state) => state.sidebarWidth);
   const setSidebarWidth = usePanelStore((state) => state.setSidebarWidth);
   const toggleDesktopAgentList = usePanelStore((state) => state.toggleDesktopAgentList);
   const { width: windowWidth, height: windowHeight } = useWindowDimensions();
@@ -706,19 +694,17 @@ function DesktopSidebar({
     leftInset: insets.left,
     rightInset: insets.right,
   });
-  const visibleSidebarWidth =
-    divisionLayout?.sidebarWidth ??
-    resolveDesktopSidebarWidth({
-      requestedWidth: sidebarWidth,
-      viewportWidth,
-    });
+  const visibleSidebarWidth = useLeftPanelWidth();
 
   const workspacesSectionHeaderElement = useMemo(
     () => <WorkspacesSectionHeader groupMode={groupMode} onAddProject={handleOpenProject} />,
     [groupMode, handleOpenProject],
   );
 
-  const startWidthRef = useRef(visibleSidebarWidth);
+  const closeSidebar = usePanelStore((state) => state.showMobileAgent);
+  const { gesture: closeGesture, gestureRef: closeGestureRef } = useCloseAgentListGesture(overlay);
+
+  const startWidth = useSharedValue(visibleSidebarWidth);
   const resizeWidth = useSharedValue(visibleSidebarWidth);
   const [resizePressed, setResizePressed] = useState(false);
   const showResizeGrip = useCallback(() => setResizePressed(true), []);
@@ -742,12 +728,12 @@ function DesktopSidebar({
         .activeOffsetX([-SIDEBAR_RESIZE_ACTIVATION_OFFSET, SIDEBAR_RESIZE_ACTIVATION_OFFSET])
         .failOffsetY([-SIDEBAR_RESIZE_FAIL_OFFSET, SIDEBAR_RESIZE_FAIL_OFFSET])
         .onStart((event) => {
-          startWidthRef.current = visibleSidebarWidth - event.translationX;
+          startWidth.value = visibleSidebarWidth - event.translationX;
           resizeWidth.value = visibleSidebarWidth;
         })
         .onUpdate((event) => {
           // Dragging right (positive translationX) increases width
-          const newWidth = startWidthRef.current + event.translationX;
+          const newWidth = startWidth.value + event.translationX;
           resizeWidth.value = resolveDesktopSidebarWidth({
             requestedWidth: newWidth,
             viewportWidth,
@@ -765,6 +751,7 @@ function DesktopSidebar({
       resizeWidth,
       setSidebarWidth,
       showResizeGrip,
+      startWidth,
       viewportWidth,
       visibleSidebarWidth,
     ],
@@ -773,21 +760,24 @@ function DesktopSidebar({
   const resizeAnimatedStyle = useAnimatedStyle(() => ({
     width: divisionLayout?.sidebarWidth ?? resizeWidth.value,
   }));
-
+  // The panel host gets no width of its own: the dock sizes to this view and the overlay fills the
+  // window. A Reanimated width on the host reached Android after React had switched presentation,
+  // and a lost update left the workspace at the dock width after the dock collapsed.
   const desktopSidebarStyle = useMemo(
-    () => [
-      staticStyles.desktopSidebar,
-      !active && staticStyles.desktopSidebarHidden,
-      resizeAnimatedStyle,
-    ],
-    [active, resizeAnimatedStyle],
+    () => [staticStyles.desktopSidebar, resizeAnimatedStyle],
+    [resizeAnimatedStyle],
   );
   const desktopSidebarBorderStyle = useMemo(
     () => [
       styles.desktopSidebarBorder(divisionLayout !== null),
-      { flex: 1, paddingTop: insetsTop, paddingBottom: insets.bottom },
+      {
+        flex: 1,
+        paddingTop: insetsTop,
+        paddingBottom: insets.bottom,
+        paddingLeft: resolveDesktopSidebarInsetLeft({ overlay, safeAreaLeft: insets.left }),
+      },
     ],
-    [insetsTop, insets.bottom, divisionLayout],
+    [insetsTop, insets.bottom, insets.left, overlay, divisionLayout],
   );
   const sidebarHeaderGroupStyle = useMemo(
     () => [
@@ -827,69 +817,79 @@ function DesktopSidebar({
     [theme.colors.accentForeground],
   );
   return (
-    <Animated.View
-      accessibilityElementsHidden={!active}
-      importantForAccessibility={active ? "auto" : "no-hide-descendants"}
-      pointerEvents={active ? "auto" : "none"}
-      style={desktopSidebarStyle}
+    <MobilePanelOverlay
+      panel="agent-list"
+      presentation={overlay ? "overlay" : "dock"}
+      dockVisible={active}
+      closeGesture={closeGesture}
     >
-      <SidebarContextMenu
-        onAddProject={handleOpenProject}
-        onImportSession={handleImportSession}
-        onRefresh={handleRefresh}
-        onSettings={handleSettings}
-        onHideSidebar={toggleDesktopAgentList}
-      >
-        <View style={desktopSidebarBorderStyle}>
-          <View style={styles.sidebarDragArea}>
-            {sidebarChromeRow}
-            <SidebarNavRows style={sidebarHeaderGroupStyle} firstRowTrailing={devBuildBadge} />
+      <Animated.View style={desktopSidebarStyle}>
+        <SidebarContextMenu
+          onAddProject={handleOpenProject}
+          onImportSession={handleImportSession}
+          onRefresh={handleRefresh}
+          onSettings={handleSettings}
+          onHideSidebar={toggleDesktopAgentList}
+        >
+          <View style={desktopSidebarBorderStyle}>
+            <View style={styles.sidebarDragArea}>
+              {sidebarChromeRow}
+              <SidebarNavRows
+                style={sidebarHeaderGroupStyle}
+                firstRowTrailing={devBuildBadge}
+                onBeforeNavigate={closeSidebar}
+              />
+            </View>
+
+            {isInitialLoad && !hasActiveHostFilter ? (
+              <SidebarAgentListSkeleton />
+            ) : (
+              <SidebarWorkspaceList
+                collapsedProjectKeys={collapsedProjectKeys}
+                onToggleProjectCollapsed={toggleProjectCollapsed}
+                shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+                groupMode={groupMode}
+                workspaceGroups={workspaceGroups}
+                projectIconTargets={projectIconTargets}
+                pinnedGroups={pinnedGroups}
+                projects={projects}
+                hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+                hasActiveProjectFilter={hasActiveProjectFilter}
+                workspaceEntriesByKey={workspaceEntriesByKey}
+                isRefreshing={isManualRefresh && isRevalidating}
+                onRefresh={handleRefresh}
+                onAddProject={handleOpenProject}
+                onImportSession={handleImportSession}
+                onWorkspacePress={closeSidebar}
+                parentGestureRef={closeGestureRef}
+                dragGestureHostActive={active}
+                listHeaderComponent={workspacesSectionHeaderElement}
+              />
+            )}
+
+            <SidebarCalloutSlot />
+
+            <SidebarFooter
+              handleOpenProject={handleOpenProject}
+              handleSettings={handleSettings}
+              labels={labels}
+              handleAddHost={handleAddHost}
+              handleOpenHostSettings={handleOpenHostSettings}
+              onBeforeNavigate={closeSidebar}
+            />
+
+            {!overlay && divisionLayout === null ? (
+              <SidebarResizeHandle
+                edge="right"
+                gesture={resizeGesture}
+                pressed={resizePressed}
+                testID="left-sidebar-resize-handle"
+              />
+            ) : null}
           </View>
-
-          {isInitialLoad && !hasActiveHostFilter ? (
-            <SidebarAgentListSkeleton />
-          ) : (
-            <SidebarWorkspaceList
-              collapsedProjectKeys={collapsedProjectKeys}
-              onToggleProjectCollapsed={toggleProjectCollapsed}
-              shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-              groupMode={groupMode}
-              workspaceGroups={workspaceGroups}
-              projectIconTargets={projectIconTargets}
-              pinnedGroups={pinnedGroups}
-              projects={projects}
-              hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-              hasActiveProjectFilter={hasActiveProjectFilter}
-              workspaceEntriesByKey={workspaceEntriesByKey}
-              isRefreshing={isManualRefresh && isRevalidating}
-              onRefresh={handleRefresh}
-              onAddProject={handleOpenProject}
-              onImportSession={handleImportSession}
-              listHeaderComponent={workspacesSectionHeaderElement}
-            />
-          )}
-
-          <SidebarCalloutSlot />
-
-          <SidebarFooter
-            handleOpenProject={handleOpenProject}
-            handleSettings={handleSettings}
-            labels={labels}
-            handleAddHost={handleAddHost}
-            handleOpenHostSettings={handleOpenHostSettings}
-          />
-
-          {divisionLayout === null ? (
-            <SidebarResizeHandle
-              edge="right"
-              gesture={resizeGesture}
-              pressed={resizePressed}
-              testID="left-sidebar-resize-handle"
-            />
-          ) : null}
-        </View>
-      </SidebarContextMenu>
-    </Animated.View>
+        </SidebarContextMenu>
+      </Animated.View>
+    </MobilePanelOverlay>
   );
 }
 
@@ -1108,9 +1108,7 @@ function SectionHeaderIconButton({
 const staticStyles = RNStyleSheet.create({
   desktopSidebar: {
     position: "relative" as const,
-  },
-  desktopSidebarHidden: {
-    display: "none",
+    flex: 1,
   },
 });
 
