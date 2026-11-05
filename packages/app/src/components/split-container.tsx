@@ -761,7 +761,6 @@ const SplitPaneView = memo(function SplitPaneView({
     ),
     [renderCompactHeader, paneTabs, activeTabDescriptor?.key, compactHeaderActions],
   );
-  const [, setHoveredCloseTabKey] = useState<string | null>(null);
   return (
     <RenderProfile id={`SplitPaneView:${pane.id}`}>
       <View
@@ -781,7 +780,6 @@ const SplitPaneView = memo(function SplitPaneView({
                 tabs={desktopTabRowItems}
                 normalizedServerId={normalizedServerId}
                 normalizedWorkspaceId={normalizedWorkspaceId}
-                setHoveredCloseTabKey={setHoveredCloseTabKey}
                 onNavigateTab={onNavigateTab}
                 onCloseTab={onCloseTab}
                 onCopyResumeCommand={onCopyResumeCommand}

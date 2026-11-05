@@ -8,6 +8,7 @@ import {
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import {
   View,
+  Platform,
   Text,
   useWindowDimensions,
   NativeSyntheticEvent,
@@ -36,7 +37,7 @@ import {
 import { ArrowUp, Mic, MicOff, CornerDownLeft, Plus, Square } from "lucide-react-native";
 import * as Haptics from "expo-haptics";
 import { useDictation } from "@/hooks/use-dictation";
-import { hasFinePointer } from "@/hooks/use-fine-pointer";
+import { hasFinePointer } from "@/hooks/pointer-capabilities";
 import { DictationOverlay } from "@/components/dictation-controls";
 import { RealtimeVoiceOverlay } from "@/components/realtime-voice-overlay";
 import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
@@ -1940,7 +1941,7 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     const inputWrapperCombinedStyle = useMemo(
       () => [
         styles.inputWrapper,
-        isCompact && !isFullscreen && styles.inputWrapperCompact,
+        Platform.OS !== "ios" && isCompact && !isFullscreen && styles.inputWrapperCompact,
         readOnly && styles.inputWrapperReadOnly,
         inputWrapperStyle,
         { opacity: surfacePresentation.input.opacity },
@@ -2236,7 +2237,11 @@ export const MessageInput = forwardRef<MessageInputRef, MessageInputProps>(
     return (
       <View
         ref={rootRef}
-        style={isFullscreen ? styles.fullscreenContainer : styles.container}
+        style={
+          isFullscreen
+            ? styles.fullscreenContainer
+            : [styles.container, Platform.OS === "ios" && isCompact && styles.inputWrapperCompact]
+        }
         testID="message-input-root"
         onLayout={handleComposerLayout}
       >
@@ -2282,6 +2287,7 @@ const styles = StyleSheet.create((theme: Theme) => ({
     position: "relative",
   },
   inputWrapper: {
+    ...(Platform.OS === "ios" ? { overflow: "hidden" as const } : {}),
     flexShrink: 1,
     flexDirection: "column",
     gap: theme.spacing[3],
