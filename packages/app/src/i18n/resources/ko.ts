@@ -1291,6 +1291,7 @@ export const ko: TranslationResources = {
       hideSidebar: "사이드바 숨기기",
       refreshWorkspaces: "워크스페이스 새로 고침",
       menu: "사이드바 작업",
+      moreActions: "추가 작업",
     },
     footer: {
       usage: "사용량",
@@ -1431,6 +1432,9 @@ export const ko: TranslationResources = {
         hideFailed: "워크스페이스를 숨기지 못했습니다",
         archiveFailed: "워크스페이스를 보관하지 못했습니다.",
         removeFailed: "워크스페이스를 제거할 수 없습니다",
+        archived: "워크스페이스를 보관했습니다",
+        undoArchive: "실행 취소",
+        undoArchiveFailed: "보관을 취소하지 못했습니다",
       },
     },
   },

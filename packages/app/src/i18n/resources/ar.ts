@@ -1284,6 +1284,7 @@ export const ar: TranslationResources = {
       hideSidebar: "إخفاء الشريط الجانبي",
       refreshWorkspaces: "تحديث مساحات العمل",
       menu: "إجراءات الشريط الجانبي",
+      moreActions: "المزيد من الإجراءات",
     },
     footer: {
       usage: "الاستخدام",
@@ -1424,6 +1425,9 @@ export const ar: TranslationResources = {
         hideFailed: "فشل في إخفاء مساحة العمل",
         archiveFailed: "فشل في أرشفة مساحة العمل",
         removeFailed: "تعذرت إزالة مساحة العمل",
+        archived: "تمت أرشفة مساحة العمل",
+        undoArchive: "تراجع",
+        undoArchiveFailed: "تعذّر التراجع عن الأرشفة",
       },
     },
   },

@@ -1314,6 +1314,7 @@ export const fr: TranslationResources = {
       hideSidebar: "Masquer la barre latérale",
       refreshWorkspaces: "Actualiser les espaces de travail",
       menu: "Actions de la barre latérale",
+      moreActions: "Plus d’actions",
     },
     footer: {
       usage: "Utilisation",
@@ -1455,6 +1456,9 @@ export const fr: TranslationResources = {
         hideFailed: "Impossible de masquer l’espace de travail",
         archiveFailed: "Impossible d’archiver l’espace de travail",
         removeFailed: "Impossible de supprimer l’espace de travail",
+        archived: "Espace de travail archivé",
+        undoArchive: "Annuler",
+        undoArchiveFailed: "Impossible d’annuler l’archivage",
       },
     },
   },

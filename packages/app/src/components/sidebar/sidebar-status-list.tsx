@@ -380,20 +380,22 @@ function StatusGroupRows({
 
   function renderWorkspaceRow(workspace: SidebarWorkspaceEntry) {
     return (
-      <StatusWorkspaceRow
-        key={workspace.workspaceKey}
-        workspace={workspace}
-        {...buildStatusRowProjectPresentation({
-          workspace,
-          projectIconByProjectViewKey,
-          hostBadgeByServerId,
-        })}
-        shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
-        showShortcutBadge={showShortcutBadges}
-        canPin={supportsPinningByServerId.get(workspace.serverId) === true}
-        onToggleWorkspacePin={onToggleWorkspacePin}
-        onWorkspacePress={onWorkspacePress}
-      />
+      <Fragment key={workspace.workspaceKey}>
+        <StatusWorkspaceRow
+          workspace={workspace}
+          {...buildStatusRowProjectPresentation({
+            workspace,
+            projectIconByProjectViewKey,
+            hostBadgeByServerId,
+          })}
+          shortcutNumber={shortcutIndex.get(workspace.workspaceKey) ?? null}
+          showShortcutBadge={showShortcutBadges}
+          canPin={supportsPinningByServerId.get(workspace.serverId) === true}
+          onToggleWorkspacePin={onToggleWorkspacePin}
+          onWorkspacePress={onWorkspacePress}
+        />
+        <SidebarWorkspaceSessions workspace={workspace} onWorkspacePress={onWorkspacePress} />
+      </Fragment>
     );
   }
 

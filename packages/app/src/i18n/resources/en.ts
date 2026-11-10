@@ -1292,6 +1292,7 @@ export const en = {
       hideSidebar: "Hide sidebar",
       refreshWorkspaces: "Refresh workspaces",
       menu: "Sidebar actions",
+      moreActions: "More actions",
     },
     footer: {
       usage: "Usage",
@@ -1432,6 +1433,9 @@ export const en = {
         hideFailed: "Failed to hide workspace",
         archiveFailed: "Failed to archive workspace",
         removeFailed: "Failed to remove workspace",
+        archived: "Workspace archived",
+        undoArchive: "Undo",
+        undoArchiveFailed: "Couldn't undo the archive",
       },
     },
   },

@@ -1321,6 +1321,7 @@ export const es: TranslationResources = {
       hideSidebar: "Ocultar barra lateral",
       refreshWorkspaces: "Actualizar espacios de trabajo",
       menu: "Acciones de la barra lateral",
+      moreActions: "Más acciones",
     },
     footer: {
       usage: "Uso",
@@ -1461,6 +1462,9 @@ export const es: TranslationResources = {
         hideFailed: "No se pudo ocultar el espacio de trabajo",
         archiveFailed: "No se pudo archivar el espacio de trabajo",
         removeFailed: "No se pudo eliminar el espacio de trabajo",
+        archived: "Espacio de trabajo archivado",
+        undoArchive: "Deshacer",
+        undoArchiveFailed: "No se pudo deshacer el archivado",
       },
     },
   },

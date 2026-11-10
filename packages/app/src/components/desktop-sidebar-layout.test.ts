@@ -16,7 +16,6 @@ import {
   resolveLeftSidebarPresentation,
 } from "@/components/desktop-sidebar-layout";
 
-describe("desktop sidebar layout", () => {
   const geometry: WindowLayout = {
     bounds: { x: 0, y: 0, width: 951, height: 669 },
     verticalBarEdge: "trailing",

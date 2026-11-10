@@ -1276,6 +1276,7 @@ export const zhCN: TranslationResources = {
       hideSidebar: "隐藏侧边栏",
       refreshWorkspaces: "刷新工作区",
       menu: "侧边栏操作",
+      moreActions: "更多操作",
     },
     footer: {
       usage: "使用情况",
@@ -1412,6 +1413,9 @@ export const zhCN: TranslationResources = {
         hideFailed: "隐藏 workspace 失败",
         archiveFailed: "归档工作区失败",
         removeFailed: "无法移除工作区",
+        archived: "工作区已归档",
+        undoArchive: "撤销",
+        undoArchiveFailed: "无法撤销归档",
       },
     },
   },

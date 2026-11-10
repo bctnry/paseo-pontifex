@@ -17,6 +17,7 @@ import type {
   PluginServerContext,
   PluginServerContribution,
 } from "@getpaseo/plugin/server";
+import { mkdir } from "node:fs/promises";
 import { assertPluginWireValue } from "@getpaseo/protocol/binary-frames/index";
 import {
   PluginSubscriptionHandlers,

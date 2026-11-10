@@ -1302,6 +1302,7 @@ export const ru: TranslationResources = {
       hideSidebar: "Скрыть боковую панель",
       refreshWorkspaces: "Обновить рабочие пространства",
       menu: "Действия боковой панели",
+      moreActions: "Дополнительные действия",
     },
     footer: {
       usage: "Использование",
@@ -1442,6 +1443,9 @@ export const ru: TranslationResources = {
         hideFailed: "Не удалось скрыть рабочее пространство",
         archiveFailed: "Не удалось архивировать рабочее пространство",
         removeFailed: "Не удалось удалить рабочее пространство",
+        archived: "Рабочее пространство архивировано",
+        undoArchive: "Отменить",
+        undoArchiveFailed: "Не удалось отменить архивацию",
       },
     },
   },

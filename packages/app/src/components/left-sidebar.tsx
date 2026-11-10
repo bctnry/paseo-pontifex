@@ -821,60 +821,52 @@ function DesktopSidebar({
       closeGesture={closeGesture}
     >
       <Animated.View style={desktopSidebarStyle}>
-        <View style={desktopSidebarBorderStyle}>
-          <View style={styles.sidebarDragArea}>
-            {ownsTopLeft || DEV_BUILD_LABEL ? (
-              <View style={styles.desktopChromeRow}>
-                <TitlebarDragRegion />
-                {DEV_BUILD_LABEL ? (
-                  <View
-                    pointerEvents="none"
-                    style={styles.devBuildBadge}
-                    testID="dev-build-label"
-                    accessibilityLabel={`Development build: ${DEV_BUILD_LABEL}`}
-                  >
-                    <GitBranch size={12} color={theme.colors.accentForeground} />
-                    <Text numberOfLines={1} ellipsizeMode="tail" style={styles.devBuildBadgeText}>
-                      {DEV_BUILD_LABEL}
-                    </Text>
-                  </View>
-                ) : null}
-              </View>
-            ) : (
-              <TitlebarDragRegion />
-            )}
-            <SidebarNavRows style={sidebarHeaderGroupStyle} onBeforeNavigate={closeSidebar} />
-          </View>
+        <SidebarContextMenu
+          onAddProject={handleOpenProject}
+          onImportSession={handleImportSession}
+          onRefresh={handleRefresh}
+          onSettings={handleSettings}
+          onHideSidebar={toggleDesktopAgentList}
+        >
+          <View style={desktopSidebarBorderStyle}>
+            <View style={styles.sidebarDragArea}>
+              {sidebarChromeRow}
+              <SidebarNavRows
+                style={sidebarHeaderGroupStyle}
+                firstRowTrailing={devBuildBadge}
+                onBeforeNavigate={closeSidebar}
+              />
+            </View>
 
-          <SidebarViewSlot dismiss={closeSidebar}>
-            <SidebarToastRegion active={active}>
-              {isInitialLoad && !hasActiveHostFilter ? (
-                <SidebarAgentListSkeleton />
-              ) : (
-                <SidebarWorkspaceList
-                  collapsedProjectKeys={collapsedProjectKeys}
-                  onToggleProjectCollapsed={toggleProjectCollapsed}
-                  shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
-                  groupMode={groupMode}
-                  workspaceGroups={workspaceGroups}
-                  projectIconTargets={projectIconTargets}
-                  pinnedGroups={pinnedGroups}
-                  projects={projects}
-                  hasProjectsBeforeFilter={hasProjectsBeforeFilter}
-                  hasActiveProjectFilter={hasActiveProjectFilter}
-                  workspaceEntriesByKey={workspaceEntriesByKey}
-                  isRefreshing={isManualRefresh && isRevalidating}
-                  onRefresh={handleRefresh}
-                  onAddProject={handleOpenProject}
-                  onImportSession={handleImportSession}
-                  onWorkspacePress={closeSidebar}
-                  parentGestureRef={closeGestureRef}
-                  dragGestureHostActive={active}
-                  listHeaderComponent={workspacesSectionHeaderElement}
-                />
-              )}
-            </SidebarToastRegion>
-          </SidebarViewSlot>
+            <SidebarViewSlot dismiss={closeSidebar}>
+              <SidebarToastRegion active={active}>
+                {isInitialLoad && !hasActiveHostFilter ? (
+                  <SidebarAgentListSkeleton />
+                ) : (
+                  <SidebarWorkspaceList
+                    collapsedProjectKeys={collapsedProjectKeys}
+                    onToggleProjectCollapsed={toggleProjectCollapsed}
+                    shortcutIndexByWorkspaceKey={shortcutIndexByWorkspaceKey}
+                    groupMode={groupMode}
+                    workspaceGroups={workspaceGroups}
+                    projectIconTargets={projectIconTargets}
+                    pinnedGroups={pinnedGroups}
+                    projects={projects}
+                    hasProjectsBeforeFilter={hasProjectsBeforeFilter}
+                    hasActiveProjectFilter={hasActiveProjectFilter}
+                    workspaceEntriesByKey={workspaceEntriesByKey}
+                    isRefreshing={isManualRefresh && isRevalidating}
+                    onRefresh={handleRefresh}
+                    onAddProject={handleOpenProject}
+                    onImportSession={handleImportSession}
+                    onWorkspacePress={closeSidebar}
+                    parentGestureRef={closeGestureRef}
+                    dragGestureHostActive={active}
+                    listHeaderComponent={workspacesSectionHeaderElement}
+                  />
+                )}
+              </SidebarToastRegion>
+            </SidebarViewSlot>
 
           <SidebarCalloutSlot />
 
@@ -894,8 +886,17 @@ function DesktopSidebar({
               pressed={resizePressed}
               testID="left-sidebar-resize-handle"
             />
-          ) : null}
-        </View>
+
+            {!overlay && divisionLayout === null ? (
+              <SidebarResizeHandle
+                edge="right"
+                gesture={resizeGesture}
+                pressed={resizePressed}
+                testID="left-sidebar-resize-handle"
+              />
+            ) : null}
+          </View>
+        </SidebarContextMenu>
       </Animated.View>
     </MobilePanelOverlay>
   );

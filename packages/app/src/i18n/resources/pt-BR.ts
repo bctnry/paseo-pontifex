@@ -1310,6 +1310,7 @@ export const ptBR: TranslationResources = {
       hideSidebar: "Ocultar barra lateral",
       refreshWorkspaces: "Atualizar workspaces",
       menu: "Ações da barra lateral",
+      moreActions: "Mais ações",
     },
     footer: {
       usage: "Uso",
@@ -1450,6 +1451,9 @@ export const ptBR: TranslationResources = {
         hideFailed: "Falha ao ocultar workspace",
         archiveFailed: "Falha ao arquivar workspace",
         removeFailed: "Não foi possível remover o espaço de trabalho",
+        archived: "Workspace arquivado",
+        undoArchive: "Desfazer",
+        undoArchiveFailed: "Não foi possível desfazer o arquivamento",
       },
     },
   },

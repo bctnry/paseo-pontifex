@@ -353,10 +353,8 @@ function reconcileCheckoutDiffSubscriptions(input: {
         if (input.active.get(key) !== registration) return;
         const snapshot = checkoutDiffSnapshot(desired.cwd, state);
         setCheckoutDiffPayload({
-          activeCheckoutDiffSubscriptions: input.active,
           queryClient: input.queryClient,
-          serverId: input.serverId,
-          subscriptionId: key,
+          queryKeys: input.queryKeys.get(key),
           payload: { ...snapshot, files: orderCheckoutDiffFiles(snapshot.files) },
         });
       },

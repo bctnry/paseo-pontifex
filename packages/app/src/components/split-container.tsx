@@ -839,7 +839,6 @@ const SplitPaneView = memo(function SplitPaneView({
                 tabs={desktopTabRowItems}
                 normalizedServerId={normalizedServerId}
                 normalizedWorkspaceId={normalizedWorkspaceId}
-                setHoveredCloseTabKey={setHoveredCloseTabKey}
                 onNavigateTab={onNavigateTab}
                 onCloseTab={onCloseTab}
                 onCopyResumeCommand={onCopyResumeCommand}

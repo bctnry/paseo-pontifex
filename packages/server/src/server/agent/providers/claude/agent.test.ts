@@ -813,6 +813,25 @@ describe("ClaudeAgentSession features", () => {
     return { ...mock, session, events, unsubscribe };
   }
 
+  test("asks a side question through the active SDK query", async () => {
+    const { queryFactory, queryMock } = createQueryMock();
+    const session = await new ClaudeAgentClient({
+      logger,
+      queryFactory,
+      resolveBinary: async () => "/test/claude/bin",
+    }).createSession({ provider: "claude", cwd: process.cwd(), modeId: "default" });
+    try {
+      await expect(session.askSideQuestion?.("what changed?")).resolves.toBe(
+        "answer:what changed?",
+      );
+      expect(queryMock.askSideQuestion).toHaveBeenCalledWith("what changed?", {
+        signal: undefined,
+      });
+    } finally {
+      await session.close();
+    }
+  });
+
   test("runtime close publishes tool cleanup without reporting a user turn cancellation", async () => {
     const fixture = await startToolForClosure();
     try {

@@ -1298,6 +1298,7 @@ export const ja: TranslationResources = {
       hideSidebar: "サイドバーを隠す",
       refreshWorkspaces: "ワークスペースを更新",
       menu: "サイドバーの操作",
+      moreActions: "その他のアクション",
     },
     footer: {
       usage: "使用状況",
@@ -1438,6 +1439,9 @@ export const ja: TranslationResources = {
         hideFailed: "ワークスペースの非表示に失敗しました",
         archiveFailed: "ワークスペースのアーカイブに失敗しました",
         removeFailed: "ワークスペースを削除できませんでした",
+        archived: "ワークスペースをアーカイブしました",
+        undoArchive: "元に戻す",
+        undoArchiveFailed: "アーカイブを元に戻せませんでした",
       },
     },
   },

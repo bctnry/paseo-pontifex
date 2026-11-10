@@ -679,6 +679,8 @@ export function useAgentAutocomplete(input: UseAgentAutocompleteInput): AgentAut
     pluginNames,
     providerLabel,
     retryCommands,
+    supportsFork,
+    supportsSideQuestion,
     t,
   ]);
 
