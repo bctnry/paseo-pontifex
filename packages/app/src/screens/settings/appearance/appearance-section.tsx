@@ -1,23 +1,17 @@
-import { Fragment, useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { TFunction } from "i18next";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
-import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { Monitor, Moon, Sun } from "lucide-react-native";
+import { StyleSheet } from "react-native-unistyles";
 import {
   SYNTAX_THEME_OPTIONS,
   type SyntaxThemeId,
   type SyntaxThemeOption,
 } from "@getpaseo/highlight";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuSeparator,
-} from "@/components/ui/dropdown-menu";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import { DropdownTrigger } from "@/components/ui/dropdown-trigger";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
-import { useContributedThemes } from "@/appearance/provider";
+import { ThemePicker } from "@/appearance/theme-picker";
 import { Button } from "@/components/ui/button";
 import {
   EditingTextInput as TextInput,
@@ -36,46 +30,11 @@ import {
   sanitizeFontFamily,
   useAppSettings,
   type AppSettings,
-  DEFAULT_THEME_PREFERENCE,
 } from "@/hooks/use-settings";
-import {
-  CUSTOM_THEME_PREFERENCE,
-  DEFAULT_MONO_FONT_STACK,
-  DEFAULT_UI_FONT_STACK,
-  ICON_SIZE,
-  PLUGIN_THEME_PREFERENCE,
-  THEME_OPTIONS,
-  THEME_SWATCHES,
-  type Theme,
-} from "@/styles/theme";
-import { getIsElectron, isNative } from "@/constants/platform";
-import type { PluginThemeOption } from "@/plugins/themes";
-import type { CustomThemeOption } from "@/styles/custom-theme";
-import { useCustomThemeCatalog } from "@/appearance/custom-themes";
+import { DEFAULT_MONO_FONT_STACK, DEFAULT_UI_FONT_STACK } from "@/styles/theme";
+import { isNative } from "@/constants/platform";
 import { settingsStyles } from "@/styles/settings";
 import { AppearancePreview } from "./appearance-preview";
-import { CustomThemesSection } from "./custom-themes-section";
-
-// ---------------------------------------------------------------------------
-// Theme-reactive leaf icons (withUnistyles + uniProps color mapping — no
-// useUnistyles). Icon sizes read the static ICON_SIZE token; the appearance
-// feature does not scale icons.
-// ---------------------------------------------------------------------------
-
-const ThemedSun = withUnistyles(Sun);
-const ThemedMoon = withUnistyles(Moon);
-const ThemedMonitor = withUnistyles(Monitor);
-
-const mutedColorMapping = (theme: Theme) => ({ color: theme.colors.foregroundMuted });
-
-type BuiltInThemePreference = Exclude<
-  AppSettings["theme"],
-  typeof PLUGIN_THEME_PREFERENCE | typeof CUSTOM_THEME_PREFERENCE
->;
-
-function getThemeLabel(t: TFunction, value: BuiltInThemePreference): string {
-  return t(`settings.appearance.theme.options.${value}`);
-}
 
 // Platform default stacks can be the bare native tokens ("normal"/"monospace");
 // those read as a bug, so show a human label in the placeholder instead.
@@ -91,181 +50,6 @@ function sizeDraftToOverride(value: string): number | undefined {
   if (value.length === 0) return undefined;
   const parsed = Number.parseInt(value, 10);
   return Number.isFinite(parsed) ? parsed : undefined;
-}
-
-// ---------------------------------------------------------------------------
-// Theme picker
-// ---------------------------------------------------------------------------
-
-interface ThemeLeadingProps {
-  themeValue: BuiltInThemePreference;
-}
-
-function ThemeLeading({ themeValue }: ThemeLeadingProps) {
-  switch (themeValue) {
-    case "light":
-      return <ThemedSun size={ICON_SIZE.md} uniProps={mutedColorMapping} />;
-    case "dark":
-      return <ThemedMoon size={ICON_SIZE.md} uniProps={mutedColorMapping} />;
-    case "auto":
-      return <ThemedMonitor size={ICON_SIZE.md} uniProps={mutedColorMapping} />;
-    default:
-      return <ThemeSwatch color={THEME_SWATCHES[themeValue]} />;
-  }
-}
-
-interface ThemeSwatchProps {
-  color: string;
-}
-
-function ThemeSwatch({ color }: ThemeSwatchProps) {
-  const swatchStyle = useMemo(() => [styles.swatch, { backgroundColor: color }], [color]);
-  return <View style={swatchStyle} />;
-}
-
-interface ThemeMenuItemProps {
-  themeValue: BuiltInThemePreference;
-  selected: boolean;
-  onChange: (theme: BuiltInThemePreference) => void;
-}
-
-function ThemeMenuItem({ themeValue, selected, onChange }: ThemeMenuItemProps) {
-  const { t } = useTranslation();
-  const handleSelect = useCallback(() => {
-    onChange(themeValue);
-  }, [onChange, themeValue]);
-  const leading = useMemo(() => <ThemeLeading themeValue={themeValue} />, [themeValue]);
-  return (
-    <DropdownMenuItem selected={selected} onSelect={handleSelect} leading={leading}>
-      {getThemeLabel(t, themeValue)}
-    </DropdownMenuItem>
-  );
-}
-
-interface PluginThemeMenuItemProps {
-  option: PluginThemeOption;
-  selected: boolean;
-  onSelect: (option: PluginThemeOption) => void;
-}
-
-function PluginThemeMenuItem({ option, selected, onSelect }: PluginThemeMenuItemProps) {
-  const handleSelect = useCallback(() => {
-    onSelect(option);
-  }, [onSelect, option]);
-  const leading = useMemo(() => <ThemeSwatch color={option.swatch} />, [option.swatch]);
-  return (
-    <DropdownMenuItem selected={selected} onSelect={handleSelect} leading={leading}>
-      {option.name}
-    </DropdownMenuItem>
-  );
-}
-
-interface CustomThemeMenuItemProps {
-  option: CustomThemeOption;
-  selected: boolean;
-  onSelect: (option: CustomThemeOption) => void;
-}
-
-function CustomThemeMenuItem({ option, selected, onSelect }: CustomThemeMenuItemProps) {
-  const handleSelect = useCallback(() => {
-    onSelect(option);
-  }, [onSelect, option]);
-  const leading = useMemo(() => <ThemeSwatch color={option.swatch} />, [option.swatch]);
-  return (
-    <DropdownMenuItem selected={selected} onSelect={handleSelect} leading={leading}>
-      {option.name}
-    </DropdownMenuItem>
-  );
-}
-
-interface ThemeRowProps {
-  value: AppSettings["theme"];
-  pluginThemes: PluginThemeOption[];
-  customThemes: CustomThemeOption[];
-  selectedPluginTheme: PluginThemeOption | null;
-  selectedCustomTheme: CustomThemeOption | null;
-  onChange: (theme: BuiltInThemePreference) => void;
-  onSelectPluginTheme: (option: PluginThemeOption) => void;
-  onSelectCustomTheme: (option: CustomThemeOption) => void;
-}
-
-function ThemeRow({
-  value,
-  pluginThemes,
-  customThemes,
-  selectedPluginTheme,
-  selectedCustomTheme,
-  onChange,
-  onSelectPluginTheme,
-  onSelectCustomTheme,
-}: ThemeRowProps) {
-  const { t } = useTranslation();
-  // A selected contribution that is no longer installed shows the fallback the app renders.
-  const isContributed = value === PLUGIN_THEME_PREFERENCE || value === CUSTOM_THEME_PREFERENCE;
-  const builtInValue = isContributed ? DEFAULT_THEME_PREFERENCE : value;
-  const selectedLabel =
-    selectedPluginTheme?.name ?? selectedCustomTheme?.name ?? getThemeLabel(t, builtInValue);
-  const leading = useMemo(() => {
-    if (selectedPluginTheme) return <ThemeSwatch color={selectedPluginTheme.swatch} />;
-    if (selectedCustomTheme) return <ThemeSwatch color={selectedCustomTheme.swatch} />;
-    return <ThemeLeading themeValue={builtInValue} />;
-  }, [builtInValue, selectedCustomTheme, selectedPluginTheme]);
-  return (
-    <View style={settingsStyles.row}>
-      <View style={settingsStyles.rowContent}>
-        <Text style={settingsStyles.rowTitle}>{t("settings.appearance.theme.title")}</Text>
-      </View>
-      <DropdownMenu>
-        <DropdownTrigger
-          accessibilityLabel={t("settings.appearance.theme.accessibilityLabel", {
-            value: selectedLabel,
-          })}
-          leading={leading}
-        >
-          {selectedLabel}
-        </DropdownTrigger>
-        <DropdownMenuContent side="bottom" align="end" width={200} scrollable>
-          {THEME_OPTIONS.map((option, index) => {
-            const previousOption = THEME_OPTIONS[index - 1];
-            return (
-              <Fragment key={option.name}>
-                {previousOption && previousOption.group !== option.group ? (
-                  <DropdownMenuSeparator />
-                ) : null}
-                <ThemeMenuItem
-                  themeValue={option.name}
-                  selected={
-                    selectedPluginTheme === null &&
-                    selectedCustomTheme === null &&
-                    builtInValue === option.name
-                  }
-                  onChange={onChange}
-                />
-              </Fragment>
-            );
-          })}
-          {pluginThemes.length > 0 ? <DropdownMenuSeparator /> : null}
-          {pluginThemes.map((option) => (
-            <PluginThemeMenuItem
-              key={option.id}
-              option={option}
-              selected={selectedPluginTheme?.id === option.id}
-              onSelect={onSelectPluginTheme}
-            />
-          ))}
-          {customThemes.length > 0 ? <DropdownMenuSeparator /> : null}
-          {customThemes.map((option) => (
-            <CustomThemeMenuItem
-              key={option.id}
-              option={option}
-              selected={selectedCustomTheme?.id === option.id}
-              onSelect={onSelectCustomTheme}
-            />
-          ))}
-        </DropdownMenuContent>
-      </DropdownMenu>
-    </View>
-  );
 }
 
 // ---------------------------------------------------------------------------
@@ -420,7 +204,6 @@ function ContentWidthRow({ value, onChange }: ContentWidthRowProps) {
         {value === null ? null : (
           <Button
             variant="ghost"
-            size="sm"
             onPress={reset}
             accessibilityLabel={t("settings.appearance.layout.resetAccessibility")}
           >
@@ -496,7 +279,7 @@ function SyntaxRow({ value, onChange }: SyntaxRowProps) {
         >
           {selectedLabel}
         </DropdownTrigger>
-        <DropdownMenuContent side="bottom" align="end" width={260} maxHeight={380} scrollable>
+        <DropdownMenuContent side="bottom" align="end" width={200}>
           {SYNTAX_THEME_OPTIONS.map((option) => (
             <SyntaxMenuItem
               key={option.id}
@@ -518,17 +301,6 @@ function SyntaxRow({ value, onChange }: SyntaxRowProps) {
 export function AppearanceSection() {
   const { t } = useTranslation();
   const { settings, updateSettings } = useAppSettings();
-  const {
-    options: pluginThemes,
-    selected: selectedPluginTheme,
-    select: selectPluginTheme,
-  } = useContributedThemes();
-  const customThemes = useCustomThemeCatalog();
-  const selectedCustomTheme = useMemo(() => {
-    if (settings.theme !== CUSTOM_THEME_PREFERENCE) return null;
-    return customThemes.options.find((option) => option.id === settings.customThemeId) ?? null;
-  }, [customThemes.options, settings.customThemeId, settings.theme]);
-  const showCustomThemes = getIsElectron();
   const showInterfaceFontFamilyRow = !isNative;
   const uiFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_UI_FONT_STACK);
   const monoFontPlaceholder = resolveDefaultStackPlaceholder(t, DEFAULT_MONO_FONT_STACK);
@@ -549,30 +321,6 @@ export function AppearanceSection() {
   useEffect(() => {
     setCodeSizeDraft(String(settings.codeFontSize));
   }, [settings.codeFontSize]);
-
-  const handleThemeChange = useCallback(
-    (theme: BuiltInThemePreference) => {
-      void updateSettings({ theme });
-    },
-    [updateSettings],
-  );
-
-  const handlePluginThemeChange = useCallback(
-    (option: PluginThemeOption) => {
-      selectPluginTheme(option);
-    },
-    [selectPluginTheme],
-  );
-
-  const handleCustomThemeChange = useCallback(
-    (option: CustomThemeOption) => {
-      void updateSettings({
-        theme: CUSTOM_THEME_PREFERENCE,
-        customThemeId: option.id,
-      });
-    },
-    [updateSettings],
-  );
 
   const handleContentMaxWidthChange = useCallback(
     (contentMaxWidth: AppSettings["contentMaxWidth"]) => {
@@ -683,22 +431,10 @@ export function AppearanceSection() {
   return (
     <View>
       <SettingsSection title={t("settings.appearance.theme.title")}>
-        <View style={settingsStyles.card}>
-          <ThemeRow
-            value={settings.theme}
-            pluginThemes={pluginThemes}
-            customThemes={customThemes.options}
-            selectedPluginTheme={selectedPluginTheme}
-            selectedCustomTheme={selectedCustomTheme}
-            onChange={handleThemeChange}
-            onSelectPluginTheme={handlePluginThemeChange}
-            onSelectCustomTheme={handleCustomThemeChange}
-          />
+        <View style={[settingsStyles.card, styles.themeCard]}>
+          <ThemePicker />
         </View>
       </SettingsSection>
-      {showCustomThemes ? (
-        <CustomThemesSection catalog={customThemes} pluginThemes={pluginThemes} />
-      ) : null}
       <SettingsSection title={t("settings.appearance.fonts.title")}>
         <View style={settingsStyles.card}>
           {showInterfaceFontFamilyRow ? (
@@ -785,12 +521,8 @@ const styles = StyleSheet.create((theme) => ({
     borderTopWidth: theme.borderWidth[1],
     borderTopColor: theme.colors.border,
   },
-  swatch: {
-    width: ICON_SIZE.md,
-    height: ICON_SIZE.md,
-    borderRadius: ICON_SIZE.md / 2,
-    borderWidth: theme.borderWidth[1],
-    borderColor: theme.colors.border,
+  themeCard: {
+    padding: theme.spacing[3],
   },
   fontFamilyInput: {
     flexGrow: 1,

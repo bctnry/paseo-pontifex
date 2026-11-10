@@ -1,12 +1,12 @@
 import { formatPluginInstallation } from "@getpaseo/protocol/plugin-source-reference";
-import { PluginSettingsMenuItems } from "@/plugins/settings";
+import { PluginSettingsButton } from "@/plugins/settings";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { useTranslation } from "react-i18next";
 import { Text, View } from "react-native";
 import { StyleSheet } from "react-native-unistyles";
 import { useMutation } from "@tanstack/react-query";
 import type { PluginListItem, PluginLogEntry } from "@getpaseo/protocol/messages";
-import { FolderOpen, MoreHorizontal, Trash2 } from "lucide-react-native";
+import { MoreHorizontal, Trash2 } from "lucide-react-native";
 import { AdaptiveModalSheet, type SheetHeader } from "@/components/adaptive-modal-sheet";
 import { SettingsCard, SettingsRow } from "@/components/settings";
 import { Alert } from "@/components/ui/alert";
@@ -22,23 +22,17 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { useFetchQuery } from "@/data/query";
-import { getIsElectron } from "@/constants/platform";
-import { pickDirectory } from "@/desktop/pick-directory";
 import { useDaemonConfig } from "@/hooks/use-daemon-config";
-import { useIsLocalDaemon } from "@/hooks/use-is-local-daemon";
 import { useHostFeature } from "@/runtime/host-features";
 import { useHostRuntimeClient, useHostRuntimeIsConnected } from "@/runtime/host-runtime";
 import { SettingsSection } from "@/components/settings/headings/settings-section";
 import { resolvePluginPageState } from "@/screens/settings/plugins-page-state";
-import {
-  openPluginInstallForm,
-  type PluginInstallFormModel,
-} from "@/screens/settings/plugin-install-form-model";
+import { openPluginInstallForm } from "@/screens/settings/plugin-install-form-model";
 import { pluginRegistry, useInstalledPlugins } from "@/plugins/registry";
+import { pluginDisplayName, usePluginList } from "@/plugins/plugin-list";
 import { settingsStyles } from "@/styles/settings";
 import { confirmDialog } from "@/utils/confirm-dialog";
 
-const pluginQueryKey = (serverId: string) => ["plugins", serverId] as const;
 const PLUGIN_SOURCE_DOCS_URL = "https://paseo.sh/docs/plugins/reference#plugin-sources";
 type PluginRowAction = "reload" | "enable" | "disable" | "remove";
 
@@ -55,7 +49,6 @@ function pluginRowAction(action: string | undefined): PluginRowAction | undefine
 
 function PluginActionsMenu({
   plugin,
-  serverId,
   pending,
   pendingAction,
   onAction,
@@ -63,19 +56,18 @@ function PluginActionsMenu({
   supportsLogs,
 }: {
   plugin: PluginListItem;
-  serverId: string;
   pending: boolean;
   pendingAction?: PluginRowAction;
   onAction(action: PluginRowAction, plugin: PluginListItem): void;
-  onOpenLogs(pluginId: string): void;
+  onOpenLogs(plugin: PluginListItem): void;
   supportsLogs: boolean;
 }) {
   const { t } = useTranslation();
   const reload = useCallback(() => onAction("reload", plugin), [onAction, plugin]);
   const remove = useCallback(() => onAction("remove", plugin), [onAction, plugin]);
-  const openLogs = useCallback(() => onOpenLogs(plugin.id), [onOpenLogs, plugin.id]);
+  const openLogs = useCallback(() => onOpenLogs(plugin), [onOpenLogs, plugin]);
   const removeIcon = useMemo(() => <Trash2 size={16} color={styles.dangerIcon.color} />, []);
-  const menuLabel = t("settings.plugins.actions.menu", { id: plugin.id });
+  const menuLabel = t("settings.plugins.actions.menu", { name: pluginDisplayName(plugin) });
 
   return (
     <DropdownMenu compactMode="sheet">
@@ -89,7 +81,6 @@ function PluginActionsMenu({
         <MoreHorizontal size={18} color={styles.menuIcon.color} />
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" width={220} sheetTitle={menuLabel}>
-        <PluginSettingsMenuItems serverId={serverId} pluginId={plugin.id} disabled={pending} />
         {supportsLogs ? (
           <DropdownMenuItem onSelect={openLogs} disabled={pending}>
             {t("settings.plugins.logs.action")}
@@ -134,7 +125,7 @@ function PluginRow({
   pending: boolean;
   pendingAction?: PluginRowAction;
   onAction(action: PluginRowAction, plugin: PluginListItem): void;
-  onOpenLogs(pluginId: string): void;
+  onOpenLogs(plugin: PluginListItem): void;
   supportsLogs: boolean;
 }) {
   const { t } = useTranslation();
@@ -151,10 +142,14 @@ function PluginRow({
     () => <StatusBadge label={statusLabel} variant={badgeVariant} />,
     [badgeVariant, statusLabel],
   );
+  const name = pluginDisplayName(plugin);
+  // A display name hides the id that the CLI and plugin routes use, so show it beneath.
+  const shownId = name === plugin.id ? null : plugin.id;
   const hint = useMemo(
     () =>
-      plugin.description || plugin.installation ? (
+      shownId || plugin.description || plugin.installation ? (
         <View>
+          {shownId ? <Text style={styles.pluginSource}>{shownId}</Text> : null}
           {plugin.description ? (
             <Text style={styles.pluginDescription}>{plugin.description}</Text>
           ) : null}
@@ -163,20 +158,21 @@ function PluginRow({
           ) : null}
         </View>
       ) : undefined,
-    [plugin.description, plugin.installation],
+    [shownId, plugin.description, plugin.installation],
   );
-  const toggleLabel = `${plugin.id}: ${t(
+  const toggleLabel = `${name}: ${t(
     plugin.enabled ? "settings.plugins.actions.disable" : "settings.plugins.actions.enable",
   )}`;
   return (
     <SettingsRow
-      label={plugin.id}
+      label={name}
       labelAccessory={statusBadge}
       hint={hint}
       error={clientError ?? plugin.error}
       testID={`plugin-row-${plugin.id}`}
     >
-      <View style={styles.pluginControls} accessibilityLabel={`${plugin.id} ${statusLabel}`}>
+      <View style={styles.pluginControls} accessibilityLabel={`${name} ${statusLabel}`}>
+        <PluginSettingsButton serverId={serverId} pluginId={plugin.id} />
         <Switch
           value={plugin.enabled}
           onValueChange={toggle}
@@ -185,7 +181,6 @@ function PluginRow({
         />
         <PluginActionsMenu
           plugin={plugin}
-          serverId={serverId}
           pending={pending}
           pendingAction={pendingAction}
           onAction={onAction}
@@ -199,15 +194,16 @@ function PluginRow({
 
 function PluginLogsSheet({
   client,
-  pluginId,
+  plugin,
   serverId,
   onClose,
 }: {
   client: NonNullable<ReturnType<typeof useHostRuntimeClient>>;
-  pluginId: string;
+  plugin: PluginListItem;
   serverId: string;
   onClose(): void;
 }) {
+  const pluginId = plugin.id;
   const { t } = useTranslation();
   const logs = useFetchQuery({
     queryKey: ["plugin-logs", serverId, pluginId],
@@ -220,16 +216,16 @@ function PluginLogsSheet({
   }, [logs]);
   const header = useMemo<SheetHeader>(
     () => ({
-      title: t("settings.plugins.logs.title", { id: pluginId }),
+      title: t("settings.plugins.logs.title", { name: pluginDisplayName(plugin) }),
       actions: (
-        <Button variant="outline" size="sm" onPress={refresh} disabled={logs.isFetching}>
+        <Button variant="outline" onPress={refresh} disabled={logs.isFetching}>
           {logs.isFetching
             ? t("settings.plugins.logs.refreshing")
             : t("settings.plugins.logs.refresh")}
         </Button>
       ),
     }),
-    [logs.isFetching, pluginId, refresh, t],
+    [logs.isFetching, plugin, refresh, t],
   );
 
   let content = <Text style={styles.logsState}>{t("settings.plugins.logs.loading")}</Text>;
@@ -241,7 +237,7 @@ function PluginLogsSheet({
         title={t("settings.plugins.logs.errorTitle")}
         description={errorMessage(logs.error)}
       >
-        <Button variant="outline" size="sm" onPress={refresh}>
+        <Button variant="outline" onPress={refresh}>
           {t("settings.plugins.logs.refresh")}
         </Button>
       </Alert>
@@ -270,26 +266,24 @@ function PluginLogsSheet({
   );
 }
 
-function PluginInstallCard({
-  installForm,
-  resetKey,
-  canSubmit,
-  canBrowseForSource,
-  busy,
-  installing,
-  onInstall,
-}: {
-  installForm: PluginInstallFormModel;
-  resetKey: number;
-  canSubmit: boolean;
-  canBrowseForSource: boolean;
-  busy: boolean;
-  installing: boolean;
-  onInstall(): void;
-}) {
+export function HostPluginsPage({ serverId }: { serverId: string }) {
   const { t } = useTranslation();
-  const [selectingFolder, setSelectingFolder] = useState(false);
-  const [folderError, setFolderError] = useState<string | null>(null);
+  const client = useHostRuntimeClient(serverId);
+  const connected = useHostRuntimeIsConnected(serverId);
+  const supported = useHostFeature(serverId, "pluginManagement");
+  // COMPAT(pluginSourceInstallation): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports source identifiers.
+  const sourceInstallSupported = useHostFeature(serverId, "pluginSourceInstallation");
+  // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
+  const logsSupported = useHostFeature(serverId, "pluginLogs");
+  const { config, patchConfig } = useDaemonConfig(serverId);
+  const refreshQueue = useRef(Promise.resolve());
+  useInstalledPlugins();
+  const [installForm] = useState(openPluginInstallForm);
+  const installState = useSyncExternalStore(
+    installForm.subscribe,
+    installForm.getState,
+    installForm.getState,
+  );
   const sourceDocsLink = useMemo(
     () => (
       <ExternalLink
@@ -300,98 +294,11 @@ function PluginInstallCard({
     ),
     [t],
   );
-  const selectFolder = useCallback(async () => {
-    if (!canBrowseForSource || selectingFolder) return;
-    setSelectingFolder(true);
-    setFolderError(null);
-    try {
-      const path = await pickDirectory();
-      if (path) installForm.replaceSource(path);
-    } catch {
-      setFolderError(t("settings.plugins.selectFolderError"));
-    } finally {
-      setSelectingFolder(false);
-    }
-  }, [canBrowseForSource, installForm, selectingFolder, t]);
-  const submit = useCallback(() => {
-    setFolderError(null);
-    onInstall();
-  }, [onInstall]);
-
-  return (
-    <View style={[settingsStyles.card, styles.install]}>
-      <Field label={t("settings.plugins.sourceLabel")} trailing={sourceDocsLink}>
-        <FormTextInput
-          key={resetKey}
-          initialValue={installForm.getState().source}
-          resetKey={resetKey}
-          onChangeText={installForm.setSource}
-          placeholder={t("settings.plugins.sourcePlaceholder")}
-          autoCapitalize="none"
-          autoCorrect={false}
-          editable={!busy}
-          accessibilityLabel={t("settings.plugins.sourceLabel")}
-        />
-      </Field>
-      {canBrowseForSource ? (
-        <Button
-          variant="outline"
-          size="sm"
-          leftIcon={FolderOpen}
-          onPress={selectFolder}
-          disabled={selectingFolder || busy}
-          accessibilityLabel={t("settings.plugins.selectFolder")}
-          testID="plugin-source-select-folder"
-          style={styles.selectFolder}
-        >
-          {selectingFolder
-            ? t("settings.plugins.selectingFolder")
-            : t("settings.plugins.selectFolder")}
-        </Button>
-      ) : null}
-      {folderError ? <Alert size="sm" variant="error" title={folderError} /> : null}
-      <Button onPress={submit} disabled={!canSubmit || busy}>
-        {installing ? t("settings.plugins.installing") : t("settings.plugins.install")}
-      </Button>
-    </View>
-  );
-}
-
-export function HostPluginsPage({ serverId }: { serverId: string }) {
-  const { t } = useTranslation();
-  const client = useHostRuntimeClient(serverId);
-  const connected = useHostRuntimeIsConnected(serverId);
-  const supported = useHostFeature(serverId, "pluginManagement");
-  // COMPAT(pluginSourceInstallation): added in v0.8.0; remove gate after 2027-03-16 once daemon floor supports source identifiers.
-  const sourceInstallSupported = useHostFeature(serverId, "pluginSourceInstallation");
-  // COMPAT(pluginLogs): added in v0.4.0, remove gate after 2027-08-16.
-  const logsSupported = useHostFeature(serverId, "pluginLogs");
-  const isLocalDaemon = useIsLocalDaemon(serverId);
-  const canBrowseForSource = getIsElectron() && isLocalDaemon;
-  const { config, patchConfig } = useDaemonConfig(serverId);
-  const refreshQueue = useRef(Promise.resolve());
-  useInstalledPlugins();
-  const queryKey = useMemo(() => pluginQueryKey(serverId), [serverId]);
-  const [installForm] = useState(openPluginInstallForm);
-  const installState = useSyncExternalStore(
-    installForm.subscribe,
-    installForm.getState,
-    installForm.getState,
-  );
-  const [logsPluginId, setLogsPluginId] = useState<string | null>(null);
+  const [logsPlugin, setLogsPlugin] = useState<PluginListItem | null>(null);
   const [feedback, setFeedback] = useState<{ kind: "success" | "error"; message: string } | null>(
     null,
   );
-  const plugins = useFetchQuery({
-    queryKey,
-    queryFn: async () => {
-      if (!client) throw new Error("Plugin host is offline");
-      return client.listPlugins();
-    },
-    enabled: Boolean(client && connected && supported),
-    dataShape: "list",
-    staleTimeMs: 1_000,
-  });
+  const plugins = usePluginList(serverId);
   const refetchPlugins = plugins.refetch;
   const refresh = useCallback(async () => {
     if (!client) return;
@@ -441,27 +348,28 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
       run: async () => {
         const installed = await client.installPluginSource(input);
         installForm.reset();
-        return t("settings.plugins.feedback.installed", { id: installed.id });
+        return t("settings.plugins.feedback.installed", { name: pluginDisplayName(installed) });
       },
     });
   }, [client, installForm, installState.canSubmit, mutation, sourceInstallSupported, t]);
   const action = useCallback(
     (name: PluginRowAction, plugin: PluginListItem) => {
       if (!client) return;
+      const pluginName = pluginDisplayName(plugin);
       const run = async () => {
         if (name === "remove") {
           const confirmed = await confirmDialog({
-            title: t("settings.plugins.removeConfirmTitle", { id: plugin.id }),
+            title: t("settings.plugins.removeConfirmTitle", { name: pluginName }),
             message: t("settings.plugins.removeConfirmMessage"),
             confirmLabel: t("settings.plugins.actions.remove"),
             destructive: true,
           });
-          if (!confirmed) return t("settings.plugins.feedback.kept", { id: plugin.id });
+          if (!confirmed) return t("settings.plugins.feedback.kept", { name: pluginName });
           await client.removePlugin(plugin.id);
         } else {
           await client[`${name}Plugin`](plugin.id);
         }
-        return t(`settings.plugins.feedback.${name}`, { id: plugin.id });
+        return t(`settings.plugins.feedback.${name}`, { name: pluginName });
       };
       setFeedback(null);
       mutation.mutate({ action: name, pluginId: plugin.id, run });
@@ -493,7 +401,7 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
   const retry = useCallback(() => {
     void refetchPlugins();
   }, [refetchPlugins]);
-  const closeLogs = useCallback(() => setLogsPluginId(null), []);
+  const closeLogs = useCallback(() => setLogsPlugin(null), []);
 
   if (pageState === "offline") {
     return (
@@ -518,7 +426,7 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
         title={t("settings.plugins.states.errorTitle")}
         description={errorMessage(plugins.error)}
       >
-        <Button variant="outline" size="sm" onPress={retry}>
+        <Button variant="outline" onPress={retry}>
           {t("settings.plugins.states.retry")}
         </Button>
       </Alert>
@@ -539,7 +447,7 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
                 pending={mutation.isPending}
                 pendingAction={pending ? pluginRowAction(mutation.variables?.action) : undefined}
                 onAction={action}
-                onOpenLogs={setLogsPluginId}
+                onOpenLogs={setLogsPlugin}
                 supportsLogs={logsSupported}
               />
             );
@@ -577,15 +485,25 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
           </View>
         </View>
         {sourceInstallSupported ? (
-          <PluginInstallCard
-            installForm={installForm}
-            resetKey={installState.resetKey}
-            canSubmit={installState.canSubmit}
-            canBrowseForSource={canBrowseForSource}
-            busy={mutation.isPending}
-            installing={mutation.isPending && mutation.variables?.action === "install"}
-            onInstall={install}
-          />
+          <View style={[settingsStyles.card, styles.install]}>
+            <Field label={t("settings.plugins.sourceLabel")} trailing={sourceDocsLink}>
+              <FormTextInput
+                initialValue=""
+                resetKey={installState.resetKey}
+                onChangeText={installForm.setSource}
+                placeholder={t("settings.plugins.sourcePlaceholder")}
+                autoCapitalize="none"
+                autoCorrect={false}
+                editable={!mutation.isPending}
+                accessibilityLabel={t("settings.plugins.sourceLabel")}
+              />
+            </Field>
+            <Button onPress={install} disabled={!installState.canSubmit || mutation.isPending}>
+              {mutation.isPending && mutation.variables?.action === "install"
+                ? t("settings.plugins.installing")
+                : t("settings.plugins.install")}
+            </Button>
+          </View>
         ) : (
           <Alert
             size="sm"
@@ -603,10 +521,10 @@ export function HostPluginsPage({ serverId }: { serverId: string }) {
         ) : null}
         {catalogContent}
       </SettingsSection>
-      {client && logsPluginId ? (
+      {client && logsPlugin ? (
         <PluginLogsSheet
           client={client}
-          pluginId={logsPluginId}
+          plugin={logsPlugin}
           serverId={serverId}
           onClose={closeLogs}
         />
@@ -627,7 +545,6 @@ const styles = StyleSheet.create((theme) => ({
     marginTop: theme.spacing[1],
   },
   install: { padding: theme.spacing[4], gap: theme.spacing[3] },
-  selectFolder: { alignSelf: "flex-start" },
   pluginControls: { flexDirection: "row", alignItems: "center", gap: theme.spacing[2] },
   menuButton: { padding: theme.spacing[1], borderRadius: theme.borderRadius.sm },
   menuIcon: { color: theme.colors.foregroundMuted },

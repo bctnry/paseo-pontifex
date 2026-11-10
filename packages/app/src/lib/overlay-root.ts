@@ -1,5 +1,6 @@
 import {
   createContext,
+  useState,
   createElement,
   useCallback,
   useContext,
@@ -8,6 +9,7 @@ import {
   useRef,
   type ReactNode,
 } from "react";
+import { getTopOverlayLayer } from "@/keyboard";
 
 /**
  * Shared overlay root for web portals (modals, toasts, etc.)
@@ -378,4 +380,27 @@ export function useWebOverlayRegistration({
   }, [active, syncRegistration]);
 
   return setScope;
+}
+
+export function useGlobalOverlayLayer(kind: OverlayKind, active: boolean): number {
+  const contextualLayer = useOverlayLayer(kind);
+  const captureOpening = () => ({
+    active,
+    contextualLayer,
+    kind,
+    layer: active
+      ? Math.max(contextualLayer, getTopOverlayLayer() + OVERLAY_Z[kind])
+      : contextualLayer,
+  });
+  const [opening, setOpening] = useState(captureOpening);
+  if (
+    opening.active !== active ||
+    opening.contextualLayer !== contextualLayer ||
+    opening.kind !== kind
+  ) {
+    const next = captureOpening();
+    setOpening(next);
+    return next.layer;
+  }
+  return opening.layer;
 }

@@ -283,15 +283,18 @@ Drafts do not appear in GitHub's releases feed. Updater clients continue to see 
 
 The `rollout_hours` input on `desktop-release.yml` defaults to 36. Set it when dispatching to use any other rollout duration, or use the post-publish flip below.
 
-### Instant-admit release (rollout_hours=0 from publish)
+### Instant-admit release (rollout_hours=0)
 
-For a fresh release that should admit everyone immediately (low-risk change, doc-only, hotfix, or just a release you want out fast), cut the release normally and queue the rollout flip immediately after:
+`npm run release:patch` and `npm run release:minor` tag-push, and tag-push runs always stamp 36 hours. To admit everyone immediately (hotfix, doc-only change, a release you want out fast), cut the release normally, wait for it to publish, then flip the manifests:
 
 ```bash
 # 1. Cut and publish, then dispatch Desktop Release (default 36h ramp).
 npm run release:patch
 
-# 2. Immediately queue the flip — runs as soon as finalize-rollout completes.
+# 2. Wait for Desktop Release to publish the GitHub Release.
+gh run watch <desktop-release-run-id> --exit-status
+
+# 3. Flip the published manifests to instant admit.
 gh workflow run desktop-rollout.yml \
   -f tag=v0.1.64 \
   -f rollout_hours=0

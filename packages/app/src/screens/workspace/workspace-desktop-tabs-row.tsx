@@ -1,12 +1,16 @@
 import { LoadingSpinner } from "@/components/ui/loading-spinner";
 import React, {
   Fragment,
+  createContext,
+  useContext,
   useCallback,
   useEffect,
   useLayoutEffect,
   useMemo,
   useRef,
   useState,
+  type Dispatch,
+  type SetStateAction,
 } from "react";
 import { Pressable, Text, View, type LayoutChangeEvent, type ScrollView } from "react-native";
 import { useFilePanelOpenWithMenu } from "@/file-panels";
@@ -45,7 +49,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem } from "@/component
 import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { useShortcutKeys } from "@/hooks/use-shortcut-keys";
 import { WORKSPACE_SECONDARY_HEADER_HEIGHT, useIsCompactFormFactor } from "@/constants/layout";
-import { buttonControlHeight } from "@/components/ui/control-geometry";
+import { CONTROL_HEIGHTS } from "@/components/ui/control-geometry";
 import type { ShortcutKey } from "@/utils/format-shortcut";
 import { Shortcut } from "@/components/ui/shortcut";
 import { useWorkspaceTabLayout } from "@/screens/workspace/use-workspace-tab-layout";
@@ -80,6 +84,7 @@ import { buildWorkspaceKeyboardHandlerId } from "@/keyboard/handler-id";
 import type { KeyboardActionDefinition } from "@/keyboard/keyboard-action-dispatcher";
 import { WorkspaceNewTabMenuContent } from "@/screens/workspace/workspace-new-tab-menu";
 import {
+  paneContentToolbarIconSize,
   paneContentToolbarTrailingPadding,
   ToolbarButton,
   ToolbarControls,
@@ -113,6 +118,8 @@ const TAB_ICON_WIDTH = 14;
 const TAB_CONTENT_GAP = 4;
 const TAB_DROP_INDICATOR_WIDTH = 4;
 const TAB_MODIFIED_DOT_SIZE = 8;
+// The tab rail only renders in the wide layout, so the device alone picks its glyph size.
+const TAB_RAIL_GLYPH_SIZE = paneContentToolbarIconSize(false);
 const TAB_MIN_WIDTH = 64;
 const TAB_MAX_WIDTH = 160;
 const TAB_CLOSE_BUTTON_RESERVED_WIDTH = 0;
@@ -247,7 +254,7 @@ function WorkspaceNewTabButton({
         testID="workspace-new-tab-button"
         style={placement === "inline" ? styles.inlineNewTabButton : undefined}
       >
-        <ThemedPlus size={14} uniProps={extraMutedColorMapping} />
+        <ThemedPlus size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />
       </ToolbarButton>
       <WorkspaceNewTabMenuContent
         serverId={serverId}
@@ -296,11 +303,11 @@ function WorkspacePaneToolbarActions({
   const splitDownKeys = useShortcutKeys("workspace-pane-split-down");
   const splitActionsVisible = showSplitActions && Boolean(onSplitRight && onSplitDown);
   const splitRightLeading = useMemo(
-    () => <ThemedColumns2 size={14} uniProps={extraMutedColorMapping} />,
+    () => <ThemedColumns2 size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />,
     [],
   );
   const splitDownLeading = useMemo(
-    () => <ThemedRows2 size={14} uniProps={extraMutedColorMapping} />,
+    () => <ThemedRows2 size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />,
     [],
   );
   const splitRightTrailing = useMemo(
@@ -339,9 +346,9 @@ function WorkspacePaneToolbarActions({
           onPress={onTogglePaneMaximized}
         >
           {paneMaximized ? (
-            <ThemedMinimize size={14} uniProps={extraMutedColorMapping} />
+            <ThemedMinimize size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />
           ) : (
-            <ThemedMaximize size={14} uniProps={extraMutedColorMapping} />
+            <ThemedMaximize size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />
           )}
         </ToolbarButton>
       ) : null}
@@ -352,7 +359,7 @@ function WorkspacePaneToolbarActions({
             label={t("workspace.git.actions.moreActions")}
             testID="workspace-split-pane-menu"
           >
-            <ThemedEllipsis size={14} uniProps={extraMutedColorMapping} />
+            <ThemedEllipsis size={TAB_RAIL_GLYPH_SIZE} uniProps={extraMutedColorMapping} />
           </ToolbarButton>
           <DropdownMenuContent
             side="bottom"
@@ -407,7 +414,7 @@ function WorkspaceExitFocusModeButton({
         testID="workspace-exit-focus-mode"
         onPress={onPress}
       >
-        <ThemedX size={14} uniProps={mutedColorMapping} />
+        <ThemedX size={TAB_RAIL_GLYPH_SIZE} uniProps={mutedColorMapping} />
       </ToolbarButton>
     </View>
   );
@@ -464,6 +471,7 @@ function tabKeyExtractor(tab: WorkspaceDesktopTabRowItem) {
 export interface WorkspaceDesktopTabRowItem {
   tab: WorkspaceTabDescriptor;
   isActive: boolean;
+  isCloseHovered: boolean;
   isClosingTab: boolean;
 }
 
@@ -482,23 +490,22 @@ interface WorkspaceTabLabelMeasurement {
   width: number;
 }
 
+const TabMeasurementCache = createContext<Map<string, WorkspaceTabLabelMeasurement> | null>(null);
+
+export function WorkspaceTabMeasurementScope({ children }: { children: React.ReactNode }) {
+  const cache = useMemo(() => new Map<string, WorkspaceTabLabelMeasurement>(), []);
+  return <TabMeasurementCache.Provider value={cache}>{children}</TabMeasurementCache.Provider>;
+}
+
 interface WorkspaceTabTrackSnapshot {
+  signature: string;
   tabs: ResolvedWorkspaceDesktopTabRowItem[];
   labels: WorkspaceTabLabel[];
   labelWidths: number[];
 }
 
-function sameWorkspaceTabLabels(left: WorkspaceTabLabel[], right: WorkspaceTabLabel[]): boolean {
-  return (
-    left === right ||
-    (left.length === right.length &&
-      left.every(
-        (label, index) =>
-          label.key === right[index]?.key &&
-          label.label === right[index]?.label &&
-          label.modified === right[index]?.modified,
-      ))
-  );
+function workspaceTabLabelSignature(labels: WorkspaceTabLabel[]): string {
+  return JSON.stringify(labels);
 }
 
 function completeWorkspaceTabLabelWidths(
@@ -532,6 +539,7 @@ export interface WorkspaceDesktopTabsRowProps {
   tabs: WorkspaceDesktopTabRowItem[];
   normalizedServerId: string;
   normalizedWorkspaceId: string;
+  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   onCopyResumeCommand: (agentId: string) => Promise<void> | void;
@@ -727,11 +735,13 @@ function TabChip({
   showLabel,
   showCloseButton,
   rail,
+  isCloseHovered,
   isClosingTab,
   presentation,
   tooltipLabel,
   accessibilityLabel,
   resolvedTab,
+  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   dragHandleProps,
@@ -747,11 +757,13 @@ function TabChip({
   showCloseButton: boolean;
   /** The surface the row paints, so chip fills and their knockouts match the host. */
   rail: WorkspaceTabRailSurface;
+  isCloseHovered: boolean;
   isClosingTab: boolean;
   presentation: WorkspaceTabPresentation;
   tooltipLabel: string;
   accessibilityLabel: string;
   resolvedTab: WorkspaceDesktopTabActions;
+  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   dragHandleProps: DraggableListDragHandleProps | undefined;
@@ -767,7 +779,6 @@ function TabChip({
   );
   const isCompact = useIsCompactFormFactor();
   const [hovered, setHovered] = useState(false);
-  const [isCloseHovered, setIsCloseHovered] = useState(false);
   // An active tab in a pane that does not have focus stays legible but quiet: it keeps the fill of
   // a hovered chip and the muted label, so only one chip in the window reads as the live one.
   const isActiveFocused = isActive && isFocused;
@@ -822,12 +833,12 @@ function TabChip({
   }, []);
 
   const handleCloseButtonHoverIn = useCallback(() => {
-    setIsCloseHovered(true);
-  }, []);
+    setHoveredCloseTabKey(tab.key);
+  }, [setHoveredCloseTabKey, tab.key]);
 
   const handleCloseButtonHoverOut = useCallback(() => {
-    setIsCloseHovered(false);
-  }, []);
+    setHoveredCloseTabKey((current) => (current === tab.key ? null : current));
+  }, [setHoveredCloseTabKey, tab.key]);
 
   const handleCloseButtonPress = useCallback(
     (event: { stopPropagation?: () => void }) => {
@@ -959,6 +970,47 @@ function TabChip({
   );
 }
 
+export function useWorkspaceNewTabKeyboardAction({
+  handlerName = "workspace-new-tab",
+  ownsKeyboardShortcuts,
+  normalizedServerId,
+  normalizedWorkspaceId,
+  paneId,
+  createNewTab,
+}: {
+  handlerName?: string;
+  ownsKeyboardShortcuts: boolean;
+  normalizedServerId: string;
+  normalizedWorkspaceId: string;
+  paneId?: string;
+  createNewTab: () => void;
+}) {
+  const handleNewTabKeyboardAction = useCallback(
+    (action: KeyboardActionDefinition): boolean => {
+      if (!ownsKeyboardShortcuts) return false;
+      if (action.id === "workspace.tab.menu.open") {
+        createNewTab();
+        return true;
+      }
+      return false;
+    },
+    [createNewTab, ownsKeyboardShortcuts],
+  );
+
+  useKeyboardActionHandler({
+    handlerId: buildWorkspaceKeyboardHandlerId({
+      name: handlerName,
+      serverId: normalizedServerId,
+      workspaceId: normalizedWorkspaceId,
+      paneId,
+    }),
+    actions: ["workspace.tab.menu.open"],
+    enabled: ownsKeyboardShortcuts,
+    priority: 200,
+    handle: handleNewTabKeyboardAction,
+  });
+}
+
 export function WorkspaceDesktopTabsRow(props: WorkspaceDesktopTabsRowProps) {
   const [presentations, setPresentations] = useState(
     () => new Map<string, WorkspaceTabPresentation>(),
@@ -1027,6 +1079,7 @@ function ResolvedWorkspaceDesktopTabsRow({
   tabs,
   normalizedServerId,
   normalizedWorkspaceId,
+  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   onCopyResumeCommand,
@@ -1059,9 +1112,13 @@ function ResolvedWorkspaceDesktopTabsRow({
   const tabsScrollRef = useRef<ScrollView>(null);
   const [exitFocusModeWidth, setExitFocusModeWidth] = useState<number>(0);
   const tabScrollBoundary = useHorizontalScrollBoundary();
-  const [labelMeasurements, setLabelMeasurements] = useState(
-    () => new Map<string, WorkspaceTabLabelMeasurement>(),
-  );
+  const measurementCache = useContext(TabMeasurementCache);
+  const [labelMeasurements, setLabelMeasurements] = useState(() => new Map(measurementCache ?? []));
+  useLayoutEffect(() => {
+    if (!measurementCache) return;
+    measurementCache.clear();
+    for (const [key, value] of labelMeasurements) measurementCache.set(key, value);
+  }, [measurementCache, labelMeasurements]);
   const [trackSnapshot, setTrackSnapshot] = useState<WorkspaceTabTrackSnapshot | null>(null);
 
   const handleTabsContainerLayout = useCallback((event: LayoutChangeEvent) => {
@@ -1138,6 +1195,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       }),
     [fallbackTabLabels, tabs],
   );
+  const tabLabelSignature = useMemo(() => workspaceTabLabelSignature(tabLabels), [tabLabels]);
   const currentTabLabelKeys = useMemo(() => new Set(tabLabels.map(({ key }) => key)), [tabLabels]);
   useEffect(() => {
     setLabelMeasurements((current) => {
@@ -1163,19 +1221,19 @@ function ResolvedWorkspaceDesktopTabsRow({
 
     setTrackSnapshot((current) => {
       if (
-        current &&
-        sameWorkspaceTabLabels(current.labels, tabLabels) &&
+        current?.signature === tabLabelSignature &&
         sameWidths(current.labelWidths, labelWidths)
       ) {
         return current;
       }
       return {
+        signature: tabLabelSignature,
         tabs,
         labels: tabLabels,
         labelWidths,
       };
     });
-  }, [labelMeasurements, tabLabels, tabs, tabsContainerWidth]);
+  }, [labelMeasurements, tabLabelSignature, tabLabels, tabs, tabsContainerWidth]);
 
   useLayoutEffect(() => {
     publishMeasuredTrack();
@@ -1245,29 +1303,12 @@ function ResolvedWorkspaceDesktopTabsRow({
 
   const createNewTab = useCallback(() => onCreateNewTab({ paneId }), [onCreateNewTab, paneId]);
 
-  const handleNewTabKeyboardAction = useCallback(
-    (action: KeyboardActionDefinition): boolean => {
-      if (!ownsKeyboardShortcuts) return false;
-      if (action.id === "workspace.tab.menu.open") {
-        createNewTab();
-        return true;
-      }
-      return false;
-    },
-    [createNewTab, ownsKeyboardShortcuts],
-  );
-
-  useKeyboardActionHandler({
-    handlerId: buildWorkspaceKeyboardHandlerId({
-      name: "workspace-new-tab",
-      serverId: normalizedServerId,
-      workspaceId: normalizedWorkspaceId,
-      paneId,
-    }),
-    actions: ["workspace.tab.menu.open"],
-    enabled: ownsKeyboardShortcuts,
-    priority: 200,
-    handle: handleNewTabKeyboardAction,
+  useWorkspaceNewTabKeyboardAction({
+    ownsKeyboardShortcuts,
+    normalizedServerId,
+    normalizedWorkspaceId,
+    paneId,
+    createNewTab,
   });
 
   const rail: WorkspaceTabRailSurface = host === "explorer" ? "sidebar" : "surface";
@@ -1314,6 +1355,7 @@ function ResolvedWorkspaceDesktopTabsRow({
           showLabel={showLabel}
           showCloseButton={shouldShowCloseButton}
           rail={rail}
+          setHoveredCloseTabKey={setHoveredCloseTabKey}
           onNavigateTab={onNavigateTab}
           onCloseTab={onCloseTab}
           labels={tabMenuLabels}
@@ -1342,6 +1384,7 @@ function ResolvedWorkspaceDesktopTabsRow({
       onReloadAgent,
       onRenameTab,
       rail,
+      setHoveredCloseTabKey,
       tabMenuLabels,
       tabDropPreviewIndex,
       displayedTabs.length,
@@ -1470,6 +1513,7 @@ function ResolvedDesktopTabChip({
   showLabel,
   showCloseButton,
   rail,
+  setHoveredCloseTabKey,
   onNavigateTab,
   onCloseTab,
   labels,
@@ -1497,6 +1541,7 @@ function ResolvedDesktopTabChip({
   showLabel: boolean;
   showCloseButton: boolean;
   rail: WorkspaceTabRailSurface;
+  setHoveredCloseTabKey: Dispatch<SetStateAction<string | null>>;
   onNavigateTab: (tabId: string) => void;
   onCloseTab: (tabId: string) => Promise<void> | void;
   labels: WorkspaceTabMenuLabels;
@@ -1569,11 +1614,13 @@ function ResolvedDesktopTabChip({
         showLabel={showLabel}
         showCloseButton={showCloseButton}
         rail={rail}
+        isCloseHovered={item.isCloseHovered}
         isClosingTab={item.isClosingTab}
         presentation={presentation}
         tooltipLabel={tooltipLabel}
         accessibilityLabel={accessibilityLabel}
         resolvedTab={resolvedTab}
+        setHoveredCloseTabKey={setHoveredCloseTabKey}
         onNavigateTab={onNavigateTab}
         onCloseTab={onCloseTab}
         dragHandleProps={dragHandleProps}
@@ -1632,15 +1679,15 @@ const styles = StyleSheet.create((theme) => ({
     paddingHorizontal: theme.spacing[1],
   },
   inlineNewTabButton: {
-    width: buttonControlHeight.xs,
-    height: buttonControlHeight.xs,
+    width: CONTROL_HEIGHTS.sm,
+    height: CONTROL_HEIGHTS.sm,
   },
   paneSplitActions: {
     paddingHorizontal: PANE_SPLIT_ACTIONS_HORIZONTAL_PADDING,
     marginRight: PANE_SPLIT_ACTIONS_OUTER_MARGIN,
   },
   tab: {
-    height: buttonControlHeight.xs,
+    height: CONTROL_HEIGHTS.sm,
     paddingHorizontal: TAB_CHIP_HORIZONTAL_PADDING,
     borderRadius: theme.borderRadius.md,
     flexDirection: "row",
@@ -1681,7 +1728,7 @@ const styles = StyleSheet.create((theme) => ({
     top: theme.spacing[0.5],
     bottom: theme.spacing[0.5],
     width: TAB_DROP_INDICATOR_WIDTH,
-    borderRadius: theme.borderRadius.none,
+    borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.accent,
     zIndex: 10,
     pointerEvents: "none",
@@ -1717,7 +1764,7 @@ const styles = StyleSheet.create((theme) => ({
     flexShrink: 1,
     minWidth: 0,
     height: 10,
-    borderRadius: theme.borderRadius.none,
+    borderRadius: theme.borderRadius.full,
     backgroundColor: theme.colors.surface3,
     opacity: 0.9,
   },

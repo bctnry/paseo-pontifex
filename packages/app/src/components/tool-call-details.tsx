@@ -23,9 +23,7 @@ import { CODE_SURFACE_DATASET } from "@/styles/code-surface";
 import { extensionFromPath, highlightToKeyedLines } from "@/utils/highlight-cache";
 import { HighlightedLines } from "./highlighted-content";
 import { DiffViewer } from "./diff-viewer";
-import { MarkdownRenderer } from "./markdown/renderer";
 import { getCodeInsets } from "./code-insets";
-import { thinkingTextFromToolCall } from "@/utils/thinking-detail";
 import { isWeb } from "@/constants/platform";
 
 const ScrollView = isWeb ? RNScrollView : GHScrollView;
@@ -39,7 +37,6 @@ interface ToolCallDetailsContentProps {
   maxHeight?: number;
   fillAvailableHeight?: boolean;
   showLoadingSkeleton?: boolean;
-  streaming?: boolean;
 }
 
 interface DetailStyles {
@@ -67,7 +64,7 @@ function resolveShouldFill(
 ): boolean {
   if (!fillAvailableHeight) return false;
   const t = detail?.type;
-  return t === "shell" || t === "edit" || t === "write" || t === "read" || t === "sub_agent";
+  return t === "shell" || t === "edit" || t === "write" || t === "read";
 }
 
 function useDetailStyles(
@@ -176,193 +173,11 @@ function ShellDetailSection({ command, output, ds }: ShellDetailProps) {
             contentContainerStyle={styles.codeHorizontalContent}
           >
             <View style={styles.codeLine} dataSet={CODE_SURFACE_DATASET}>
-              <Text selectable style={[styles.scrollText, styles.shellCommand]}>
+              <Text selectable style={styles.scrollText}>
                 <Text style={styles.shellPrompt}>$ </Text>
                 {normalizedCommand}
+                {hasOutput ? `\n\n${commandOutput}` : ""}
               </Text>
-              {hasOutput ? (
-                <Text selectable style={[styles.scrollText, styles.shellOutput]}>
-                  {commandOutput}
-                </Text>
-              ) : null}
-            </View>
-          </ScrollView>
-        </ScrollView>
-      </View>
-    </View>
-  );
-}
-
-function resolveSubAgentFallbackHeader(
-  subAgentType: string | null | undefined,
-  description: string | null | undefined,
-  fallbackText: string,
-): string {
-  if (subAgentType && description) {
-    return `${subAgentType}: ${description}`;
-  }
-  return subAgentType ?? description ?? fallbackText;
-}
-
-interface SubAgentDetailProps {
-  log: string;
-  childSessionId: string | null | undefined;
-  subAgentType: string | null | undefined;
-  description: string | null | undefined;
-  ds: DetailStyles;
-}
-
-interface SubAgentActivityRow {
-  index: number;
-  toolName: string;
-  summary?: string;
-}
-
-interface ParsedSubAgentLog {
-  actions: SubAgentActivityRow[];
-  remainingLog: string;
-}
-
-function parseBracketedSubAgentLine(line: string, index: number): SubAgentActivityRow | null {
-  const match = line.match(/^\[([^\]]+)\](?:\s+(.*))?$/);
-  if (!match) {
-    return null;
-  }
-  const toolName = match[1]?.trim();
-  if (!toolName) {
-    return null;
-  }
-  const summary = match[2]?.trim();
-  return {
-    index,
-    toolName,
-    ...(summary ? { summary } : {}),
-  };
-}
-
-function parseSubAgentLog(log: string): ParsedSubAgentLog {
-  const actions: SubAgentActivityRow[] = [];
-  const remainingLines: string[] = [];
-  for (const line of log.replace(/^\n+/, "").split("\n")) {
-    const normalizedLine = line.trim();
-    if (!normalizedLine) {
-      continue;
-    }
-    const parsedAction = parseBracketedSubAgentLine(normalizedLine, actions.length + 1);
-    if (parsedAction) {
-      actions.push(parsedAction);
-    } else {
-      remainingLines.push(line);
-    }
-  }
-  return {
-    actions,
-    remainingLog: remainingLines.join("\n").replace(/^\n+/, ""),
-  };
-}
-
-function SubAgentActionRow({ action }: { action: SubAgentActivityRow }) {
-  return (
-    <View style={styles.subAgentActionRow}>
-      <Text selectable style={styles.subAgentActionTool}>
-        {formatSubAgentToolName(action.toolName)}
-      </Text>
-      {action.summary ? (
-        <Text selectable style={styles.subAgentActionSummary}>
-          {action.summary}
-        </Text>
-      ) : null}
-    </View>
-  );
-}
-
-function formatSubAgentToolName(toolName: string): string {
-  const trimmed = toolName.trim();
-  if (!trimmed) {
-    return toolName;
-  }
-  return trimmed
-    .replace(/[._-]+/g, " ")
-    .split(" ")
-    .filter((segment) => segment.length > 0)
-    .map((segment) => `${segment[0]?.toUpperCase() ?? ""}${segment.slice(1)}`)
-    .join(" ");
-}
-
-function SubAgentLogText({
-  activityLog,
-  fallbackHeader,
-  hasActions,
-}: {
-  activityLog: string;
-  fallbackHeader: string;
-  hasActions: boolean;
-}) {
-  if (activityLog.length > 0) {
-    return (
-      <Text selectable style={styles.scrollText}>
-        {activityLog}
-      </Text>
-    );
-  }
-  if (!hasActions) {
-    return (
-      <Text selectable style={styles.scrollText}>
-        {fallbackHeader}
-      </Text>
-    );
-  }
-  return null;
-}
-
-function SubAgentDetailSection({
-  log,
-  childSessionId,
-  subAgentType,
-  description,
-  ds,
-}: SubAgentDetailProps) {
-  const { t } = useTranslation();
-  const { actions, remainingLog } = useMemo(() => parseSubAgentLog(log), [log]);
-  const fallbackHeader = resolveSubAgentFallbackHeader(
-    subAgentType,
-    description,
-    t("toolCallDetails.subAgentActivity"),
-  );
-  const hasActions = actions.length > 0;
-  return (
-    <View style={ds.sectionFillStyle}>
-      <View style={ds.codeBlockFillStyle}>
-        <ScrollView
-          style={ds.codeVerticalScrollStyle}
-          contentContainerStyle={styles.codeVerticalContent}
-          nestedScrollEnabled
-          showsVerticalScrollIndicator
-        >
-          <ScrollView
-            horizontal
-            nestedScrollEnabled
-            showsHorizontalScrollIndicator
-            contentContainerStyle={styles.codeHorizontalContent}
-          >
-            <View style={styles.codeLine} dataSet={CODE_SURFACE_DATASET}>
-              {childSessionId ? (
-                <Text selectable style={styles.subAgentSessionText}>
-                  session {childSessionId}
-                </Text>
-              ) : null}
-              {hasActions ? (
-                <View style={styles.subAgentActions}>
-                  {actions.map((action) => (
-                    <SubAgentActionRow key={action.index} action={action} />
-                  ))}
-                </View>
-              ) : null}
-              <SubAgentLogText
-                activityLog={remainingLog}
-                fallbackHeader={fallbackHeader}
-                hasActions={hasActions}
-              />
             </View>
           </ScrollView>
         </ScrollView>
@@ -471,32 +286,6 @@ function ScrollablePlainTextSection({ text, ds }: { text: string; ds: DetailStyl
         <Text selectable style={styles.plainText}>
           {text}
         </Text>
-      </ScrollView>
-    </View>
-  );
-}
-
-interface ThinkingDetailProps {
-  text: string;
-  maxHeight: number | undefined;
-  streaming: boolean;
-}
-
-/** Reasoning text is Markdown, so it renders through the shared Markdown engine. */
-function ThinkingDetailSection({ text, maxHeight, streaming }: ThinkingDetailProps) {
-  const scrollStyle = useMemo(
-    () => (maxHeight === undefined ? undefined : inlineUnistylesStyle({ maxHeight })),
-    [maxHeight],
-  );
-  return (
-    <View style={styles.section}>
-      <ScrollView
-        style={scrollStyle}
-        contentContainerStyle={styles.thinkingContent}
-        nestedScrollEnabled
-        showsVerticalScrollIndicator
-      >
-        <MarkdownRenderer text={text} compact streaming={streaming} />
       </ScrollView>
     </View>
   );
@@ -662,7 +451,6 @@ function buildDetailSections(
   diffLines: DiffLine[] | undefined,
   ds: DetailStyles,
   t: TFunction,
-  streaming: boolean,
 ): ReactNode[] {
   if (!detail) return [];
   if (detail.type === "shell") {
@@ -670,19 +458,7 @@ function buildDetailSections(
       <ShellDetailSection key="shell" command={detail.command} output={detail.output} ds={ds} />,
     ];
   }
-  if (detail.type === "worktree_setup") return [];
-  if (detail.type === "sub_agent") {
-    return [
-      <SubAgentDetailSection
-        key="sub-agent"
-        log={detail.log}
-        childSessionId={detail.childSessionId}
-        subAgentType={detail.subAgentType}
-        description={detail.description}
-        ds={ds}
-      />,
-    ];
-  }
+  if (detail.type === "worktree_setup" || detail.type === "sub_agent") return [];
   if (detail.type === "edit") {
     return [<EditDetailSection key="edit" diffLines={diffLines} ds={ds} />];
   }
@@ -721,17 +497,6 @@ function buildDetailSections(
   if (detail.type === "plain_text") {
     if (!detail.text) return [];
     return [<ScrollablePlainTextSection key="plain-text" text={detail.text} ds={ds} />];
-  }
-  const thinkingText = thinkingTextFromToolCall(toolName, detail);
-  if (thinkingText !== null) {
-    return [
-      <ThinkingDetailSection
-        key="thinking"
-        text={thinkingText}
-        maxHeight={ds.resolvedMaxHeight}
-        streaming={streaming}
-      />,
-    ];
   }
   if (detail.type === "unknown") {
     return buildPaseoUnknownSections(toolName, detail) ?? buildUnknownSections(detail, ds, t);
@@ -780,14 +545,13 @@ export function ToolCallDetailsContent({
   maxHeight,
   fillAvailableHeight = false,
   showLoadingSkeleton = false,
-  streaming = false,
 }: ToolCallDetailsContentProps) {
   const { t } = useTranslation();
   const resolvedMaxHeight = fillAvailableHeight ? undefined : (maxHeight ?? 300);
   const ds = useDetailStyles(detail, resolvedMaxHeight, fillAvailableHeight);
   const diffLines = useDiffLines(detail);
 
-  const sections: ReactNode[] = buildDetailSections(toolName, detail, diffLines, ds, t, streaming);
+  const sections: ReactNode[] = buildDetailSections(toolName, detail, diffLines, ds, t);
 
   if (errorText) {
     sections.push(<ErrorSection key="error" errorText={errorText} ds={ds} />);
@@ -885,10 +649,6 @@ const styles = StyleSheet.create((theme) => {
       lineHeight: 22,
       overflowWrap: "anywhere",
     },
-    thinkingContent: {
-      paddingHorizontal: theme.spacing[3],
-      paddingVertical: theme.spacing[2],
-    },
     sectionTitle: {
       color: theme.colors.foregroundMuted,
       fontSize: theme.fontSize.sm,
@@ -950,41 +710,6 @@ const styles = StyleSheet.create((theme) => {
     shellPrompt: {
       color: theme.colors.foregroundMuted,
     },
-    shellCommand: {
-      color: theme.colors.foreground,
-    },
-    shellOutput: {
-      color: theme.colors.foregroundMuted,
-      marginTop: theme.spacing[2],
-    },
-    subAgentSessionText: {
-      fontFamily: theme.fontFamily.mono,
-      fontSize: theme.fontSize.code,
-      color: theme.colors.foregroundMuted,
-      lineHeight: 18,
-      marginBottom: theme.spacing[2],
-    },
-    subAgentActions: {
-      gap: theme.spacing[1],
-      marginBottom: theme.spacing[2],
-    },
-    subAgentActionRow: {
-      flexDirection: "row",
-      alignItems: "center",
-      gap: theme.spacing[2],
-    },
-    subAgentActionTool: {
-      fontFamily: theme.fontFamily.mono,
-      fontSize: theme.fontSize.code,
-      color: theme.colors.foregroundMuted,
-      lineHeight: 18,
-    },
-    subAgentActionSummary: {
-      fontFamily: theme.fontFamily.mono,
-      fontSize: theme.fontSize.code,
-      color: theme.colors.foreground,
-      lineHeight: 18,
-    },
     jsonScroll: {
       borderWidth: theme.borderWidth[1],
       borderColor: theme.colors.border,
@@ -1012,19 +737,19 @@ const styles = StyleSheet.create((theme) => {
     loadingLineWide: {
       height: 12,
       width: "100%",
-      borderRadius: theme.borderRadius.none,
+      borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.surface3,
     },
     loadingLineMedium: {
       height: 12,
       width: "72%",
-      borderRadius: theme.borderRadius.none,
+      borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.surface3,
     },
     loadingLineShort: {
       height: 12,
       width: "48%",
-      borderRadius: theme.borderRadius.none,
+      borderRadius: theme.borderRadius.full,
       backgroundColor: theme.colors.surface3,
     },
   };

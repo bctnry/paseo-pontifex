@@ -1,3 +1,4 @@
+import { useDisclosureHold } from "@/agent-stream/disclosure";
 import { MessagePreview, MessageSender } from "@/components/user-message";
 import { useStableEvent } from "@/hooks/use-stable-event";
 import { getAgentAttachmentPillContent } from "@/attachments/attachment-pill-content";
@@ -9,6 +10,7 @@ import {
   AttachmentThumbnail,
 } from "@/components/attachment-pill";
 import { MarkdownRenderer } from "@/components/markdown/renderer";
+import { useRetainedPanelActive } from "@/components/retained-panel";
 import { RewindMenu, type RewindMode } from "@/components/rewind/rewind-menu";
 import { useRewindAgentMutation } from "@/components/rewind/use-rewind-agent-mutation";
 import { TaskListRow } from "@/components/task-list-row";
@@ -32,6 +34,7 @@ import type { DaemonClient } from "@getpaseo/client/internal/daemon-client";
 import type { AgentMessage } from "@getpaseo/protocol/agent-message";
 import type { AgentCapabilityFlags, ToolCallDetail } from "@getpaseo/protocol/agent-types";
 import type { AgentAttachment } from "@getpaseo/protocol/messages";
+import MaskedView from "@react-native-masked-view/masked-view";
 import {
   Check,
   CheckSquare,
@@ -66,8 +69,18 @@ import {
   View,
   ViewStyle,
   type GestureResponderEvent,
+  type LayoutChangeEvent,
   type TextStyle,
 } from "react-native";
+import Animated, {
+  Easing,
+  cancelAnimation,
+  useAnimatedStyle,
+  useSharedValue,
+  withRepeat,
+  withTiming,
+} from "react-native-reanimated";
+import Svg, { Defs, Rect, Stop, LinearGradient as SvgLinearGradient } from "react-native-svg";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
 import { capAssistantMessageForRender, getUtf8ByteLength } from "./assistant-message-render-limit";
 import { getTurnDurationLabel } from "./assistant-turn-footer-label";
@@ -116,6 +129,8 @@ function useDisableOuterSpacing(disableOuterSpacing: boolean | undefined) {
   return disableOuterSpacing ?? contextValue;
 }
 
+const WEB_TOOLCALL_SHIMMER_KEYFRAME_ID = "paseo-toolcall-shimmer-keyframes";
+const WEB_TOOLCALL_SHIMMER_ANIMATION_NAME = "paseo-toolcall-shimmer";
 const ThemedMicVocal = withUnistyles(MicVocal);
 const ThemedFileSymlinkIcon = withUnistyles(FileSymlink);
 const ThemedTriangleAlertIcon = withUnistyles(TriangleAlertIcon);
@@ -134,12 +149,48 @@ const mutedForegroundColorMapping = (theme: Theme) => ({
 const destructiveColorMapping = (theme: Theme) => ({ color: theme.colors.destructive });
 const infoColorMapping = (theme: Theme) => ({ color: theme.colors.palette.blue[300] });
 const warningColorMapping = (theme: Theme) => ({ color: theme.colors.palette.amber[500] });
+const WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS = `
+  @keyframes ${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} {
+    0% {
+      background-position: var(--paseo-shimmer-start, -200px) 0;
+    }
+    100% {
+      background-position: var(--paseo-shimmer-end, 200px) 0;
+    }
+  }
+`;
+let webToolCallShimmerRegistered = false;
 const SCROLL_EDGE_EPSILON = 0.5;
 
 // Font size for stream metadata (timestamps, durations, live elapsed timer).
 // Lives between theme.fontSize.sm (12) and theme.fontSize.base (14); no token.
 export const STREAM_METADATA_FONT_SIZE = 13;
 type ScrollAxis = "x" | "y";
+
+function ensureWebToolCallShimmerKeyframes() {
+  if (isNative) {
+    return;
+  }
+  if (typeof document === "undefined") {
+    return;
+  }
+  const existing = document.getElementById(WEB_TOOLCALL_SHIMMER_KEYFRAME_ID);
+  if (existing) {
+    if (existing.textContent !== WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS) {
+      existing.textContent = WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS;
+    }
+    webToolCallShimmerRegistered = true;
+    return;
+  }
+  if (webToolCallShimmerRegistered) {
+    return;
+  }
+  const styleElement = document.createElement("style");
+  styleElement.id = WEB_TOOLCALL_SHIMMER_KEYFRAME_ID;
+  styleElement.textContent = WEB_TOOLCALL_SHIMMER_KEYFRAME_CSS;
+  document.head.appendChild(styleElement);
+  webToolCallShimmerRegistered = true;
+}
 
 function getWheelEventElementTarget(event: WheelEvent, fallback: HTMLElement): HTMLElement {
   const { target } = event;
@@ -506,6 +557,15 @@ interface AssistantTurnFooterProps {
 
 const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
   container: {
+    flex: 1,
+    minWidth: 0,
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "flex-start",
+    gap: theme.spacing[2],
+  },
+  actions: {
+    height: 24,
     flexDirection: "row",
     alignItems: "center",
     gap: theme.spacing[2],
@@ -517,20 +577,24 @@ const assistantTurnFooterStylesheet = StyleSheet.create((theme) => ({
     marginTop: 0,
     marginLeft: -theme.spacing[1],
   },
-  labelWrapper: {
-    position: "relative",
+  labelButton: {
+    flex: 1,
+    minHeight: 24,
+    flexDirection: "row",
+    alignItems: "center",
+    minWidth: 0,
   },
-  labelSizer: {
+  label: {
+    width: "100%",
+    flexShrink: 0,
     color: theme.colors.foregroundMuted,
     fontSize: STREAM_METADATA_FONT_SIZE,
+  },
+  overlappingLabel: {
+    marginLeft: "-100%",
+  },
+  hiddenLabel: {
     opacity: 0,
-  },
-  labelOverlay: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    color: theme.colors.foregroundMuted,
-    fontSize: STREAM_METADATA_FONT_SIZE,
   },
 }));
 
@@ -598,31 +662,51 @@ export const AssistantTurnFooter = memo(function AssistantTurnFooter({
 
   return (
     <View style={assistantTurnFooterStylesheet.container}>
-      {getContent ? (
-        <TurnCopyButton
-          getContent={getContent}
-          containerStyle={assistantTurnFooterStylesheet.copyButton}
-        />
+      {getContent || canFork ? (
+        <View style={assistantTurnFooterStylesheet.actions}>
+          {getContent ? (
+            <TurnCopyButton
+              getContent={getContent}
+              containerStyle={assistantTurnFooterStylesheet.copyButton}
+            />
+          ) : null}
+          {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
+        </View>
       ) : null}
-      {canFork ? <AssistantForkMenu onFork={handleFork} /> : null}
       {primaryLabel ? (
         <Pressable
+          style={assistantTurnFooterStylesheet.labelButton}
           onPress={handlePress}
           onHoverIn={handleHoverIn}
           onHoverOut={handleHoverOut}
           accessibilityRole={canSwap ? "button" : undefined}
           accessibilityLabel={canSwap ? `${durationLabel}, ended ${timestampLabel}` : primaryLabel}
         >
-          <View style={assistantTurnFooterStylesheet.labelWrapper}>
-            {/* Sizer reserves space for whichever label is longer so the
-                container width is stable across hover transitions. */}
-            <Text style={assistantTurnFooterStylesheet.labelSizer} aria-hidden>
-              {primaryLabel.length >= timestampLabel.length ? primaryLabel : timestampLabel}
+          {/* Both labels participate in layout at the available width. Overlapping their
+              columns reserves the taller wrapped height without measuring text or characters. */}
+          <Text
+            testID={!showTimestamp ? "turn-footer-timing-label" : undefined}
+            aria-hidden={showTimestamp}
+            style={[
+              assistantTurnFooterStylesheet.label,
+              showTimestamp && assistantTurnFooterStylesheet.hiddenLabel,
+            ]}
+          >
+            {primaryLabel}
+          </Text>
+          {canSwap ? (
+            <Text
+              testID={showTimestamp ? "turn-footer-timing-label" : undefined}
+              aria-hidden={!showTimestamp}
+              style={[
+                assistantTurnFooterStylesheet.label,
+                assistantTurnFooterStylesheet.overlappingLabel,
+                !showTimestamp && assistantTurnFooterStylesheet.hiddenLabel,
+              ]}
+            >
+              {timestampLabel}
             </Text>
-            <Text style={assistantTurnFooterStylesheet.labelOverlay}>
-              {showTimestamp ? timestampLabel : primaryLabel}
-            </Text>
-          </View>
+          ) : null}
         </Pressable>
       ) : null}
     </View>
@@ -858,7 +942,7 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   iconBadge: {
     width: 22,
     height: 22,
-    borderRadius: 0,
+    borderRadius: 11,
     alignItems: "center",
     justifyContent: "center",
     marginRight: theme.spacing[1],
@@ -887,6 +971,11 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   },
   secondaryLabelActive: {
     color: theme.colors.foreground,
+  },
+  shimmerText: {
+    color: "transparent",
+    fontSize: theme.fontSize.base,
+    fontWeight: theme.fontWeight.normal,
   },
   spacer: {
     flex: 1,
@@ -932,7 +1021,159 @@ const expandableBadgeStylesheet = StyleSheet.create((theme) => ({
   detailWrapperBorderless: {
     borderWidth: 0,
   },
+  shimmerOverlay: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    flexDirection: "row",
+    alignItems: "center",
+    overflow: "hidden",
+  },
+  shimmerMaskRow: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%",
+    height: "100%",
+  },
+  nativeShimmerTrack: {
+    position: "absolute",
+    top: 0,
+    right: 0,
+    bottom: 0,
+    left: 0,
+    overflow: "hidden",
+  },
+  nativeShimmerPeak: {
+    position: "absolute",
+    top: 0,
+    bottom: 0,
+    left: 0,
+  },
 }));
+
+interface NativeExpandableBadgeShimmerProps {
+  label: string;
+  secondaryLabel?: string;
+  rowWidth: number;
+  rowHeight: number;
+  peakWidth: number;
+  durationSeconds: number;
+  gradientId: string;
+}
+
+const NativeExpandableBadgeShimmer = memo(function NativeExpandableBadgeShimmer({
+  label,
+  secondaryLabel,
+  rowWidth,
+  rowHeight,
+  peakWidth,
+  durationSeconds,
+  gradientId,
+}: NativeExpandableBadgeShimmerProps) {
+  const isPanelActive = useRetainedPanelActive();
+  const shimmerTranslateX = useSharedValue(0);
+
+  useEffect(() => {
+    if (!isPanelActive) {
+      cancelAnimation(shimmerTranslateX);
+      return;
+    }
+    const startPosition = -peakWidth;
+    const endPosition = rowWidth + peakWidth;
+    shimmerTranslateX.value = startPosition;
+    shimmerTranslateX.value = withRepeat(
+      withTiming(endPosition, {
+        duration: durationSeconds * 1000,
+        easing: Easing.linear,
+      }),
+      -1,
+      false,
+    );
+    return () => {
+      cancelAnimation(shimmerTranslateX);
+    };
+  }, [durationSeconds, isPanelActive, peakWidth, rowWidth, shimmerTranslateX]);
+
+  const nativeShimmerPeakStyle = useAnimatedStyle(() => ({
+    transform: [{ translateX: shimmerTranslateX.value }],
+  }));
+
+  const nativeShimmerTrackStyle = useMemo(
+    () => [expandableBadgeStylesheet.nativeShimmerTrack, { width: rowWidth, height: rowHeight }],
+    [rowHeight, rowWidth],
+  );
+
+  const nativeShimmerMaskStyle = useMemo(
+    () => [expandableBadgeStylesheet.shimmerMaskRow, { width: rowWidth, height: rowHeight }],
+    [rowHeight, rowWidth],
+  );
+
+  const nativeLabelMaskStyle = useMemo(
+    () => [expandableBadgeStylesheet.label, { color: "#000000", opacity: 1 }],
+    [],
+  );
+
+  const nativeSecondaryMaskStyle = useMemo(
+    () => [expandableBadgeStylesheet.secondaryLabel, { color: "#000000", opacity: 1 }],
+    [],
+  );
+
+  const nativeShimmerPeakCombinedStyle = useMemo(
+    () => [
+      expandableBadgeStylesheet.nativeShimmerPeak,
+      nativeShimmerPeakStyle,
+      { width: peakWidth, height: rowHeight },
+    ],
+    [nativeShimmerPeakStyle, peakWidth, rowHeight],
+  );
+
+  const maskElement = useMemo(
+    () => (
+      <View pointerEvents="none" style={nativeShimmerMaskStyle}>
+        <Text style={nativeLabelMaskStyle} numberOfLines={1}>
+          {label}
+        </Text>
+        {secondaryLabel ? (
+          <Text style={nativeSecondaryMaskStyle} numberOfLines={1}>
+            {secondaryLabel}
+          </Text>
+        ) : (
+          <View style={expandableBadgeStylesheet.spacer} />
+        )}
+      </View>
+    ),
+    [nativeShimmerMaskStyle, nativeLabelMaskStyle, nativeSecondaryMaskStyle, label, secondaryLabel],
+  );
+
+  return (
+    <View style={expandableBadgeStylesheet.shimmerOverlay} pointerEvents="none">
+      <MaskedView pointerEvents="none" style={nativeShimmerTrackStyle} maskElement={maskElement}>
+        <View pointerEvents="none" style={nativeShimmerTrackStyle}>
+          <Animated.View pointerEvents="none" style={nativeShimmerPeakCombinedStyle}>
+            <NativeShimmerPeakSvg gradientId={gradientId} />
+          </Animated.View>
+        </View>
+      </MaskedView>
+    </View>
+  );
+});
+
+function NativeShimmerPeakSvg({ gradientId }: { gradientId: string }) {
+  return (
+    <Svg width="100%" height="100%" preserveAspectRatio="none">
+      <Defs>
+        <SvgLinearGradient id={gradientId} x1="0%" y1="0%" x2="100%" y2="0%">
+          <Stop offset="0%" stopColor="#ffffff" stopOpacity={0} />
+          <Stop offset="50%" stopColor="#ffffff" stopOpacity={1} />
+          <Stop offset="100%" stopColor="#ffffff" stopOpacity={0} />
+        </SvgLinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill={`url(#${gradientId})`} />
+    </Svg>
+  );
+}
 
 export const AssistantMessage = memo(function AssistantMessage({
   renderFullContent = false,
@@ -981,10 +1222,6 @@ export const AssistantMessage = memo(function AssistantMessage({
   );
 
   const measureMessage = useStableEvent((event: import("react-native").LayoutChangeEvent) => {
-    // The revealed text changes every frame while a message streams. Hashing
-    // each intermediate height would fill the estimate cache with values that
-    // can never be reused; only the final layout is cacheable.
-    if (phase !== "complete" || revealedMessage.length < renderedMessage.text.length) return;
     setAssistantMessageHeight({ markdown: revealedMessage, ...event.nativeEvent.layout });
   });
   return (
@@ -996,6 +1233,7 @@ export const AssistantMessage = memo(function AssistantMessage({
     >
       <MarkdownRenderer
         text={revealedMessage}
+        agentCommands
         streaming={phase !== "complete" || revealedMessage.length < renderedMessage.text.length}
         client={client}
         workspaceRoot={workspaceRoot}
@@ -1279,9 +1517,9 @@ export const TodoListCard = memo(function TodoListCard({
     };
   }, [activity, t]);
 
-  const handleToggle = useCallback(() => {
-    setIsExpanded((prev) => !prev);
-  }, []);
+  const hold = useDisclosureHold();
+  const toggleExpanded = useCallback(() => setIsExpanded((prev) => !prev), []);
+  const handleToggle = useCallback(() => hold(toggleExpanded), [hold, toggleExpanded]);
 
   const renderDetails = useCallback(() => {
     return (
@@ -1331,19 +1569,64 @@ interface ExpandableBadgeProps {
 interface ExpandableBadgeSecondaryLabelProps {
   secondaryLabel?: string;
   secondaryLabelStyle: StyleProp<TextStyle>;
+  shouldMeasureWebShimmer: boolean;
+  onSecondaryLayout: (event: LayoutChangeEvent) => void;
 }
 
 function ExpandableBadgeSecondaryLabel({
   secondaryLabel,
   secondaryLabelStyle,
+  shouldMeasureWebShimmer,
+  onSecondaryLayout,
 }: ExpandableBadgeSecondaryLabelProps) {
   if (!secondaryLabel) {
     return null;
   }
   return (
-    <Text style={secondaryLabelStyle} numberOfLines={1}>
+    <Text
+      style={secondaryLabelStyle}
+      numberOfLines={1}
+      onLayout={shouldMeasureWebShimmer ? onSecondaryLayout : undefined}
+    >
       {secondaryLabel}
     </Text>
+  );
+}
+
+interface ExpandableBadgeWebShimmerOverlayProps {
+  label: string;
+  secondaryLabel?: string;
+  shimmerLabelTextStyle: StyleProp<TextStyle>;
+  shimmerSecondaryTextStyle: StyleProp<TextStyle>;
+  showOpenFileButton: boolean;
+}
+
+function ExpandableBadgeWebShimmerOverlay({
+  label,
+  secondaryLabel,
+  shimmerLabelTextStyle,
+  shimmerSecondaryTextStyle,
+  showOpenFileButton,
+}: ExpandableBadgeWebShimmerOverlayProps) {
+  return (
+    <View style={expandableBadgeStylesheet.shimmerOverlay} pointerEvents="none">
+      <Text style={shimmerLabelTextStyle} numberOfLines={1}>
+        {label}
+      </Text>
+      {secondaryLabel ? (
+        <Text style={shimmerSecondaryTextStyle} numberOfLines={1}>
+          {secondaryLabel}
+        </Text>
+      ) : null}
+      {showOpenFileButton ? (
+        <View style={expandableBadgeStylesheet.openFileButton}>
+          <View style={expandableBadgeStylesheet.openFileButtonPlaceholderIcon} />
+        </View>
+      ) : null}
+      {!secondaryLabel && !showOpenFileButton ? (
+        <View style={expandableBadgeStylesheet.spacer} />
+      ) : null}
+    </View>
   );
 }
 
@@ -1352,6 +1635,20 @@ interface ExpandableBadgeLabelRowProps {
   labelStyle: StyleProp<TextStyle>;
   secondaryLabel?: string;
   secondaryLabelStyle: StyleProp<TextStyle>;
+  shouldMeasureWebShimmer: boolean;
+  shouldMeasureNativeShimmer: boolean;
+  isWebShimmer: boolean;
+  isNativeShimmer: boolean;
+  shimmerLabelTextStyle: StyleProp<TextStyle>;
+  shimmerSecondaryTextStyle: StyleProp<TextStyle>;
+  labelRowWidth: number;
+  labelRowHeight: number;
+  nativeShimmerPeakWidth: number;
+  shimmerDuration: number;
+  nativeGradientId: string;
+  onLabelRowLayout: (event: LayoutChangeEvent) => void;
+  onLabelLayout: (event: LayoutChangeEvent) => void;
+  onSecondaryLayout: (event: LayoutChangeEvent) => void;
   showOpenFileButton: boolean;
   isOpenFileHovered: boolean;
   onOpenFilePress: (event: GestureResponderEvent) => void;
@@ -1364,6 +1661,20 @@ function ExpandableBadgeLabelRow({
   labelStyle,
   secondaryLabel,
   secondaryLabelStyle,
+  shouldMeasureWebShimmer,
+  shouldMeasureNativeShimmer,
+  isWebShimmer,
+  isNativeShimmer,
+  shimmerLabelTextStyle,
+  shimmerSecondaryTextStyle,
+  labelRowWidth,
+  labelRowHeight,
+  nativeShimmerPeakWidth,
+  shimmerDuration,
+  nativeGradientId,
+  onLabelRowLayout,
+  onLabelLayout,
+  onSecondaryLayout,
   showOpenFileButton,
   isOpenFileHovered,
   onOpenFilePress,
@@ -1372,13 +1683,22 @@ function ExpandableBadgeLabelRow({
 }: ExpandableBadgeLabelRowProps) {
   const { t } = useTranslation();
   return (
-    <View style={expandableBadgeStylesheet.labelRow}>
-      <Text style={labelStyle} numberOfLines={1}>
+    <View
+      style={expandableBadgeStylesheet.labelRow}
+      onLayout={shouldMeasureNativeShimmer ? onLabelRowLayout : undefined}
+    >
+      <Text
+        style={labelStyle}
+        numberOfLines={1}
+        onLayout={shouldMeasureWebShimmer ? onLabelLayout : undefined}
+      >
         {label}
       </Text>
       <ExpandableBadgeSecondaryLabel
         secondaryLabel={secondaryLabel}
         secondaryLabelStyle={secondaryLabelStyle}
+        shouldMeasureWebShimmer={shouldMeasureWebShimmer}
+        onSecondaryLayout={onSecondaryLayout}
       />
       {showOpenFileButton ? (
         <Pressable
@@ -1396,6 +1716,26 @@ function ExpandableBadgeLabelRow({
             uniProps={isOpenFileHovered ? foregroundColorMapping : foregroundMutedColorMapping}
           />
         </Pressable>
+      ) : null}
+      {isWebShimmer ? (
+        <ExpandableBadgeWebShimmerOverlay
+          label={label}
+          secondaryLabel={secondaryLabel}
+          shimmerLabelTextStyle={shimmerLabelTextStyle}
+          shimmerSecondaryTextStyle={shimmerSecondaryTextStyle}
+          showOpenFileButton={showOpenFileButton}
+        />
+      ) : null}
+      {isNativeShimmer ? (
+        <NativeExpandableBadgeShimmer
+          label={label}
+          secondaryLabel={secondaryLabel}
+          rowWidth={labelRowWidth}
+          rowHeight={labelRowHeight}
+          peakWidth={nativeShimmerPeakWidth}
+          durationSeconds={shimmerDuration}
+          gradientId={nativeGradientId}
+        />
       ) : null}
     </View>
   );
@@ -1469,6 +1809,55 @@ function renderExpandableBadgeIconSlot({
   return iconNode;
 }
 
+function computeShimmerMetrics(input: {
+  label: string;
+  secondaryLabel: string | undefined;
+  isLoading: boolean;
+  labelRowWidth: number;
+  labelRowHeight: number;
+  labelOffsetX: number;
+  labelWidth: number;
+  secondaryOffsetX: number;
+  secondaryWidth: number;
+}) {
+  const totalShimmerChars = input.label.trim().length + (input.secondaryLabel?.trim().length ?? 0);
+  const shortTextDurationAdjustment = totalShimmerChars <= 12 ? 0.25 : 0;
+  const shimmerDuration = Math.max(
+    1,
+    Math.min(2.3, 1.25 + totalShimmerChars * 0.008 - shortTextDurationAdjustment),
+  );
+  const nativeShimmerPeakWidth = Math.max(
+    32,
+    Math.min(120, input.labelRowWidth > 0 ? input.labelRowWidth * 0.28 : 0),
+  );
+  const isWebShimmer = input.isLoading && isWeb;
+  // React Native Web only observes a node when onLayout exists at mount. Keep
+  // measuring while idle so a retained badge has dimensions when it starts loading.
+  const shouldMeasureWebShimmer = isWeb;
+  const shouldMeasureNativeShimmer = input.isLoading && isNative;
+  const isNativeShimmer =
+    shouldMeasureNativeShimmer && input.labelRowWidth > 0 && input.labelRowHeight > 0;
+  const webShimmerSpanStartX = input.labelOffsetX;
+  const webShimmerSpanEndX = input.secondaryLabel
+    ? input.secondaryOffsetX + input.secondaryWidth
+    : input.labelOffsetX + input.labelWidth;
+  const webShimmerSpanWidth = Math.max(1, webShimmerSpanEndX - webShimmerSpanStartX);
+  const webShimmerPeakWidth = Math.max(42, Math.min(120, webShimmerSpanWidth * 0.22));
+  const webShimmerTrackStart = webShimmerSpanStartX - webShimmerPeakWidth;
+  const webShimmerTrackEnd = webShimmerSpanEndX;
+  return {
+    shimmerDuration,
+    nativeShimmerPeakWidth,
+    isWebShimmer,
+    shouldMeasureWebShimmer,
+    shouldMeasureNativeShimmer,
+    isNativeShimmer,
+    webShimmerPeakWidth,
+    webShimmerTrackStart,
+    webShimmerTrackEnd,
+  };
+}
+
 function useDetailWheelPropagationBlocker(input: {
   detailWrapperRef: React.RefObject<View | null>;
   enabled: boolean;
@@ -1493,6 +1882,33 @@ function useDetailWheelPropagationBlocker(input: {
       node.removeEventListener("wheel", stopWheelPropagation);
     };
   }, [detailWrapperRef, enabled]);
+}
+
+const SHIMMER_GRADIENT =
+  "linear-gradient(90deg, rgba(255, 255, 255, 0) 0%, rgba(255, 255, 255, 0.45) 24%, #ffffff 40%, #ffffff 60%, rgba(255, 255, 255, 0.45) 76%, rgba(255, 255, 255, 0) 100%)";
+
+function buildShimmerTextStyle(input: {
+  isWebShimmer: boolean;
+  webShimmerPeakWidth: number;
+  shimmerDuration: number;
+  webShimmerTrackStart: number;
+  webShimmerTrackEnd: number;
+  offsetX: number;
+}): object | null {
+  if (!input.isWebShimmer) return null;
+  return inlineUnistylesStyle({
+    opacity: 1,
+    color: "transparent",
+    backgroundImage: SHIMMER_GRADIENT,
+    backgroundSize: `${input.webShimmerPeakWidth}px 100%`,
+    backgroundRepeat: "no-repeat",
+    backgroundClip: "text",
+    WebkitBackgroundClip: "text",
+    WebkitTextFillColor: "transparent",
+    animation: `${WEB_TOOLCALL_SHIMMER_ANIMATION_NAME} ${input.shimmerDuration}s linear infinite`,
+    "--paseo-shimmer-start": `${input.webShimmerTrackStart - input.offsetX}px`,
+    "--paseo-shimmer-end": `${input.webShimmerTrackEnd - input.offsetX}px`,
+  });
 }
 
 export const ExpandableBadge = memo(function ExpandableBadge({
@@ -1543,10 +1959,125 @@ export const ExpandableBadge = memo(function ExpandableBadge({
   const handleOpenFileHoverIn = useCallback(() => setIsOpenFileHovered(true), []);
   const handleOpenFileHoverOut = useCallback(() => setIsOpenFileHovered(false), []);
 
+  const nativeGradientIdRef = useRef(
+    `shimmer-gradient-${Math.random().toString(36).substring(2, 9)}`,
+  );
+  const [labelRowWidth, setLabelRowWidth] = useState(0);
+  const [labelRowHeight, setLabelRowHeight] = useState(0);
+  const [labelOffsetX, setLabelOffsetX] = useState(0);
+  const [labelWidth, setLabelWidth] = useState(0);
+  const [secondaryOffsetX, setSecondaryOffsetX] = useState(0);
+  const [secondaryWidth, setSecondaryWidth] = useState(0);
+
+  const {
+    shimmerDuration,
+    nativeShimmerPeakWidth,
+    isWebShimmer,
+    shouldMeasureWebShimmer,
+    shouldMeasureNativeShimmer,
+    isNativeShimmer,
+    webShimmerPeakWidth,
+    webShimmerTrackStart,
+    webShimmerTrackEnd,
+  } = computeShimmerMetrics({
+    label,
+    secondaryLabel,
+    isLoading,
+    labelRowWidth,
+    labelRowHeight,
+    labelOffsetX,
+    labelWidth,
+    secondaryOffsetX,
+    secondaryWidth,
+  });
+
+  const handleLabelRowLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      if (!shouldMeasureNativeShimmer) {
+        return;
+      }
+      const { width, height } = event.nativeEvent.layout;
+      setLabelRowWidth((previous) => (Math.abs(previous - width) > 0.5 ? width : previous));
+      setLabelRowHeight((previous) => (Math.abs(previous - height) > 0.5 ? height : previous));
+    },
+    [shouldMeasureNativeShimmer],
+  );
+
+  const handleLabelLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      if (!shouldMeasureWebShimmer) {
+        return;
+      }
+      const { x, width } = event.nativeEvent.layout;
+      setLabelOffsetX((previous) => (Math.abs(previous - x) > 0.5 ? x : previous));
+      setLabelWidth((previous) => (Math.abs(previous - width) > 0.5 ? width : previous));
+    },
+    [shouldMeasureWebShimmer],
+  );
+
+  const handleSecondaryLayout = useCallback(
+    (event: LayoutChangeEvent) => {
+      if (!shouldMeasureWebShimmer || !secondaryLabel) {
+        return;
+      }
+      const { x, width } = event.nativeEvent.layout;
+      setSecondaryOffsetX((previous) => (Math.abs(previous - x) > 0.5 ? x : previous));
+      setSecondaryWidth((previous) => (Math.abs(previous - width) > 0.5 ? width : previous));
+    },
+    [shouldMeasureWebShimmer, secondaryLabel],
+  );
+
+  useEffect(() => {
+    if (!isWebShimmer) {
+      return;
+    }
+    ensureWebToolCallShimmerKeyframes();
+  }, [isWebShimmer]);
+
   useDetailWheelPropagationBlocker({
     detailWrapperRef,
     enabled: !isNative && isExpanded && hasDetailContent,
   });
+
+  const shimmerLabelStyle = useMemo<StyleProp<TextStyle>>(
+    () =>
+      buildShimmerTextStyle({
+        isWebShimmer,
+        webShimmerPeakWidth,
+        shimmerDuration,
+        webShimmerTrackStart,
+        webShimmerTrackEnd,
+        offsetX: labelOffsetX,
+      }),
+    [
+      isWebShimmer,
+      webShimmerPeakWidth,
+      shimmerDuration,
+      webShimmerTrackStart,
+      webShimmerTrackEnd,
+      labelOffsetX,
+    ],
+  );
+
+  const shimmerSecondaryStyle = useMemo<StyleProp<TextStyle>>(
+    () =>
+      buildShimmerTextStyle({
+        isWebShimmer,
+        webShimmerPeakWidth,
+        shimmerDuration,
+        webShimmerTrackStart,
+        webShimmerTrackEnd,
+        offsetX: secondaryOffsetX,
+      }),
+    [
+      isWebShimmer,
+      webShimmerPeakWidth,
+      shimmerDuration,
+      webShimmerTrackStart,
+      webShimmerTrackEnd,
+      secondaryOffsetX,
+    ],
+  );
 
   const containerStyle = useMemo(
     () => [
@@ -1605,6 +2136,25 @@ export const ExpandableBadge = memo(function ExpandableBadge({
     [isActive],
   );
 
+  const shimmerLabelTextStyle = useMemo(
+    () => [
+      expandableBadgeStylesheet.label,
+      isLoading && expandableBadgeStylesheet.labelLoading,
+      expandableBadgeStylesheet.shimmerText,
+      shimmerLabelStyle,
+    ],
+    [isLoading, shimmerLabelStyle],
+  );
+
+  const shimmerSecondaryTextStyle = useMemo(
+    () => [
+      expandableBadgeStylesheet.secondaryLabel,
+      expandableBadgeStylesheet.shimmerText,
+      shimmerSecondaryStyle,
+    ],
+    [shimmerSecondaryStyle],
+  );
+
   const chevronStyle = useMemo(
     () => [
       expandableBadgeStylesheet.chevron,
@@ -1653,6 +2203,20 @@ export const ExpandableBadge = memo(function ExpandableBadge({
             labelStyle={labelStyle}
             secondaryLabel={secondaryLabel}
             secondaryLabelStyle={secondaryLabelStyle}
+            shouldMeasureWebShimmer={shouldMeasureWebShimmer}
+            shouldMeasureNativeShimmer={shouldMeasureNativeShimmer}
+            isWebShimmer={isWebShimmer}
+            isNativeShimmer={isNativeShimmer}
+            shimmerLabelTextStyle={shimmerLabelTextStyle}
+            shimmerSecondaryTextStyle={shimmerSecondaryTextStyle}
+            labelRowWidth={labelRowWidth}
+            labelRowHeight={labelRowHeight}
+            nativeShimmerPeakWidth={nativeShimmerPeakWidth}
+            shimmerDuration={shimmerDuration}
+            nativeGradientId={nativeGradientIdRef.current}
+            onLabelRowLayout={handleLabelRowLayout}
+            onLabelLayout={handleLabelLayout}
+            onSecondaryLayout={handleSecondaryLayout}
             showOpenFileButton={Boolean(onOpenFile && isHovered)}
             isOpenFileHovered={isOpenFileHovered}
             onOpenFilePress={handleOpenFilePress}
@@ -1749,6 +2313,7 @@ export const ToolCall = memo(function ToolCall({
 
   const isMobile = useIsCompactFormFactor();
   const shouldRenderInline = !isMobile || forceInline;
+  const hold = useDisclosureHold();
 
   const effectiveDetail = useMemo<ToolCallDetail | undefined>(() => {
     if (detail) {
@@ -1800,9 +2365,10 @@ export const ToolCall = memo(function ToolCall({
         showLoadingSkeleton: presentation.isLoadingDetails,
       });
     } else {
-      toggleExpanded();
+      hold(toggleExpanded);
     }
   }, [
+    hold,
     shouldRenderInline,
     toggleExpanded,
     openToolCall,
@@ -1852,7 +2418,6 @@ export const ToolCall = memo(function ToolCall({
         errorText={presentation.errorText}
         maxHeight={maxDetailHeight}
         showLoadingSkeleton={presentation.isLoadingDetails}
-        streaming={status === "executing" || status === "running"}
       />
     );
   }, [
@@ -1862,7 +2427,6 @@ export const ToolCall = memo(function ToolCall({
     presentation.errorText,
     presentation.isLoadingDetails,
     maxDetailHeight,
-    status,
   ]);
 
   if (presentation.isPlan && effectiveDetail?.type === "plan") {

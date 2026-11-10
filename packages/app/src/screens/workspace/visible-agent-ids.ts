@@ -1,4 +1,4 @@
-import { useMemo, useRef } from "react";
+import { useRef } from "react";
 import { collectAllPanes, type WorkspaceLayout } from "@/stores/workspace-layout-store";
 import type { WorkspaceTab } from "@/workspace-tabs/model";
 import { deriveWorkspacePaneState } from "./workspace-pane-state";
@@ -6,8 +6,6 @@ import { deriveWorkspacePaneState } from "./workspace-pane-state";
 export function selectVisibleAgentIds(input: {
   layout: WorkspaceLayout | null;
   tabs: WorkspaceTab[];
-  /** The workspace sheet's tab, shown over the panes. */
-  sheetTab?: WorkspaceTab | null;
   routeFocused: boolean;
   focusedPaneOnly: boolean;
   explorerPaneId?: string | null;
@@ -29,7 +27,6 @@ export function selectVisibleAgentIds(input: {
       .target;
     return target ? [target] : [];
   });
-  if (input.sheetTab) targets.push(input.sheetTab.target);
   return [
     ...new Set(targets.flatMap((target) => (target.kind === "agent" ? [target.agentId] : []))),
   ].sort();
@@ -38,17 +35,12 @@ export function selectVisibleAgentIds(input: {
 export function useVisibleAgentIds(input: {
   layout: WorkspaceLayout | null;
   tabs: WorkspaceTab[];
-  sheetTab: WorkspaceTab | null;
   routeFocused: boolean;
   focusedPaneOnly: boolean;
   explorerPaneId?: string | null;
   explorerVisible?: boolean;
 }): string[] {
-  const { layout, tabs, sheetTab, routeFocused, focusedPaneOnly } = input;
-  const nextAgentIds = useMemo(
-    () => selectVisibleAgentIds({ layout, tabs, sheetTab, routeFocused, focusedPaneOnly }),
-    [focusedPaneOnly, layout, routeFocused, sheetTab, tabs],
-  );
+  const nextAgentIds = selectVisibleAgentIds(input);
   const stableAgentIds = useRef<string[]>([]);
   if (
     stableAgentIds.current.length !== nextAgentIds.length ||

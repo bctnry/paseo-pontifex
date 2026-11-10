@@ -1,9 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { Agent } from "@/stores/session-store";
-import {
-  buildWorkspaceAgentActivityIndex,
-  updateWorkspaceAgentActivityIndex,
-} from "./workspace-agent-activity";
+import { buildWorkspaceAgentActivityIndex } from "./workspace-agent-activity";
 
 function agent(input: {
   id: string;
@@ -17,6 +14,7 @@ function agent(input: {
   pendingPermissionCount?: number;
   archivedAt?: string | null;
   parentAgentId?: string | null;
+  background?: boolean;
 }): Agent {
   return {
     serverId: "host-a",
@@ -64,6 +62,7 @@ function agent(input: {
     attentionTimestamp: input.attentionTimestamp ? new Date(input.attentionTimestamp) : null,
     archivedAt: input.archivedAt ? new Date(input.archivedAt) : null,
     parentAgentId: input.parentAgentId ?? null,
+    background: input.background ?? false,
     labels: {},
   };
 }
@@ -94,6 +93,8 @@ describe("workspace agent activity index", () => {
             workspaceId: "workspace-error",
             status: "error",
             turn: { phase: "idle", cancellationRequestId: null },
+            requiresAttention: true,
+            attentionReason: "error",
             updatedAt: "2026-01-01T00:00:00.000Z",
           }),
         ],
@@ -159,6 +160,33 @@ describe("workspace agent activity index", () => {
         ],
       ]),
     );
+  });
+
+  it("does not let a running background agent change root workspace activity", () => {
+    const index = buildWorkspaceAgentActivityIndex(
+      new Map([
+        [
+          "root",
+          agent({ id: "root", workspaceId: "workspace-a", updatedAt: "2026-06-01T10:00:00.000Z" }),
+        ],
+        [
+          "classifier",
+          agent({
+            id: "classifier",
+            workspaceId: "workspace-a",
+            status: "running",
+            updatedAt: "2026-06-01T10:05:00.000Z",
+            background: true,
+          }),
+        ],
+      ]),
+    );
+
+    expect(index.get("workspace-a")).toEqual({
+      agentId: "root",
+      status: "done",
+      enteredAt: new Date("2026-06-01T10:00:00.000Z"),
+    });
   });
 
   it("does not let archived or child agents change root workspace activity", () => {
@@ -282,49 +310,6 @@ describe("workspace agent activity index", () => {
 
     expect(next).toBe(previous);
     expect(next.get("workspace-a")?.enteredAt).toEqual(new Date("2026-06-01T10:00:00.000Z"));
-  });
-
-  it("updates only workspaces touched by changed agents", () => {
-    const previousAgents = new Map([
-      [
-        "root-a",
-        agent({
-          id: "root-a",
-          workspaceId: "workspace-a",
-          status: "running",
-          updatedAt: "2026-06-01T10:00:00.000Z",
-        }),
-      ],
-      [
-        "root-b",
-        agent({
-          id: "root-b",
-          workspaceId: "workspace-b",
-          status: "idle",
-          updatedAt: "2026-06-01T10:01:00.000Z",
-        }),
-      ],
-    ]);
-    const previous = buildWorkspaceAgentActivityIndex(previousAgents);
-    const nextAgents = new Map(previousAgents);
-    nextAgents.set(
-      "root-a",
-      agent({
-        id: "root-a",
-        workspaceId: "workspace-a",
-        status: "idle",
-        updatedAt: "2026-06-01T10:05:00.000Z",
-      }),
-    );
-
-    const next = updateWorkspaceAgentActivityIndex(previousAgents, nextAgents, previous);
-
-    expect(next).not.toBe(previous);
-    expect(next.get("workspace-a")?.status).toBe("done");
-    expect(next.get("workspace-b")).toBe(previous.get("workspace-b"));
-    expect(updateWorkspaceAgentActivityIndex(previousAgents, previousAgents, previous)).toBe(
-      previous,
-    );
   });
 
   it("records a new entry time when an agent changes status", () => {

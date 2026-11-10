@@ -1,14 +1,7 @@
-import {
-  useCallback,
-  useMemo,
-  type ComponentProps,
-  type PropsWithChildren,
-  type ReactNode,
-} from "react";
+import { useMemo, type ComponentProps, type PropsWithChildren, type ReactNode } from "react";
 import { useTranslation } from "react-i18next";
-import { type PressableStateCallbackType } from "react-native";
+import type { PressableStateCallbackType } from "react-native";
 import { StyleSheet, withUnistyles } from "react-native-unistyles";
-import { isWeb as platformIsWeb } from "@/constants/platform";
 import {
   Archive,
   Circle,
@@ -19,8 +12,9 @@ import {
   Pin,
   PinOff,
   Tag,
-  Trash2,
 } from "lucide-react-native";
+import { PressHighlight } from "@/components/ui/press-highlight";
+import { isWeb } from "@/constants/platform";
 import { getForgePresentation, normalizeForge } from "@/git/forge";
 import type { SidebarWorkspaceEntry } from "@/hooks/use-sidebar-workspaces-list";
 import { useAppSettings } from "@/hooks/use-settings";
@@ -43,6 +37,7 @@ import {
 import { Shortcut } from "@/components/ui/shortcut";
 import { OpenInFileManagerMenuItem } from "@/workspace/open-in-file-manager/menu-item";
 import { resolveSidebarWorkspaceAccessibilityLabel } from "@/components/sidebar/sidebar-workspace-title";
+import { bySizing } from "@/components/ui/control-geometry";
 import {
   workspaceServiceLabelKey,
   type WorkspaceServiceSummary,
@@ -52,8 +47,6 @@ import {
   WORKSPACE_LABEL_PAGE_ID,
   type WorkspaceLabelTarget,
 } from "@/workspace-labels/picker";
-import { useSidebarSelectionStore, workspaceSelectionKey } from "@/stores/sidebar-selection-store";
-import { useSidebarSelectionArchive } from "@/hooks/use-sidebar-selection-archive";
 
 const foregroundColorMapping = (theme: Theme) => ({ color: theme.colors.foreground });
 const foregroundMutedColorMapping = (theme: Theme) => ({
@@ -69,8 +62,6 @@ const ThemedCircleCheck = withUnistyles(CircleCheck);
 const ThemedPin = withUnistyles(Pin);
 const ThemedPinOff = withUnistyles(PinOff);
 const ThemedTag = withUnistyles(Tag);
-const ThemedTrash2 = withUnistyles(Trash2);
-const removeLeadingIcon = <ThemedTrash2 size={14} uniProps={foregroundMutedColorMapping} />;
 
 const copyLeadingIcon = <ThemedCopy size={14} uniProps={foregroundMutedColorMapping} />;
 const renameLeadingIcon = <ThemedPencil size={14} uniProps={foregroundMutedColorMapping} />;
@@ -82,11 +73,45 @@ const archiveLeadingIcon = <ThemedArchive size={14} uniProps={foregroundMutedCol
 const pinLeadingIcon = <ThemedPin size={14} uniProps={foregroundMutedColorMapping} />;
 const unpinLeadingIcon = <ThemedPinOff size={14} uniProps={foregroundMutedColorMapping} />;
 
+/** Pointer-only, so it is always the kebab's pointer size. */
+const ARCHIVE_BUTTON_SIZE = 18;
+/** Keeps a press aimed at the kebab from landing on the one-click archive. */
+const ARCHIVE_BUTTON_KEBAB_GAP = 8;
+/** The width the archive button and its gap take up left of the kebab. */
+export const ARCHIVE_BUTTON_FOOTPRINT = ARCHIVE_BUTTON_SIZE + ARCHIVE_BUTTON_KEBAB_GAP;
+
 const triggerIconProps = densityIconProps("sm", foregroundMutedColorMapping);
 const triggerIconHoveredProps = densityIconProps("sm", foregroundColorMapping);
 
 function renderTriggerIcon({ hovered }: { hovered?: boolean }) {
   return <ThemedMoreVertical uniProps={hovered ? triggerIconHoveredProps : triggerIconProps} />;
+}
+
+function renderArchiveIcon({ hovered }: PressableStateCallbackType & { hovered?: boolean }) {
+  return <ThemedArchive uniProps={hovered ? triggerIconHoveredProps : triggerIconProps} />;
+}
+
+/** One-click archive beside the kebab, for pointer rows that reveal it on hover. */
+export function SidebarWorkspaceArchiveButton({
+  workspaceKey,
+  onArchive,
+}: {
+  workspaceKey: string;
+  onArchive: () => void;
+}) {
+  const { t } = useTranslation();
+  return (
+    <PressHighlight
+      hitSlop={4}
+      style={archiveButtonStyle}
+      onPress={onArchive}
+      accessibilityRole={isWeb ? undefined : "button"}
+      accessibilityLabel={t("sidebar.workspace.actions.archiveWorkspace")}
+      testID={`sidebar-workspace-archive-button-${workspaceKey}`}
+    >
+      {renderArchiveIcon}
+    </PressHighlight>
+  );
 }
 
 export interface SidebarWorkspaceMenuProps {
@@ -104,8 +129,6 @@ export interface SidebarWorkspaceMenuProps {
   archiveStatus?: "idle" | "pending" | "success";
   archivePendingLabel?: string;
   archiveShortcutKeys?: ShortcutKey[][] | null;
-  /** Permanent removal. Omitted when the host does not support workspace removal. */
-  onRemove?: () => void;
   isPinned?: boolean;
   onTogglePin?: () => void;
   openInFileManagerPath?: string | null;
@@ -154,22 +177,11 @@ function SidebarWorkspaceMenuItems({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
-  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
 }: SidebarWorkspaceMenuItemsProps & { surface: MenuSurface }): ReactNode {
   const { t } = useTranslation();
-  const selectionKey =
-    serverId && workspaceId ? workspaceSelectionKey(serverId, workspaceId) : null;
-  const isSelectionMode = useSidebarSelectionStore((state) => state.isSelectionMode);
-  const isSelected = useSidebarSelectionStore((state) =>
-    selectionKey ? state.selected.has(selectionKey) : false,
-  );
-  const selectedCount = useSidebarSelectionStore((state) => state.selected.size);
-  const startSelection = useSidebarSelectionStore((state) => state.startSelection);
-  const toggleSelection = useSidebarSelectionStore((state) => state.toggle);
-  const { archiveSelected, isArchiving } = useSidebarSelectionArchive();
   const archiveTrailing = useMemo(
     () => (archiveShortcutKeys ? <Shortcut chord={archiveShortcutKeys} /> : null),
     [archiveShortcutKeys],
@@ -178,40 +190,9 @@ function SidebarWorkspaceMenuItems({
     () => <ThemedTag size={14} uniProps={foregroundMutedColorMapping} />,
     [],
   );
-  const handleSelect = useCallback(() => {
-    if (!serverId || !workspaceId) {
-      return;
-    }
-    const selection = { kind: "workspace" as const, serverId, workspaceId };
-    if (isSelectionMode) {
-      toggleSelection(selection);
-    } else {
-      startSelection(selection);
-    }
-  }, [isSelectionMode, serverId, startSelection, toggleSelection, workspaceId]);
 
   return (
     <>
-      {serverId && workspaceId ? (
-        <WorkspaceMenuItem
-          surface={surface}
-          testID={`sidebar-workspace-menu-select-${workspaceKey}`}
-          onSelect={handleSelect}
-        >
-          {isSelected ? t("sidebar.selection.deselect") : t("sidebar.selection.select")}
-        </WorkspaceMenuItem>
-      ) : null}
-      {selectedCount > 0 ? (
-        <WorkspaceMenuItem
-          surface={surface}
-          testID={`sidebar-workspace-menu-archive-selected-${workspaceKey}`}
-          leading={archiveLeadingIcon}
-          disabled={isArchiving}
-          onSelect={archiveSelected}
-        >
-          {t("sidebar.selection.archiveSelected", { count: selectedCount })}
-        </WorkspaceMenuItem>
-      ) : null}
       {onCopyPath ? (
         <WorkspaceMenuItem
           surface={surface}
@@ -299,17 +280,6 @@ function SidebarWorkspaceMenuItems({
           {archiveLabel ?? t("sidebar.workspace.actions.archive")}
         </WorkspaceMenuItem>
       ) : null}
-      {onRemove ? (
-        <WorkspaceMenuItem
-          surface={surface}
-          testID={`sidebar-workspace-menu-remove-${workspaceKey}`}
-          leading={removeLeadingIcon}
-          destructive
-          onSelect={onRemove}
-        >
-          {t("sidebar.workspace.actions.remove")}
-        </WorkspaceMenuItem>
-      ) : null}
     </>
   );
 }
@@ -329,7 +299,6 @@ export function SidebarWorkspaceMenu({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
-  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
@@ -348,7 +317,7 @@ export function SidebarWorkspaceMenu({
       <DropdownMenuTrigger
         hitSlop={8}
         style={triggerStyle}
-        accessibilityRole={platformIsWeb ? undefined : "button"}
+        accessibilityRole={isWeb ? undefined : "button"}
         accessibilityLabel={t("sidebar.workspace.actions.menu")}
         testID={`sidebar-workspace-kebab-${workspaceKey}`}
       >
@@ -376,7 +345,6 @@ export function SidebarWorkspaceMenu({
           archiveStatus={archiveStatus}
           archivePendingLabel={archivePendingLabel}
           archiveShortcutKeys={archiveShortcutKeys}
-          onRemove={onRemove}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           openInFileManagerPath={openInFileManagerPath}
@@ -410,7 +378,6 @@ export function SidebarWorkspaceContextMenu({
   archiveStatus,
   archivePendingLabel,
   archiveShortcutKeys,
-  onRemove,
   isPinned,
   onTogglePin,
   openInFileManagerPath,
@@ -492,7 +459,6 @@ export function SidebarWorkspaceContextMenu({
           archiveStatus={archiveStatus}
           archivePendingLabel={archivePendingLabel}
           archiveShortcutKeys={archiveShortcutKeys}
-          onRemove={onRemove}
           isPinned={isPinned}
           onTogglePin={onTogglePin}
           openInFileManagerPath={openInFileManagerPath}
@@ -506,22 +472,37 @@ function triggerStyle({ hovered = false }: PressableStateCallbackType & { hovere
   return [styles.trigger, hovered && styles.triggerHovered];
 }
 
+function archiveButtonStyle({
+  hovered = false,
+}: PressableStateCallbackType & { hovered?: boolean }) {
+  return [styles.archiveButton, hovered && styles.triggerHovered];
+}
+
 const styles = StyleSheet.create((theme) => ({
   trigger: {
-    // Larger on compact so the kebab is an easy tap target.
-    width: { xs: 32, md: 18 },
-    height: { xs: 32, md: 18 },
+    // Larger on touch so the kebab is an easy tap target.
+    width: bySizing({ touch: 32, pointer: 18 }),
+    height: bySizing({ touch: 32, pointer: 18 }),
     alignItems: "center",
     justifyContent: "center",
     borderRadius: 4,
-    marginLeft: 2,
-    // Center the compact box on the 20px title line it is anchored to.
-    marginTop: { xs: -6, md: 0 },
+    // Center the touch box on the 20px title line it is anchored to.
+    marginTop: bySizing({ touch: -6, pointer: 0 }),
     // MoreVertical paints only around the center of its SVG. Keep the padded hit box, but
     // pull the painted dots through that unused view-box space onto the trailing-content rail.
-    marginRight: { xs: -14, md: -7 },
+    marginRight: bySizing({ touch: -14, pointer: -7 }),
   },
   triggerHovered: {
     backgroundColor: theme.colors.surface2,
+  },
+  // The kebab's box without its offsets: the archive glyph fills its view box, so it needs
+  // none of the nudging the three dots do.
+  archiveButton: {
+    width: ARCHIVE_BUTTON_SIZE,
+    height: ARCHIVE_BUTTON_SIZE,
+    marginRight: ARCHIVE_BUTTON_KEBAB_GAP,
+    alignItems: "center",
+    justifyContent: "center",
+    borderRadius: 4,
   },
 }));

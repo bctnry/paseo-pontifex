@@ -1,11 +1,14 @@
+import { checkoutDiffSnapshot, type CheckoutDiffSnapshot } from "@/git/diff-snapshot";
+import type { DiffState } from "@getpaseo/client";
 import type { OwnedSubscription } from "@getpaseo/client";
+import type { ProviderSnapshotEntry } from "@getpaseo/protocol/agent-types";
 import type { Query, QueryCacheNotifyEvent, QueryClient, QueryKey } from "@tanstack/react-query";
 import type {
   ListTerminalsResponse,
   MutableDaemonConfig,
   SessionOutboundMessage,
 } from "@getpaseo/protocol/messages";
-import { agentCommandsQueryRoot } from "@/hooks/agent-commands-query";
+import { invalidateCommandsForProviderChange } from "@/agent-commands/cache";
 import { shareCheckoutDiff } from "@/git/diff-sharing";
 import { orderCheckoutDiffFiles } from "@/git/diff-order";
 import { daemonConfigQueryKey } from "@/data/daemon-config";
@@ -22,14 +25,9 @@ type ProvidersSnapshotUpdateMessage = Extract<
   SessionOutboundMessage,
   { type: "providers_snapshot_update" }
 >;
-type SubscribeCheckoutDiffResponseMessage = Extract<
-  SessionOutboundMessage,
-  { type: "subscribe_checkout_diff_response" }
->;
 type StatusMessage = Extract<SessionOutboundMessage, { type: "status" }>;
 type TerminalsChangedMessage = Extract<SessionOutboundMessage, { type: "terminals_changed" }>;
-type CheckoutDiffResponsePayload = SubscribeCheckoutDiffResponseMessage["payload"];
-type CheckoutDiffCachePayload = Omit<CheckoutDiffResponsePayload, "subscriptionId">;
+type CheckoutDiffCachePayload = CheckoutDiffSnapshot;
 type ListTerminalsPayload = ListTerminalsResponse["payload"];
 
 interface CheckoutDiffCompare {
@@ -48,7 +46,7 @@ interface CheckoutDiffRoute {
 }
 
 interface CheckoutDiffRegistration extends CheckoutDiffRoute {
-  subscription: OwnedSubscription<CheckoutDiffResponsePayload>;
+  subscription: OwnedSubscription<DiffState>;
 }
 
 interface WorkspaceTerminalsRoute {
@@ -69,29 +67,12 @@ export interface ServerDataQueryMeta extends Record<string, unknown> {
   serverData: ServerDataRoute;
 }
 
-function addQueryKey(map: Map<string, Set<QueryKey>>, key: string, queryKey: QueryKey): void {
-  let keys = map.get(key);
-  if (!keys) {
-    keys = new Set();
-    map.set(key, keys);
-  }
-  keys.add(queryKey);
-}
-
-function replaceQueryKeyMap(
-  target: Map<string, Set<QueryKey>>,
-  source: Map<string, Set<QueryKey>>,
-): void {
-  target.clear();
-  for (const [key, queryKeys] of source) target.set(key, queryKeys);
-}
-
 export type ProvidersSnapshotUpdate = ProvidersSnapshotUpdateMessage;
 
 interface ServerDataPushClient {
   getProvidersSnapshot: import("@getpaseo/client/internal/daemon-client").DaemonClient["getProvidersSnapshot"];
   observeEvents: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeEvents"];
-  observeCheckoutDiff: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeCheckoutDiff"];
+  observeDiff: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeDiff"];
   observeTerminals: import("@getpaseo/client/internal/daemon-client").DaemonClient["observeTerminals"];
 }
 
@@ -203,10 +184,10 @@ export async function applyProvidersSnapshotUpdate(input: {
   const snapshot = { ...input.message.payload, requestId: "providers_snapshot_update" };
   const cwd = normalizeProvidersSnapshotCwd(snapshot.cwd);
   const queryKey = providersSnapshotQueryKey(input.serverId, cwd);
-  const previous = input.queryClient.getQueryData<{ snapshotHash?: string }>(queryKey);
+  const previous = input.queryClient.getQueryData<{ entries: ProviderSnapshotEntry[] }>(queryKey);
   let announcement: typeof snapshot | undefined = snapshot;
   void input.queryClient.cancelQueries({ queryKey, exact: true });
-  await input.queryClient.fetchQuery({
+  const current = await input.queryClient.fetchQuery({
     queryKey,
     staleTime: 0,
     structuralSharing: false,
@@ -222,19 +203,18 @@ export async function applyProvidersSnapshotUpdate(input: {
       });
     },
   });
-  if (!snapshot.snapshotHash || previous?.snapshotHash !== snapshot.snapshotHash) {
-    void input.queryClient.invalidateQueries({
-      queryKey: agentCommandsQueryRoot(input.serverId),
-      exact: false,
-    });
-  }
+  void invalidateCommandsForProviderChange({
+    queryClient: input.queryClient,
+    serverId: input.serverId,
+    cwd,
+    previous: previous?.entries,
+    current: current.entries,
+  });
 }
 
 export function mountServerDataPushRouter(input: PushRouterInput): () => void {
   const activeCheckoutDiffSubscriptions = new Map<string, CheckoutDiffRegistration>();
   const activeTerminalSubscriptions = new Map<string, WorkspaceTerminalsRegistration>();
-  const checkoutDiffQueryKeys = new Map<string, Set<QueryKey>>();
-  const terminalQueryKeys = new Map<string, Set<QueryKey>>();
   let disposed = false;
 
   function reconcileSubscriptions(
@@ -249,8 +229,6 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
 
     const desiredCheckoutDiffSubscriptions = new Map<string, CheckoutDiffRoute>();
     const desiredTerminalSubscriptions = new Map<string, WorkspaceTerminalsRoute>();
-    const nextCheckoutDiffQueryKeys = new Map<string, Set<QueryKey>>();
-    const nextTerminalQueryKeys = new Map<string, Set<QueryKey>>();
     for (const query of input.queryClient.getQueryCache().getAll()) {
       const route = getActiveServerDataRoute(query, input.serverId, {
         checkoutDiff: fallbackActive.checkoutDiff,
@@ -261,15 +239,10 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       }
       if (route.domain === "checkoutDiff") {
         desiredCheckoutDiffSubscriptions.set(route.subscriptionId, route);
-        addQueryKey(nextCheckoutDiffQueryKeys, route.subscriptionId, query.queryKey);
         continue;
       }
-      const key = workspaceTerminalSubscriptionKey(route);
-      desiredTerminalSubscriptions.set(key, route);
-      addQueryKey(nextTerminalQueryKeys, key, query.queryKey);
+      desiredTerminalSubscriptions.set(workspaceTerminalSubscriptionKey(route), route);
     }
-    replaceQueryKeyMap(checkoutDiffQueryKeys, nextCheckoutDiffQueryKeys);
-    replaceQueryKeyMap(terminalQueryKeys, nextTerminalQueryKeys);
 
     reconcileCheckoutDiffSubscriptions({
       active: activeCheckoutDiffSubscriptions,
@@ -277,7 +250,6 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       desired: desiredCheckoutDiffSubscriptions,
       serverId: input.serverId,
       queryClient: input.queryClient,
-      queryKeys: checkoutDiffQueryKeys,
     });
     reconcileTerminalSubscriptions({
       active: activeTerminalSubscriptions,
@@ -285,9 +257,11 @@ export function mountServerDataPushRouter(input: PushRouterInput): () => void {
       desired: desiredTerminalSubscriptions,
       apply: (route, payload) =>
         applyTerminalsChanged({
+          activeCheckoutDiffSubscriptions,
+          activeTerminalSubscriptions,
           queryClient: input.queryClient,
+          serverId: input.serverId,
           route,
-          queryKeys: terminalQueryKeys.get(workspaceTerminalSubscriptionKey(route)),
           message: { type: "terminals_changed", payload },
         }),
     });
@@ -353,7 +327,6 @@ function reconcileCheckoutDiffSubscriptions(input: {
   desired: Map<string, CheckoutDiffRoute>;
   serverId: string;
   queryClient: QueryClient;
-  queryKeys: Map<string, Set<QueryKey>>;
 }): void {
   for (const [key, current] of input.active) {
     const desired = input.desired.get(key);
@@ -363,32 +336,34 @@ function reconcileCheckoutDiffSubscriptions(input: {
   }
   for (const [key, desired] of input.desired) {
     if (input.active.has(key)) continue;
-    const subscription = input.client.observeCheckoutDiff(desired.cwd, desired.compare);
+    const { mode, baseRef, ignoreWhitespace } = desired.compare;
+    const revision = mode === "uncommitted" ? "HEAD" : baseRef;
+    if (!revision) continue;
+    const subscription = input.client.observeDiff({
+      cwd: desired.cwd,
+      base: { kind: "rev", rev: revision },
+      head: mode === "base" ? { kind: "rev", rev: "HEAD" } : { kind: "worktree" },
+      mergeBase: mode !== "uncommitted",
+      ignoreWhitespace,
+    });
     const registration = { ...desired, subscription };
     input.active.set(key, registration);
-    const apply = (
-      payload: Omit<CheckoutDiffResponsePayload, "requestId"> & { requestId?: string },
-    ) => {
-      if (input.active.get(key) !== registration) return;
-      const { subscriptionId, ...snapshot } = payload;
-      setCheckoutDiffPayload({
-        queryClient: input.queryClient,
-        queryKeys: input.queryKeys.get(key),
-        payload: {
-          ...snapshot,
-          files: orderCheckoutDiffFiles(payload.files),
-          requestId: payload.requestId ?? `subscription:${subscriptionId}`,
-        },
-      });
-    };
     subscription.subscribe({
-      snapshot: apply,
-      update: (message) => {
-        if (message.type === "checkout_diff_update") apply(message.payload);
+      snapshot: (state) => {
+        if (input.active.get(key) !== registration) return;
+        const snapshot = checkoutDiffSnapshot(desired.cwd, state);
+        setCheckoutDiffPayload({
+          activeCheckoutDiffSubscriptions: input.active,
+          queryClient: input.queryClient,
+          serverId: input.serverId,
+          subscriptionId: key,
+          payload: { ...snapshot, files: orderCheckoutDiffFiles(snapshot.files) },
+        });
       },
+      update: () => {},
       error: (error) => {
         if (input.active.get(key) === registration) input.active.delete(key);
-        console.error("[server-data] observeCheckoutDiff failed", {
+        console.error("[server-data] observeDiff failed", {
           serverId: input.serverId,
           cwd: desired.cwd,
           error,
@@ -450,28 +425,59 @@ function applyDaemonConfigStatus(input: {
 }
 
 function setCheckoutDiffPayload(input: {
+  activeCheckoutDiffSubscriptions: Map<string, CheckoutDiffRoute>;
   queryClient: QueryClient;
-  queryKeys: Set<QueryKey> | undefined;
+  serverId: string;
+  subscriptionId: string;
   payload: CheckoutDiffCachePayload;
 }): void {
-  for (const queryKey of input.queryKeys ?? []) {
-    const query = input.queryClient.getQueryCache().find({ queryKey, exact: true });
-    query?.setOptions({ ...query.options, structuralSharing: shareCheckoutDiff });
-    input.queryClient.setQueryData<CheckoutDiffCachePayload>(queryKey, input.payload);
+  for (const query of input.queryClient.getQueryCache().getAll()) {
+    const route =
+      getServerDataRoute(query) ??
+      getActiveCheckoutDiffRouteForQueryKey({
+        active: input.activeCheckoutDiffSubscriptions,
+        queryKey: query.queryKey,
+        serverId: input.serverId,
+      });
+    if (
+      !route ||
+      route.domain !== "checkoutDiff" ||
+      route.serverId !== input.serverId ||
+      route.subscriptionId !== input.subscriptionId
+    ) {
+      continue;
+    }
+    query.setOptions({ ...query.options, structuralSharing: shareCheckoutDiff });
+    input.queryClient.setQueryData<CheckoutDiffCachePayload>(query.queryKey, input.payload);
   }
 }
 
 function applyTerminalsChanged(input: {
+  activeCheckoutDiffSubscriptions: Map<string, CheckoutDiffRoute>;
+  activeTerminalSubscriptions: Map<string, WorkspaceTerminalsRoute>;
   queryClient: QueryClient;
-  queryKeys: Set<QueryKey> | undefined;
+  serverId: string;
   message: TerminalsChangedMessage;
   route: WorkspaceTerminalsRoute;
 }): void {
-  const matchingTerminals = input.message.payload.terminals.filter(
-    (terminal) => terminal.workspaceId === input.route.workspaceId,
-  );
-  for (const queryKey of input.queryKeys ?? []) {
-    input.queryClient.setQueryData<ListTerminalsPayload>(queryKey, (current) => ({
+  for (const query of input.queryClient.getQueryCache().getAll()) {
+    const route = getActiveServerDataRoute(query, input.serverId, {
+      checkoutDiff: input.activeCheckoutDiffSubscriptions,
+      workspaceTerminals: input.activeTerminalSubscriptions,
+    });
+    if (
+      !route ||
+      route.domain !== "workspaceTerminals" ||
+      !areWorkspaceTerminalsRoutesEqual(route, input.route)
+    ) {
+      continue;
+    }
+
+    const matchingTerminals = input.message.payload.terminals.filter(
+      (terminal) => terminal.workspaceId === route.workspaceId,
+    );
+
+    input.queryClient.setQueryData<ListTerminalsPayload>(query.queryKey, (current) => ({
       cwd: input.message.payload.cwd,
       terminals: matchingTerminals,
       requestId: current?.requestId ?? `terminals-changed-${Date.now()}`,

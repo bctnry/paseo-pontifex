@@ -97,6 +97,7 @@ export class V2Harness {
   readonly api: V2Api = {
     server: { info: unexpected },
     shell: {
+      remove: unexpected,
       list: async () => ({ location: { directory: this.info.location.directory }, data: [] }),
     },
     plugin: {
@@ -179,6 +180,9 @@ export class V2Harness {
     event: { subscribe: (options) => this.events(options?.signal) },
   };
   readonly connection: V2Connection = {
+    bindSession: async () => {},
+    unbindSession: async () => {},
+    refreshLocation: async () => {},
     client: this.api,
     release: async () => {
       this.releases += 1;

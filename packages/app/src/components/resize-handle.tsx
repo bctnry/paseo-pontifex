@@ -1,9 +1,9 @@
 import { useCallback, useMemo, useRef, useState } from "react";
 import { View, type PointerEvent as RNPointerEvent } from "react-native";
 import { Gesture, GestureDetector } from "react-native-gesture-handler";
-import { StyleSheet } from "react-native-unistyles";
+import { StyleSheet, useUnistyles } from "react-native-unistyles";
 import { startResizeHandleDrag, type ResizeHandleDrag } from "@/components/resize-handle-drag";
-import { useHasFinePointer } from "@/hooks/use-fine-pointer";
+import { usePointerCapabilities } from "@/hooks/pointer-capabilities";
 import {
   SIDEBAR_RESIZE_ACTIVATION_OFFSET,
   SIDEBAR_RESIZE_FAIL_OFFSET,
@@ -46,7 +46,8 @@ export function ResizeHandle({
   onPreviewResizeSplit,
   onResizeSplit,
 }: ResizeHandleProps) {
-  const finePointer = useHasFinePointer();
+  const { theme } = useUnistyles();
+  const { finePointer } = usePointerCapabilities();
   const pointerStatesRef = useRef(new Map<number, PointerState>());
   const touchStateRef = useRef<PointerState | null>(null);
   const cursorBeforeDragRef = useRef<string | null>(null);
@@ -204,15 +205,17 @@ export function ResizeHandle({
     () => [
       styles.handle,
       direction === "horizontal" ? styles.handleHorizontal : styles.handleVertical,
+      { backgroundColor: theme.colors.border },
     ],
-    [direction],
+    [direction, theme.colors.border],
   );
   const highlightStyle = useMemo(
     () => [
       styles.highlight,
       direction === "horizontal" ? styles.highlightHorizontal : styles.highlightVertical,
+      { backgroundColor: theme.colors.accent },
     ],
-    [direction],
+    [direction, theme.colors.accent],
   );
   const hitAreaStyle = useMemo(
     () => [
@@ -246,8 +249,9 @@ export function ResizeHandle({
       styles.touchGrip,
       direction === "horizontal" ? styles.touchGripHorizontal : styles.touchGripVertical,
       highlighted ? styles.touchGripVisible : styles.touchGripHidden,
+      { backgroundColor: theme.colors.foreground },
     ],
-    [direction, highlighted],
+    [direction, highlighted, theme.colors.foreground],
   );
 
   return (
@@ -284,7 +288,7 @@ export function ResizeHandle({
   );
 }
 
-const styles = StyleSheet.create((theme) => ({
+const styles = StyleSheet.create((_theme) => ({
   handle: {
     position: "relative",
     flexShrink: 0,
@@ -293,12 +297,10 @@ const styles = StyleSheet.create((theme) => ({
   handleHorizontal: {
     width: 1,
     alignSelf: "stretch",
-    backgroundColor: theme.colors.border,
   },
   handleVertical: {
     height: 1,
     width: "100%",
-    backgroundColor: theme.colors.border,
   },
   highlight: {
     position: "absolute",
@@ -309,14 +311,12 @@ const styles = StyleSheet.create((theme) => ({
     bottom: 0,
     width: 3,
     left: -1,
-    backgroundColor: theme.colors.accent,
   },
   highlightVertical: {
     left: 0,
     right: 0,
     height: 3,
     top: -1,
-    backgroundColor: theme.colors.accent,
   },
   hitArea: {
     position: "absolute",
@@ -351,17 +351,15 @@ const styles = StyleSheet.create((theme) => ({
     transform: [{ translateX: -44 }],
   },
   touchGrip: {
-    borderRadius: 0,
+    borderRadius: 2,
   },
   touchGripHorizontal: {
     width: 4,
     height: 36,
-    backgroundColor: theme.colors.foreground,
   },
   touchGripVertical: {
     width: 36,
     height: 4,
-    backgroundColor: theme.colors.foreground,
   },
   touchGripHidden: {
     opacity: 0.12,

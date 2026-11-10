@@ -243,9 +243,12 @@ function NativeStreamViewport(props: StreamRenderInput & { strategy: StreamStrat
         animated:
           animated &&
           shouldAnimateNativeScrollToBottom({
-            offsetY: scrollOffsetYRef.current,
+            distanceFromEnd:
+              streamViewportMetricsRef.current.contentHeight -
+              streamViewportMetricsRef.current.viewportHeight -
+              scrollOffsetYRef.current,
             viewportHeight: streamViewportMetricsRef.current.viewportHeight,
-            windowSize: NATIVE_STREAM_WINDOW_SIZE,
+            drawDistance: NATIVE_STREAM_WINDOW_SIZE,
           }),
       });
       scrollOffsetYRef.current = 0;

@@ -10,6 +10,7 @@ import type {
 } from "./bottom-anchor-controller";
 
 type EdgeSlot = "header" | "footer";
+export type DisclosureTriggerEdge = "top" | "bottom";
 type NeighborRelation = "above" | "below";
 type AssistantTurnTraversalStep = -1 | 1;
 export type StreamFrameChildOrder = "content-then-footer" | "footer-then-content";
@@ -57,7 +58,8 @@ export interface StreamViewportHandle {
   scrollToBottom: (reason?: BottomAnchorLocalRequest["reason"]) => void;
   prepareForViewportChange: () => void;
   /** Stop following output so the rows on screen stay put while rows below them open or close. */
-  holdReadingPosition: () => void;
+  holdReadingPosition?: () => void;
+  holdRow?: (rowId: string, apply: () => void, triggerEdge: DisclosureTriggerEdge) => void;
   scrollToMessage?: (messageId: string, occurrence?: ScrollToMessageOccurrence) => void;
 }
 
@@ -76,6 +78,8 @@ export interface StreamHistoryRowRevision {
 
 export interface StreamRenderInput {
   agentId: string;
+  isInitialHistoryLoading?: boolean;
+  revealInitialHistory?: boolean;
   segments: StreamRenderSegments;
   historyRowRevision?: StreamHistoryRowRevision;
   liveHeadRowRevision?: unknown;

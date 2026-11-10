@@ -8,7 +8,7 @@ import {
   invalidatePrPaneTimelineForCheckout,
 } from "@/git/query-keys";
 import { type CheckoutPrStatusPayload, normalizeCheckoutPrStatusPayload } from "@/git/pr-status";
-import { resetDraftAgentCommandsForCheckout } from "@/hooks/agent-commands-query";
+import { resetDraftAgentCommandsForCheckout } from "@/agent-commands/cache";
 
 export type CheckoutStatusPayload = CheckoutStatusResponse["payload"];
 export type { CheckoutPrStatusPayload } from "@/git/pr-status";
@@ -25,7 +25,7 @@ export async function fetchCheckoutStatus({
   serverId: string;
   cwd: string;
 }): Promise<CheckoutStatusPayload> {
-  const payload = await client.getCheckoutStatus(cwd);
+  const payload = normalizeCheckoutBaseRef(await client.getCheckoutStatus(cwd));
   return payload;
 }
 
@@ -56,7 +56,7 @@ export function applyCheckoutStatusUpdateFromEvent({
   serverId: string;
   message: CheckoutStatusUpdate;
 }): void {
-  const { payload } = message;
+  const payload = normalizeCheckoutBaseRef(message.payload);
   const prStatus = payload.prStatus
     ? normalizeCheckoutPrStatusPayload(payload.prStatus)
     : undefined;
@@ -68,11 +68,9 @@ export function applyCheckoutStatusUpdateFromEvent({
   if (previousStatus?.currentBranch !== payload.currentBranch) {
     void resetDraftAgentCommandsForCheckout(queryClient, { serverId, cwd: payload.cwd });
   }
-  if (hasCommitListChanged(previousStatus, payload)) {
-    void queryClient.invalidateQueries({
-      queryKey: checkoutCommitsQueryKey(serverId, payload.cwd),
-    });
-  }
+  void queryClient.invalidateQueries({
+    queryKey: checkoutCommitsQueryKey(serverId, payload.cwd),
+  });
 
   if (!prStatus) {
     return;
@@ -90,21 +88,11 @@ export function applyCheckoutStatusUpdateFromEvent({
   }
 }
 
-function hasCommitListChanged(
-  previous: CheckoutStatusPayload | undefined,
-  next: CheckoutStatusPayload,
-): boolean {
-  if (!previous) return true;
-  return (
-    previous.isGit !== next.isGit ||
-    previous.repoRoot !== next.repoRoot ||
-    previous.currentBranch !== next.currentBranch ||
-    previous.baseRef !== next.baseRef ||
-    previous.upstreamRef !== next.upstreamRef ||
-    !equal(previous.aheadBehind, next.aheadBehind) ||
-    previous.aheadOfOrigin !== next.aheadOfOrigin ||
-    previous.behindOfOrigin !== next.behindOfOrigin
-  );
+function normalizeCheckoutBaseRef<T extends CheckoutStatusPayload>(payload: T): T {
+  // COMPAT(workspaceBaseBranch): hosts <= v0.11.2 only send the display ref; remove after 2027-10-14.
+  return !payload.isGit || payload.baseRefExact === undefined
+    ? payload
+    : { ...payload, baseRef: payload.baseRefExact };
 }
 
 // requestId changes on every emission and carries no PR state.

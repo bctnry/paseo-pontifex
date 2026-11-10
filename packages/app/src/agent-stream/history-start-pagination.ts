@@ -136,3 +136,8 @@ export function settleHistoryStartPagination(
     shouldLoad: true,
   };
 }
+
+/** Alias matching upstream's entrypoint name; returns the fork pagination state. */
+export function createHistoryStartPagination(_input?: unknown) {
+  return createHistoryStartPaginationState();
+}

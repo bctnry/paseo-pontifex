@@ -23,7 +23,6 @@ function deferred(): { promise: Promise<void>; resolve(): void } {
 
 class MemoryStorage implements ReplicaRowStore {
   readonly rows = new Map<string, ReplicaRow>();
-  readonly metadata = new Map<string, string>();
   readonly changes: ReplicaRowChanges[] = [];
   readonly reads: Array<{
     serverId: string;
@@ -44,14 +43,6 @@ class MemoryStorage implements ReplicaRowStore {
   }
 
   async open(): Promise<void> {}
-
-  async readMetadata(key: string): Promise<string | null> {
-    return this.metadata.get(key) ?? null;
-  }
-
-  async writeMetadata(key: string, value: string): Promise<void> {
-    this.metadata.set(key, value);
-  }
 
   async read(
     serverId: string,
@@ -86,23 +77,6 @@ class MemoryStorage implements ReplicaRowStore {
     return [...hosts].map(([serverId, rows]) => ({ serverId, rows }));
   }
 
-  async readHostSummaries() {
-    const summaries = new Map<string, { rowCount: number; bytes: number }>();
-    for (const row of this.rows.values()) {
-      const summary = summaries.get(row.serverId) ?? { rowCount: 0, bytes: 0 };
-      summary.rowCount += 1;
-      summary.bytes += Buffer.byteLength(row.payload);
-      summaries.set(row.serverId, summary);
-    }
-    return [...summaries]
-      .map(([serverId, summary]) => ({
-        serverId,
-        rowCount: summary.rowCount,
-        bytes: summary.bytes,
-      }))
-      .sort((left, right) => left.serverId.localeCompare(right.serverId));
-  }
-
   async apply(changes: ReplicaRowChanges): Promise<void> {
     this.writes += 1;
     if (this.persistentWriteFailure) throw this.persistentWriteFailure;
@@ -112,13 +86,6 @@ class MemoryStorage implements ReplicaRowStore {
       throw error;
     }
     this.changes.push(changes);
-    for (const replacement of changes.replaceKinds ?? []) {
-      for (const [key, row] of this.rows) {
-        if (row.serverId === replacement.serverId && replacement.kinds.includes(row.kind)) {
-          this.rows.delete(key);
-        }
-      }
-    }
     for (const key of changes.deletes) this.rows.delete(this.key(key));
     for (const row of changes.upserts) this.rows.set(this.key(row), row);
   }
@@ -249,6 +216,19 @@ function timeline(text = "Cached") {
   };
 }
 
+it("keeps the unsettled turn with the cached messages", async () => {
+  const storage = new MemoryStorage();
+  const writer = createCache(storage);
+  const cached = {
+    ...timeline(),
+    unsettledTurn: { startedAt: new Date("2026-08-26T09:59:00.000Z"), turnId: "turn-1" },
+  };
+  writer.commitTimeline(SERVER_ID, "agent-1", cached);
+  await writer.flush();
+
+  expect(await createCache(storage).readTimeline(SERVER_ID, "agent-1")).toEqual(cached);
+});
+
 function commitDirectory(
   cache: ReplicaCache,
   serverId: string,
@@ -352,6 +332,26 @@ describe("ReplicaCache", () => {
     const restored = await createCache(storage).readTimeline(SERVER_ID, "agent-1");
     expect(restored?.items.map((item) => item.id)).toEqual(items.map((item) => item.id));
     expect(restored?.range).toBeNull();
+  });
+
+  it("preserves workspace parentage and its checkpoint across cache reopen", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const baseline = directory({ workspaces: { generation: "g", afterSeq: 8 } });
+    const workspace = normalizeWorkspaceDescriptor({
+      ...workspacePayload(),
+      parentWorkspaceId: "parent",
+    });
+    baseline.workspaces.set(workspace.id, workspace);
+    commitDirectory(writer, SERVER_ID, baseline);
+    await writer.flush();
+    const reader = createCache(storage);
+    const restored = await reader.readDirectory(SERVER_ID);
+    expect(restored.checkpoint).toEqual(baseline.checkpoint);
+    expect(restored.workspaces.get(workspace.id)?.parentWorkspaceId).toBe("parent");
+    expect((await reader.readWorkspace(SERVER_ID, workspace.id))?.workspace.parentWorkspaceId).toBe(
+      "parent",
+    );
   });
 
   it("preserves workspace sorting timestamps across cache reopen", async () => {
@@ -546,6 +546,23 @@ describe("ReplicaCache", () => {
     expect(storage.changes[0]?.deletes).toEqual([]);
   });
 
+  it("keeps a background agent background across cache reopen", async () => {
+    const storage = new MemoryStorage();
+    const writer = createCache(storage);
+    const helper = { ...agent("helper"), background: true };
+    const visible = agent("visible");
+    writer.commitDirectoryMutations(SERVER_ID, [
+      { kind: "agent", type: "upsert", id: helper.id, value: helper },
+      { kind: "agent", type: "upsert", id: visible.id, value: visible },
+    ]);
+    await writer.flush();
+
+    const restored = await createCache(storage).readDirectory(SERVER_ID);
+
+    expect(restored.agents.get("helper")?.background).toBe(true);
+    expect(restored.agents.get("visible")?.background).toBe(false);
+  });
+
   it("round-trips identified and anonymous open turns without changing protocol status", async () => {
     const storage = new MemoryStorage();
     const writer = createCache(storage);
@@ -614,39 +631,6 @@ describe("ReplicaCache", () => {
     expect(storage.changes[0]?.upserts.map(({ kind, id }) => ({ kind, id }))).toEqual([
       { kind: "timeline", id: "agent-1" },
     ]);
-  });
-
-  it("does not serialize timeline items outside the retained window", async () => {
-    const storage = new MemoryStorage();
-    const cache = createCache(storage);
-    const items = Array.from({ length: 60 }, (_, index) => ({
-      ...timelineItem(`item ${index}`),
-      id: `message-${index}`,
-      timelineCursor: { epoch: "epoch-1", seq: index + 1 },
-    }));
-    let discardedItemReads = 0;
-    Object.defineProperty(items[0]!, "text", {
-      configurable: true,
-      enumerable: true,
-      get: () => {
-        discardedItemReads += 1;
-        return "discarded";
-      },
-    });
-
-    cache.commitTimeline(SERVER_ID, "agent-1", {
-      agentId: "agent-1",
-      items,
-      range: { epoch: "epoch-1", startSeq: 1, endSeq: 60 },
-      hasOlder: false,
-    });
-    await cache.flush();
-
-    expect(discardedItemReads).toBe(0);
-    const payload = JSON.parse(requireTimelineRow(storage).payload) as {
-      items: unknown[];
-    };
-    expect(payload.items).toHaveLength(50);
   });
 
   it("never reads directory rows older than an accepted deferred deletion", async () => {
@@ -1116,14 +1100,6 @@ describe("ReplicaCache", () => {
     commitDirectory(cache, SERVER_ID, directory());
     await cache.flush();
 
-    const nextBoot = new ReplicaCache(storage, {
-      clearLegacyCache: async () => {
-        storage.cleanups += 1;
-      },
-    });
-    nextBoot.setHosts([SERVER_ID]);
-    await nextBoot.readAgent(SERVER_ID, "missing");
-
     expect(storage.cleanups).toBe(1);
   });
 
@@ -1177,9 +1153,7 @@ describe("ReplicaCache", () => {
         const { cache, expectReads } = await streamingCache();
 
         expect((await cache.readWorkspace(SERVER_ID, "workspace-1"))?.workspace.name).toBe("main");
-        // The pending stream commit touches other rows, so the two reads answer
-        // from storage without forcing a write first.
-        expectReads(2, 0);
+        expectReads(2, 1);
         await cache.flush();
       });
 

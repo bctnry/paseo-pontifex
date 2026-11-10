@@ -40,16 +40,7 @@ function createAgent(overrides: Partial<Agent> = {}): Agent {
     cwd: "/repo",
     model: "agent-model",
     thinkingOptionId: "think-hard",
-    features: [
-      { type: "toggle", id: "web-search", label: "Web search", value: true },
-      {
-        type: "select",
-        id: "effort",
-        label: "Effort",
-        value: "high",
-        options: [{ id: "high", label: "High" }],
-      },
-    ],
+    options: { "web-search": true, effort: "high" },
     parentAgentId: null,
     labels: {},
     ...overrides,
@@ -66,71 +57,38 @@ describe("resolveClientSlashCommand", () => {
         command.execution,
       ]),
     ).toEqual([
-      ["btw", [], "insert"],
       ["exit", ["quit", "q"], "immediate"],
       ["clear", ["new"], "immediate"],
-      ["fork", [], "immediate"],
     ]);
   });
 
   it("resolves canonical names and aliases after trimming", () => {
     expect(resolveClientSlashCommand({ text: " /quit ", hasAttachments: false })).toMatchObject({
-      command: { name: "exit", kind: "archive-agent", execution: "immediate" },
-      args: "",
+      name: "exit",
+      kind: "archive-agent",
+      execution: "immediate",
     });
     expect(resolveClientSlashCommand({ text: "/exit", hasAttachments: false })).toMatchObject({
-      command: { name: "exit", kind: "archive-agent" },
-      args: "",
+      name: "exit",
+      kind: "archive-agent",
     });
     expect(resolveClientSlashCommand({ text: "/q", hasAttachments: false })).toMatchObject({
-      command: { name: "exit", kind: "archive-agent" },
-      args: "",
+      name: "exit",
+      kind: "archive-agent",
     });
     expect(resolveClientSlashCommand({ text: "/clear", hasAttachments: false })).toMatchObject({
-      command: { name: "clear", kind: "replace-agent-with-draft" },
-      args: "",
+      name: "clear",
+      kind: "replace-agent-with-draft",
     });
     expect(resolveClientSlashCommand({ text: "/new", hasAttachments: false })).toMatchObject({
-      command: { name: "clear", kind: "replace-agent-with-draft" },
-      args: "",
-    });
-  });
-
-  it("resolves /fork without arguments", () => {
-    expect(resolveClientSlashCommand({ text: "/fork", hasAttachments: false })).toMatchObject({
-      command: { name: "fork", kind: "fork-agent", execution: "immediate" },
-      args: "",
-    });
-    expect(resolveClientSlashCommand({ text: " /fork ", hasAttachments: false })).toMatchObject({
-      command: { name: "fork", kind: "fork-agent" },
-      args: "",
-    });
-  });
-
-  it("resolves /btw with its question", () => {
-    expect(
-      resolveClientSlashCommand({ text: "/btw what changed in step 2?", hasAttachments: false }),
-    ).toMatchObject({
-      command: { name: "btw", kind: "side-question", execution: "insert" },
-      args: "what changed in step 2?",
-    });
-    expect(resolveClientSlashCommand({ text: "/btw", hasAttachments: false })).toMatchObject({
-      command: { name: "btw", kind: "side-question" },
-      args: "",
-    });
-    expect(
-      resolveClientSlashCommand({ text: "/btw check this", hasAttachments: true }),
-    ).toMatchObject({
-      command: { name: "btw", kind: "side-question" },
-      args: "check this",
-      hasAttachments: true,
+      name: "clear",
+      kind: "replace-agent-with-draft",
     });
   });
 
   it("leaves provider commands, arguments, ordinary messages, and attachment submits alone", () => {
     expect(resolveClientSlashCommand({ text: "/clear now", hasAttachments: false })).toBeNull();
     expect(resolveClientSlashCommand({ text: "/quit now", hasAttachments: false })).toBeNull();
-    expect(resolveClientSlashCommand({ text: "/fork now", hasAttachments: false })).toBeNull();
     expect(
       resolveClientSlashCommand({ text: "/provider-command", hasAttachments: false }),
     ).toBeNull();
@@ -147,7 +105,7 @@ describe("buildDraftAgentSetup", () => {
       modeId: "mode-current",
       model: "agent-model",
       thinkingOptionId: "think-hard",
-      featureValues: {
+      providerOptions: {
         "web-search": true,
         effort: "high",
       },

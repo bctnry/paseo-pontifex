@@ -552,7 +552,7 @@ const ghosttyDarkColors = buildDarkSemanticColors({
   foregroundExtraMuted: "#a0a4b2",
   border: "#353a47",
   borderAccent: "#3f4454",
-  accent: "#89b4fa",
+  accent: "#3570e0", // dark enough to carry white text on filled buttons
   accentBright: "#b4d0fc",
   destructive: "#c44a55", // red with slight cool lean against the slate-blue surfaces
   terminalBlack: "#21252d",
@@ -566,8 +566,10 @@ export const SPACING = {
   1.5: 6,
   2: 8,
   3: 12,
+  3.5: 14,
   4: 16,
   6: 24,
+  7: 28,
   8: 32,
   12: 48,
   16: 64,
@@ -940,6 +942,8 @@ export const THEME_OPTIONS = [
   },
 ] as const;
 
+export const PONTIFEX_THEME_PREFERENCES = ["pontifexLight", "pontifexDark"] as const;
+
 export const PLUGIN_THEME_PREFERENCE = "plugin";
 export const CUSTOM_THEME_PREFERENCE = "custom";
 export const PLUGIN_THEME_NAMES = {
@@ -949,6 +953,7 @@ export const PLUGIN_THEME_NAMES = {
 
 export type ThemePreference =
   | (typeof THEME_OPTIONS)[number]["name"]
+  | (typeof PONTIFEX_THEME_PREFERENCES)[number]
   | typeof PLUGIN_THEME_PREFERENCE
   | typeof CUSTOM_THEME_PREFERENCE;
 export type ThemeName = Exclude<
@@ -963,6 +968,9 @@ const CONCRETE_THEME_OPTIONS = THEME_OPTIONS.filter(
 
 type ThemeToUnistyles = {
   [Name in ThemeName]: Extract<ConcreteThemeOption, { name: Name }>["unistylesName"];
+} & {
+  pontifexLight: "pontifexLight";
+  pontifexDark: "pontifexDark";
 };
 
 type ThemeSwatches = {
